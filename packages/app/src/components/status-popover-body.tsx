@@ -5,7 +5,7 @@ import { Switch } from "@opencode-ai/ui/switch"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { useMutation, useQueryClient } from "@tanstack/solid-query"
 import { showToast } from "@/utils/toast"
-import { useNavigate } from "@solidjs/router"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { type Accessor, createEffect, createMemo, For, type JSXElement, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ServerHealthIndicator, ServerRow } from "@/components/server/server-row"
@@ -287,13 +287,14 @@ function ServerStatusList(props: { state: ServerStatusState }) {
   )
 }
 
-export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
+export function StatusPopoverBody(props: { shown: Accessor<boolean>; close?: () => void }) {
   const sync = useSync()
   const global = useGlobal()
   const server = useServer()
   const platform = usePlatform()
   const dialog = useDialog()
   const language = useLanguage()
+  const location = useLocation()
   const navigate = useNavigate()
   const settings = useSettings()
 
@@ -379,8 +380,16 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                         aria-disabled={blocked()}
                         onClick={() => {
                           if (blocked()) return
+                          props.close?.()
                           navigate("/")
-                          queueMicrotask(() => server.setActive(key))
+                          const activate = () => {
+                            if (location.pathname !== "/") {
+                              setTimeout(activate, 16)
+                              return
+                            }
+                            setTimeout(() => server.setActive(key), 0)
+                          }
+                          setTimeout(activate, 0)
                         }}
                       >
                         <ServerHealthIndicator health={global.servers.health[key]} />

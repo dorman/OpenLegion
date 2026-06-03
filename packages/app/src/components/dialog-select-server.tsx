@@ -38,6 +38,10 @@ interface ServerFormProps {
   onBack: () => void
 }
 
+interface DialogSelectServerProps {
+  onNavigateHome?: () => void
+}
+
 function showRequestError(language: ReturnType<typeof useLanguage>, err: unknown) {
   showToast({
     variant: "error",
@@ -173,9 +177,9 @@ function ServerForm(props: ServerFormProps) {
   )
 }
 
-export function DialogSelectServer() {
+export function DialogSelectServer(props: DialogSelectServerProps = {}) {
   const dialog = useDialog()
-  const controller = useServerManagementController({ onSelect: dialog.close })
+  const controller = useServerManagementController({ onSelect: dialog.close, onNavigateHome: props.onNavigateHome })
 
   return (
     <Dialog title={controller.formTitle()}>
@@ -188,7 +192,7 @@ export function DialogSelectServer() {
   )
 }
 
-export function useServerManagementController(options: { onSelect?: () => void } = {}) {
+export function useServerManagementController(options: { onSelect?: () => void; onNavigateHome?: () => void } = {}) {
   const navigate = useNavigate()
   const server = useServer()
   const global = useGlobal()
@@ -357,12 +361,13 @@ export function useServerManagementController(options: { onSelect?: () => void }
   async function select(conn: ServerConnection.Any, persist?: boolean) {
     if (!persist && global.servers.health[ServerConnection.key(conn)]?.healthy === false) return
     options.onSelect?.()
+    const navigateHome = () => options.onNavigateHome?.() ?? navigate("/")
     if (persist && conn.type === "http") {
       server.add(conn)
-      navigate("/")
+      navigateHome()
       return
     }
-    navigate("/")
+    navigateHome()
     queueMicrotask(() => server.setActive(ServerConnection.key(conn)))
   }
 

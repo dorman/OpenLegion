@@ -142,6 +142,12 @@ export function createChildStoreManager(input: {
     }
   }
 
+  function disposeAll() {
+    for (const directory of Object.keys(children)) {
+      disposeDirectory(directoryKey(directory))
+    }
+  }
+
   function ensureChild(directory: string) {
     const key = directoryKey(directory)
     if (!key) console.error("No directory provided")
@@ -351,6 +357,7 @@ export function createChildStoreManager(input: {
     mcp: (directory: string) => mcpDirectories.has(directoryKey(directory)),
     disableMcp,
     disposeDirectory,
+    disposeAll,
     runEviction,
     vcsCache,
     metaCache,
