@@ -153,6 +153,7 @@ export const Definitions = {
   prompt_stash_pop: keybind("none", "Pop stashed prompt"),
   prompt_stash_list: keybind("none", "List stashed prompts"),
   workspace_set: keybind("none", "Set workspace"),
+  permission_auto_accept_toggle: keybind("none", "Toggle auto-accept mode for permissions"),
 
   input_clear: keybind("ctrl+c", "Clear input field"),
   input_paste: keybind({ key: "ctrl+v", preventDefault: false }, "Paste from clipboard"),
@@ -348,6 +349,7 @@ export const CommandMap = {
   prompt_stash_pop: "prompt.stash.pop",
   prompt_stash_list: "prompt.stash.list",
   workspace_set: "workspace.set",
+  permission_auto_accept_toggle: "permission.auto_accept.toggle",
   input_clear: "prompt.clear",
   input_paste: "prompt.paste",
   input_submit: "input.submit",
