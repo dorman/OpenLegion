@@ -54,13 +54,13 @@ async function start(command: StartCommand) {
     ensureLoopbackNoProxy()
     useSystemCertificates()
     useEnvProxy()
-    const { Log, Server } = await import("virtual:opencode-server")
+    const { Log, Server } = await import("virtual:openlegion-server")
     await Log.init({ level: "WARN" })
 
     listener = await Server.listen({
       port: command.port,
       hostname: command.hostname,
-      username: "opencode",
+      username: "openlegion",
       password: command.password,
       cors: ["oc://renderer"],
     })
@@ -83,8 +83,8 @@ async function stop() {
 
 function prepareSidecarEnv(password: string, userDataPath: string) {
   Object.assign(process.env, {
-    OPENCODE_SERVER_USERNAME: "opencode",
-    OPENCODE_SERVER_PASSWORD: password,
+    OPENLEGION_SERVER_USERNAME: "openlegion",
+    OPENLEGION_SERVER_PASSWORD: password,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
 }

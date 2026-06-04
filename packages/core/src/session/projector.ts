@@ -362,7 +362,7 @@ export const layer = Layer.effectDiscard(
       }),
     )
     // session.next.* projectors are disabled while the v2 message projection is stabilized.
-    // The events still publish through EventV2 and fan out through the opencode bridge.
+    // The events still publish through EventV2 and fan out through the openlegion bridge.
     // yield* events.project(SessionEvent.AgentSwitched, (event) =>
     //   Effect.gen(function* () {
     //     const message = Schema.encodeSync(SessionMessage.AgentSwitched)(

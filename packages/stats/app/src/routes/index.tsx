@@ -1,6 +1,6 @@
 import "./index.css"
 import { Link, Meta, Title } from "@solidjs/meta"
-import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
+import { ProviderIcon } from "@openlegion-ai/ui/provider-icon"
 import { geoEquirectangular, geoPath } from "d3-geo"
 import { scaleSqrt } from "d3-scale"
 import countryCodesSource from "i18n-iso-countries/codes.json?raw"
@@ -10,7 +10,7 @@ import ibmPlexMonoRegularLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/
 import ibmPlexMonoMediumLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Medium-Latin1.woff2?url"
 import ibmPlexMonoSemiBoldLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-SemiBold-Latin1.woff2?url"
 import ibmPlexMonoBoldLatin1 from "@ibm/plex/IBM-Plex-Mono/fonts/split/woff2/IBMPlexMono-Bold-Latin1.woff2?url"
-import opencodeWordmarkDark from "../asset/logo-ornate-dark.svg"
+import openlegionWordmarkDark from "../asset/logo-ornate-dark.svg"
 import {
   getStatsHomeData,
   type CacheRatioEntry,
@@ -21,8 +21,8 @@ import {
   type SessionCostEntry,
   type TokenCostEntry,
   type UsagePoint,
-} from "@opencode-ai/stats-core/domain/home"
-import { runtime } from "@opencode-ai/stats-core/runtime"
+} from "@openlegion-ai/stats-core/domain/home"
+import { runtime } from "@openlegion-ai/stats-core/runtime"
 import { createAsync, query } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js"
 import { getRequestEvent } from "solid-js/web"
@@ -39,11 +39,11 @@ const rangeLabels: Record<UsageRange, string> = {
   "1M": "1 Month",
   "2M": "2 Months",
 }
-const statsHomeTitle = "OpenCode Stats"
-const statsHomeDescription = "OpenCode usage, market share, token cost, and session cost stats."
-const statsHomeFallbackUrl = "https://opencode.ai/stats/"
+const statsHomeTitle = "OpenLegion Stats"
+const statsHomeDescription = "OpenLegion usage, market share, token cost, and session cost stats."
+const statsHomeFallbackUrl = "https://openlegion.dev/stats/"
 const statsUnfurlPath = "banner.png"
-const statsUnfurlAlt = "OpenCode Stats wordmark on a dark patterned background"
+const statsUnfurlAlt = "OpenLegion Stats wordmark on a dark patterned background"
 const headerLinks = [
   { href: "#top-models", label: "Top Models" },
   { href: "#session-cost", label: "Session Cost" },
@@ -53,11 +53,11 @@ const headerLinks = [
   { href: "#geo-breakdown", label: "Geo Breakdown" },
 ] as const
 const githubLink = {
-  href: "https://github.com/anomalyco/opencode",
-  apiHref: "https://api.github.com/repos/anomalyco/opencode",
+  href: "https://github.com/dorman/OpenLegion",
+  apiHref: "https://api.github.com/repos/dorman/OpenLegion",
   label: "GitHub",
   fallbackStars: "150K",
-  ariaLabel: "Star OpenCode on GitHub",
+  ariaLabel: "Star OpenLegion on GitHub",
 }
 const compactNumberFormatter = new Intl.NumberFormat("en", {
   notation: "compact",
@@ -83,7 +83,7 @@ const themePreferenceLabels = {
   light: "Light",
   system: "System",
 } as const
-const themeStorageKey = "opencode:stats-theme"
+const themeStorageKey = "openlegion:stats-theme"
 const geoMapWidth = 960
 const geoMapHeight = 430
 const countryDisplayNames = new Intl.DisplayNames(["en"], { type: "region" })
@@ -176,7 +176,7 @@ export default function StatsHome() {
       <Meta name="description" content={statsHomeDescription} />
       <Link rel="canonical" href={statsHomeUrl} />
       <Meta property="og:type" content="website" />
-      <Meta property="og:site_name" content="OpenCode" />
+      <Meta property="og:site_name" content="OpenLegion" />
       <Meta property="og:title" content={statsHomeTitle} />
       <Meta property="og:description" content={statsHomeDescription} />
       <Meta property="og:url" content={statsHomeUrl} />
@@ -219,8 +219,8 @@ export default function StatsHome() {
 
 function getStatsHomeUrl(base: string, requestUrl: string) {
   const url = new URL(base, requestUrl)
-  if (url.hostname === "stats.opencode.ai") return "https://opencode.ai/stats/"
-  if (url.hostname === "stats.dev.opencode.ai") return "https://dev.opencode.ai/stats/"
+  if (url.hostname === "stats.openlegion.dev") return "https://openlegion.dev/stats/"
+  if (url.hostname === "stats.dev.openlegion.dev") return "https://dev.openlegion.dev/stats/"
   return url.toString()
 }
 
@@ -447,7 +447,7 @@ function TopModelsSection(props: { data: StatsHomeData["usage"]; leaderboard: St
   return (
     <section id="top-models" data-section="top-models">
       <h2 data-slot="top-models-title">
-        <strong>Top models.</strong> <span>Usage of models across OpenCode Go.</span>
+        <strong>Top models.</strong> <span>Usage of models across OpenLegion Go.</span>
       </h2>
       <Show
         when={data().some((item) => usageTotal(item) > 0)}
@@ -1868,8 +1868,8 @@ function Header(props: { githubStars: string }) {
             <strong>{githubLink.label}</strong>
             <span>[{props.githubStars}]</span>
           </a>
-          <a data-slot="header-button" data-variant="contrast" href="https://opencode.ai/">
-            <strong>Try OpenCode</strong>
+          <a data-slot="header-button" data-variant="contrast" href="https://openlegion.dev/">
+            <strong>Try OpenLegion</strong>
           </a>
           <button
             data-slot="menu-button"
@@ -1950,9 +1950,9 @@ function StatsMark() {
   )
 }
 
-function OpenCodeMark() {
+function OpenLegionMark() {
   return (
-    <svg data-slot="opencode-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+    <svg data-slot="openlegion-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
       <path d="M40 40H0V0H40V40Z" fill="var(--stats-logo-bg)" />
       <path d="M26 29H14V17H26V29Z" fill="var(--stats-logo-fill)" />
       <path d="M26 11H14V29H26V11ZM32 35H8V5H32V35Z" fill="var(--stats-logo-stroke)" />
@@ -1974,13 +1974,13 @@ function Footer(props: {
     { href: "#geo-breakdown", label: "Geo Breakdown" },
   ]
   const legal = [
-    { href: "https://opencode.ai/legal/terms-of-service", label: "Terms of service" },
-    { href: "https://opencode.ai/legal/privacy-policy", label: "Privacy policy" },
+    { href: "https://openlegion.dev/legal/terms-of-service", label: "Terms of service" },
+    { href: "https://openlegion.dev/legal/privacy-policy", label: "Privacy policy" },
   ]
   const connect = [
-    { href: "mailto:hello@opencode.ai", label: "Contact us" },
-    { href: "https://opencode.ai/discord", label: "Community" },
-    { href: "https://x.com/opencode", label: "X" },
+    { href: "mailto:hello@openlegion.dev", label: "Contact us" },
+    { href: "https://openlegion.dev/discord", label: "Community" },
+    { href: "https://x.com/openlegion", label: "X" },
     githubLink,
     { href: "https://www.youtube.com/@anomaly-co", label: "YouTube" },
   ]
@@ -1989,8 +1989,8 @@ function Footer(props: {
     <footer data-component="footer">
       <SectionBridge label="GEO BREAKDOWN" href="#geo-breakdown" />
       <div data-slot="footer-grid">
-        <a data-slot="footer-mark" href="https://opencode.ai" aria-label="OpenCode home">
-          <OpenCodeMark />
+        <a data-slot="footer-mark" href="https://openlegion.dev" aria-label="OpenLegion home">
+          <OpenLegionMark />
         </a>
         <FooterColumn title="Model Stats" links={modelStats} />
         <FooterColumn title="Legal" links={legal} />
@@ -2130,7 +2130,7 @@ function SubscribeModal(props: { onClose: () => void }) {
       <div data-slot="modal-scrim" aria-hidden="true" onClick={props.onClose} />
       <div data-slot="modal-panel">
         <div data-slot="modal-brand">
-          <img data-slot="modal-logo" src={opencodeWordmarkDark} alt="OpenCode" />
+          <img data-slot="modal-logo" src={openlegionWordmarkDark} alt="OpenLegion" />
           <button data-slot="modal-close" type="button" aria-label="Close newsletter signup" onClick={props.onClose}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M4.44 4.44L11.56 11.56M11.56 4.44L4.44 11.56" stroke="currentColor" />
@@ -2139,7 +2139,7 @@ function SubscribeModal(props: { onClose: () => void }) {
         </div>
         <div data-slot="modal-body">
           <div data-slot="modal-intro">
-            <h2 id="subscribe-title">OpenCode Newsletter</h2>
+            <h2 id="subscribe-title">OpenLegion Newsletter</h2>
             <p>
               Be the first to know
               <br />

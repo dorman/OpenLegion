@@ -1,9 +1,9 @@
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
-import { Catalog } from "@opencode-ai/core/catalog"
-import { PluginV2 } from "@opencode-ai/core/plugin"
-import { VercelPlugin } from "@opencode-ai/core/plugin/provider/vercel"
-import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Catalog } from "@openlegion-ai/core/catalog"
+import { PluginV2 } from "@openlegion-ai/core/plugin"
+import { VercelPlugin } from "@openlegion-ai/core/plugin/provider/vercel"
+import { ProviderV2 } from "@openlegion-ai/core/provider"
 import { it, model, provider } from "./provider-helper"
 
 describe("VercelPlugin", () => {
@@ -25,8 +25,8 @@ describe("VercelPlugin", () => {
       })
       expect((yield* catalog.provider.get(ProviderV2.ID.make("vercel"))).request.headers).toEqual({
         Existing: "1",
-        "http-referer": "https://opencode.ai/",
-        "x-title": "opencode",
+        "http-referer": "https://openlegion.dev/",
+        "x-title": "openlegion",
       })
     }),
   )

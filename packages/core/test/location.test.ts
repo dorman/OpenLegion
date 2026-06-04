@@ -1,8 +1,8 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
-import { Location } from "@opencode-ai/core/location"
-import { Project } from "@opencode-ai/core/project"
-import { AbsolutePath } from "@opencode-ai/core/schema"
+import { Location } from "@openlegion-ai/core/location"
+import { Project } from "@openlegion-ai/core/project"
+import { AbsolutePath } from "@openlegion-ai/core/schema"
 import { testEffect } from "./lib/effect"
 
 const ref = { directory: AbsolutePath.make("/repo/packages/app"), workspaceID: "workspace" }

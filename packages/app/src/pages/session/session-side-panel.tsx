@@ -1,16 +1,16 @@
 import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
-import { Tabs } from "@opencode-ai/ui/tabs"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
-import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
-import { Mark } from "@opencode-ai/ui/logo"
+import { Tabs } from "@openlegion-ai/ui/tabs"
+import { IconButton } from "@openlegion-ai/ui/icon-button"
+import { TooltipKeybind } from "@openlegion-ai/ui/tooltip"
+import { ResizeHandle } from "@openlegion-ai/ui/resize-handle"
+import { Mark } from "@openlegion-ai/ui/logo"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
-import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { SnapshotFileDiff, VcsFileDiff } from "@openlegion-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
 
 import FileTree from "@/components/file-tree"
 import { SessionContextUsage } from "@/components/session-context-usage"
@@ -325,7 +325,7 @@ export function SessionSidePanel(props: {
                       <Show when={activeTab() === "empty"}>
                         <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
                           <div class="h-full px-6 pb-42 -mt-4 flex flex-col items-center justify-center text-center gap-6">
-                            <Mark class="w-14 opacity-10" />
+                            <Mark class="size-14 object-contain opacity-10" />
                             <div class="text-14-regular text-text-weak max-w-56">
                               {language.t("session.files.selectToOpen")}
                             </div>

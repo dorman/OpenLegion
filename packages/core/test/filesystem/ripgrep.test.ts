@@ -4,14 +4,14 @@ import * as Stream from "effect/Stream"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
-import { Ripgrep } from "@opencode-ai/core/filesystem/ripgrep"
+import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { testEffect } from "../lib/effect"
 
 const it = testEffect(Ripgrep.defaultLayer)
 
 const tmpdir = (init?: (dir: string) => Effect.Effect<void>) =>
   Effect.acquireRelease(
-    Effect.promise(async () => fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "opencode-test-")))),
+    Effect.promise(async () => fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "openlegion-test-")))),
     (dir) =>
       Effect.promise(() =>
         fs.rm(dir, {
@@ -54,14 +54,14 @@ describe("file.ripgrep", () => {
       const dir = yield* tmpdir((dir) =>
         Effect.gen(function* () {
           yield* write(path.join(dir, "visible.txt"), "hello")
-          yield* mkdir(path.join(dir, ".opencode"))
-          yield* write(path.join(dir, ".opencode", "thing.json"), "{}")
+          yield* mkdir(path.join(dir, ".openlegion"))
+          yield* write(path.join(dir, ".openlegion", "thing.json"), "{}")
         }),
       )
 
       const files = yield* collectFiles({ cwd: dir })
       expect(files.includes("visible.txt")).toBe(true)
-      expect(files.includes(path.join(".opencode", "thing.json"))).toBe(true)
+      expect(files.includes(path.join(".openlegion", "thing.json"))).toBe(true)
     }),
   )
 
@@ -70,14 +70,14 @@ describe("file.ripgrep", () => {
       const dir = yield* tmpdir((dir) =>
         Effect.gen(function* () {
           yield* write(path.join(dir, "visible.txt"), "hello")
-          yield* mkdir(path.join(dir, ".opencode"))
-          yield* write(path.join(dir, ".opencode", "thing.json"), "{}")
+          yield* mkdir(path.join(dir, ".openlegion"))
+          yield* write(path.join(dir, ".openlegion", "thing.json"), "{}")
         }),
       )
 
       const files = yield* collectFiles({ cwd: dir, hidden: false })
       expect(files.includes("visible.txt")).toBe(true)
-      expect(files.includes(path.join(".opencode", "thing.json"))).toBe(false)
+      expect(files.includes(path.join(".openlegion", "thing.json"))).toBe(false)
     }),
   )
 

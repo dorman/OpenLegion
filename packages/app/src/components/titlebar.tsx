@@ -1,13 +1,14 @@
 import { createEffect, createMemo, For, mapArray, Match, Show, startTransition, Switch, untrack } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { useLocation, useMatch, useNavigate, useParams } from "@solidjs/router"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Button } from "@opencode-ai/ui/button"
-import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
-import { useTheme } from "@opencode-ai/ui/theme/context"
-import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
-import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
+import { IconButton } from "@openlegion-ai/ui/icon-button"
+import { Icon } from "@openlegion-ai/ui/icon"
+import { Button } from "@openlegion-ai/ui/button"
+import { Tooltip, TooltipKeybind } from "@openlegion-ai/ui/tooltip"
+import { useTheme } from "@openlegion-ai/ui/theme/context"
+import { IconButtonV2 } from "@openlegion-ai/ui/v2/icon-button-v2"
+import { Icon as IconV2 } from "@openlegion-ai/ui/v2/icon"
+import { Mark } from "@openlegion-ai/ui/logo"
 
 import { getProjectAvatarVariant, useLayout, type LocalProject } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
@@ -18,9 +19,9 @@ import { WindowsAppMenu } from "./windows-app-menu"
 import { applyPath, backPath, forwardPath } from "./titlebar-history"
 import { useServerSync } from "@/context/server-sync"
 import { decodeDirectory } from "@/pages/directory-layout"
-import { iife } from "@opencode-ai/core/util/iife"
-import { base64Encode } from "@opencode-ai/core/util/encode"
-import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
+import { iife } from "@openlegion-ai/core/util/iife"
+import { base64Encode } from "@openlegion-ai/core/util/encode"
+import { ProjectAvatar } from "@openlegion-ai/ui/v2/project-avatar-v2"
 import { displayName, getProjectAvatarSource, projectForSession } from "@/pages/layout/helpers"
 import { useSessionTabAvatarState } from "@/pages/layout/project-avatar-state"
 import { makeEventListener } from "@solid-primitives/event-listener"
@@ -467,6 +468,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                   "pl-4": !mac(),
                 }}
               >
+                <TitlebarBrand />
                 <ChannelIndicator />
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} variant="v2" />
@@ -656,7 +658,8 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
                         </Tooltip>
                       </div>
                     </Show>
-                    <div id="opencode-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" />
+                    <div id="openlegion-titlebar-left" class="flex items-center gap-3 min-w-0 px-2" />
+                    <TitlebarBrand />
                     <ChannelIndicator />
                   </div>
                 </div>
@@ -665,7 +668,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
 
             <div class="min-w-0 flex items-center justify-center pointer-events-none">
               <div
-                id="opencode-titlebar-center"
+                id="openlegion-titlebar-center"
                 class="pointer-events-auto min-w-0 flex justify-center w-fit max-w-full"
               />
             </div>
@@ -678,7 +681,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
               data-tauri-drag-region
               onMouseDown={drag}
             >
-              <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" />
+              <div id="openlegion-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" />
               <Show when={windows()}>
                 {!tauriApi() && <div class="shrink-0" style={{ width: windowsControlsWidth() }} />}
                 <div data-tauri-decorum-tb class="flex flex-row" />
@@ -710,7 +713,7 @@ function TitlebarV2Right(props: { state: TitlebarV2RightState }) {
       <Show when={props.state.update.visible}>
         <TitlebarUpdateIconButton state={props.state.update} />
       </Show>
-      <div id="opencode-titlebar-right" class="flex shrink-0 items-center justify-end gap-0" />
+      <div id="openlegion-titlebar-right" class="flex shrink-0 items-center justify-end gap-0" />
     </div>
   )
 }
@@ -855,12 +858,27 @@ function NewSessionTabItem(props: { href: string; title: string; onClose: () => 
   )
 }
 
+function TitlebarBrand() {
+  return (
+    <div
+      class="flex shrink-0 items-center gap-2.5 pr-1 select-none"
+      data-tauri-drag-region
+      aria-label="OpenLegion"
+    >
+      <Mark class="size-9 object-contain" alt="" />
+      <span class="text-[14px] font-semibold leading-none tracking-[-0.02em] text-text-strong">
+        OpenLegion
+      </span>
+    </div>
+  )
+}
+
 function ChannelIndicator() {
   return (
     <>
-      {["beta", "dev"].includes(import.meta.env.VITE_OPENCODE_CHANNEL) && (
+      {["beta", "dev"].includes(import.meta.env.VITE_OPENLEGION_CHANNEL) && (
         <div class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono">
-          {import.meta.env.VITE_OPENCODE_CHANNEL.toUpperCase()}
+          {import.meta.env.VITE_OPENLEGION_CHANNEL.toUpperCase()}
         </div>
       )}
     </>

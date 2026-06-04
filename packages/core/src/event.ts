@@ -132,7 +132,7 @@ export interface Interface {
   readonly claim: (aggregateID: string, ownerID: string) => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/Event") {}
+export class Service extends Context.Service<Service, Interface>()("@openlegion/Event") {}
 
 export const layer = Layer.effect(
   Service,

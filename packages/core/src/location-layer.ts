@@ -24,7 +24,7 @@ import { RepositoryCache } from "./repository-cache"
 import { Pty } from "./pty"
 import { SkillV2 } from "./skill"
 
-export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("@opencode/example/LocationServiceMap", {
+export class LocationServiceMap extends LayerMap.Service<LocationServiceMap>()("@openlegion/example/LocationServiceMap", {
   lookup: (ref: Location.Ref) => {
     const location = Location.layer(ref)
     return Layer.mergeAll(

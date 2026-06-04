@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# OpenLegion Desktop
 
-The OpenCode Desktop app, built with Electron.
+The OpenLegion Desktop app, built with Electron.
 
 ## Development
 

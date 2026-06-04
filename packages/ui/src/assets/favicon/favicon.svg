@@ -1,7 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="512" height="512" fill="#131010"></rect>
-<path d="M320 224V352H192V224H320Z" fill="#5A5858"></path>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="white"></path>
-</svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
-@media (prefers-color-scheme: dark) { :root { filter: none; } }
-</style></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#0d1117"/>
+  <path
+    d="M16 5c-3.5 0-6 2.8-6 6.2 0 1.8.7 3.4 2 4.5L10 24h12l-2-8.3c1.3-1.1 2-2.7 2-4.5C22 7.8 19.5 5 16 5z"
+    fill="#22c55e"
+  />
+  <path d="M13 11.5h6v1.2h-6V11.5z" fill="#0d1117" opacity="0.35"/>
+  <path
+    d="M16 18.5c-2.2 0-4 1.2-4.8 3h9.6c-.8-1.8-2.6-3-4.8-3z"
+    fill="#16a34a"
+  />
+  <path
+    d="M16 20.2l-3.8 2.2.9-4.3 3-1.6 3 1.6.9 4.3L16 20.2z"
+    fill="#4ade80"
+    stroke="#0d1117"
+    stroke-width="0.4"
+  />
+  <circle cx="16" cy="21.8" r="1.1" fill="#0d1117"/>
+  <path d="M8 10.5c2-2.5 5-3.8 8-3.8" stroke="#4ade80" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
+  <path d="M24 10.5c-2-2.5-5-3.8-8-3.8" stroke="#4ade80" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
+</svg>

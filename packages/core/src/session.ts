@@ -139,7 +139,7 @@ export interface Interface {
   readonly resume: (sessionID: SessionSchema.ID) => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Session") {}
+export class Service extends Context.Service<Service, Interface>()("@openlegion/v2/Session") {}
 
 function fromRow(row: typeof SessionTable.$inferSelect): SessionSchema.Info {
   return SessionSchema.Info.make({

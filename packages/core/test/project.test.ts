@@ -3,13 +3,13 @@ import { $ } from "bun"
 import fs from "fs/promises"
 import path from "path"
 import { Effect, Layer, Schema } from "effect"
-import { ProjectV2 } from "@opencode-ai/core/project"
-import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
-import { Database } from "@opencode-ai/core/database/database"
-import { FSUtil } from "@opencode-ai/core/fs-util"
-import { Git } from "@opencode-ai/core/git"
-import { AbsolutePath } from "@opencode-ai/core/schema"
-import { Hash } from "@opencode-ai/core/util/hash"
+import { ProjectV2 } from "@openlegion-ai/core/project"
+import { ProjectDirectoryTable, ProjectTable } from "@openlegion-ai/core/project/sql"
+import { Database } from "@openlegion-ai/core/database/database"
+import { FSUtil } from "@openlegion-ai/core/fs-util"
+import { Git } from "@openlegion-ai/core/git"
+import { AbsolutePath } from "@openlegion-ai/core/schema"
+import { Hash } from "@openlegion-ai/core/util/hash"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
@@ -41,7 +41,7 @@ async function initRepo(dir: string, opts?: { commit?: boolean; remote?: string 
   await $`git init`.cwd(dir).quiet()
   await $`git config core.fsmonitor false`.cwd(dir).quiet()
   await $`git config commit.gpgsign false`.cwd(dir).quiet()
-  await $`git config user.email test@opencode.test`.cwd(dir).quiet()
+  await $`git config user.email test@openlegion.test`.cwd(dir).quiet()
   await $`git config user.name Test`.cwd(dir).quiet()
   if (opts?.commit) await $`git commit --allow-empty -m root`.cwd(dir).quiet()
   if (opts?.remote) await $`git remote add origin ${opts.remote}`.cwd(dir).quiet()
@@ -213,7 +213,7 @@ describe("ProjectV2.resolve", () => {
         (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
       )
       yield* Effect.promise(() => initRepo(tmp.path, { commit: true, remote: "git@github.com:owner/repo.git" }))
-      yield* Effect.promise(() => Bun.write(path.join(tmp.path, ".git", "opencode"), "old-id"))
+      yield* Effect.promise(() => Bun.write(path.join(tmp.path, ".git", "openlegion"), "old-id"))
       const project = yield* ProjectV2.Service
 
       const result = yield* project.resolve(abs(tmp.path))
@@ -234,7 +234,7 @@ describe("ProjectV2.resolve", () => {
 
       yield* project.resolve(abs(tmp.path))
 
-      expect(yield* Effect.promise(() => Bun.file(path.join(tmp.path, ".git", "opencode")).exists())).toBe(false)
+      expect(yield* Effect.promise(() => Bun.file(path.join(tmp.path, ".git", "openlegion")).exists())).toBe(false)
     }),
   )
 
@@ -265,7 +265,7 @@ describe("ProjectV2.resolve", () => {
         Effect.promise(() => $`rm -rf ${worktree}`.quiet().nothrow()).pipe(Effect.ignore),
       )
       yield* Effect.promise(() => initRepo(tmp.path, { commit: true, remote: "git@github.com:owner/repo.git" }))
-      yield* Effect.promise(() => Bun.write(path.join(tmp.path, ".git", "opencode"), "old-id"))
+      yield* Effect.promise(() => Bun.write(path.join(tmp.path, ".git", "openlegion"), "old-id"))
       yield* Effect.promise(() => $`git worktree add ${worktree} -b test-${Date.now()}`.cwd(tmp.path).quiet())
       const project = yield* ProjectV2.Service
 

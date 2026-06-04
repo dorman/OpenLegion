@@ -1,11 +1,11 @@
-import { Button } from "@opencode-ai/ui/button"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { Dialog } from "@opencode-ai/ui/dialog"
-import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
-import { Icon } from "@opencode-ai/ui/icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { List } from "@opencode-ai/ui/list"
-import { TextField } from "@opencode-ai/ui/text-field"
+import { Button } from "@openlegion-ai/ui/button"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
+import { Dialog } from "@openlegion-ai/ui/dialog"
+import { DropdownMenu } from "@openlegion-ai/ui/dropdown-menu"
+import { Icon } from "@openlegion-ai/ui/icon"
+import { IconButton } from "@openlegion-ai/ui/icon-button"
+import { List } from "@openlegion-ai/ui/list"
+import { TextField } from "@openlegion-ai/ui/text-field"
 import { useMutation } from "@tanstack/solid-query"
 import { showToast } from "@/utils/toast"
 import { useNavigate } from "@solidjs/router"
@@ -19,7 +19,7 @@ import { normalizeServerUrl, ServerConnection, useServer } from "@/context/serve
 import { type ServerHealth, useCheckServerHealth } from "@/utils/server-health"
 import { useSettings } from "@/context/settings"
 
-const DEFAULT_USERNAME = "opencode"
+const DEFAULT_USERNAME = "openlegion"
 
 interface ServerFormProps {
   value: string

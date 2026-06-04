@@ -2,11 +2,11 @@ import fs from "fs/promises"
 import path from "path"
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
-import { Catalog } from "@opencode-ai/core/catalog"
-import { LocationServiceMap } from "@opencode-ai/core/location-layer"
-import { PluginBoot } from "@opencode-ai/core/plugin/boot"
-import { ProviderV2 } from "@opencode-ai/core/provider"
-import { AbsolutePath } from "@opencode-ai/core/schema"
+import { Catalog } from "@openlegion-ai/core/catalog"
+import { LocationServiceMap } from "@openlegion-ai/core/location-layer"
+import { PluginBoot } from "@openlegion-ai/core/plugin/boot"
+import { ProviderV2 } from "@openlegion-ai/core/provider"
+import { AbsolutePath } from "@openlegion-ai/core/schema"
 import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 import { FSUtil } from "../src/fs-util"
@@ -44,7 +44,7 @@ describe("LocationServiceMap", () => {
         Effect.gen(function* () {
           yield* Effect.promise(() =>
             fs.writeFile(
-              path.join(blocked.path, "opencode.json"),
+              path.join(blocked.path, "openlegion.json"),
               JSON.stringify({
                 experimental: { policies: [{ effect: "deny", action: "provider.use", resource: "test" }] },
               }),

@@ -97,7 +97,7 @@ export interface Interface {
   readonly refresh: (input: RefreshInput) => Effect.Effect<void, Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/ProjectCopy") {}
+export class Service extends Context.Service<Service, Interface>()("@openlegion/ProjectCopy") {}
 
 export const layer = Layer.effect(
   Service,

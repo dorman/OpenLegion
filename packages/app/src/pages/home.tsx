@@ -1,24 +1,24 @@
-import type { Session } from "@opencode-ai/sdk/v2/client"
+import type { Session } from "@openlegion-ai/sdk/v2/client"
 import { createEffect, createMemo, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createStore } from "solid-js/store"
 import { useQuery } from "@tanstack/solid-query"
-import { Button } from "@opencode-ai/ui/button"
-import { Logo } from "@opencode-ai/ui/logo"
-import { Spinner } from "@opencode-ai/ui/spinner"
-import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
-import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
-import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
-import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
-import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
-import { TabStateIndicator } from "@opencode-ai/ui/v2/tab-state-indicator"
+import { Button } from "@openlegion-ai/ui/button"
+import { Logo } from "@openlegion-ai/ui/logo"
+import { Spinner } from "@openlegion-ai/ui/spinner"
+import { ProjectAvatar } from "@openlegion-ai/ui/v2/project-avatar-v2"
+import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
+import { Icon as IconV2 } from "@openlegion-ai/ui/v2/icon"
+import { IconButtonV2 } from "@openlegion-ai/ui/v2/icon-button-v2"
+import { MenuV2 } from "@openlegion-ai/ui/v2/menu-v2"
+import { TabStateIndicator } from "@openlegion-ai/ui/v2/tab-state-indicator"
 import { getProjectAvatarVariant, useLayout, type LocalProject } from "@/context/layout"
 import { useNavigate } from "@solidjs/router"
-import { base64Encode } from "@opencode-ai/core/util/encode"
-import { Icon } from "@opencode-ai/ui/icon"
+import { base64Encode } from "@openlegion-ai/core/util/encode"
+import { Icon } from "@openlegion-ai/ui/icon"
 import { usePlatform } from "@/context/platform"
 import { DateTime } from "luxon"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { DialogSelectServer } from "@/components/dialog-select-server"
 import { ServerConnection, useServer } from "@/context/server"
@@ -286,7 +286,7 @@ function HomeDesign() {
           clearNotifications={clearNotifications}
           unseenCount={unseenCount}
           openSettings={openSettings}
-          openHelp={() => platform.openLink("https://opencode.ai/desktop-feedback")}
+          openHelp={() => platform.openLink("https://openlegion.dev/desktop-feedback")}
           language={language}
         />
 
@@ -1052,7 +1052,7 @@ function LegacyHome() {
 
   return (
     <div class="mx-auto mt-55 w-full md:w-auto px-4">
-      <Logo class="md:w-xl opacity-12" />
+      <Logo class="max-w-[280px] w-full h-auto object-contain opacity-90" />
       <Button
         size="large"
         variant="ghost"

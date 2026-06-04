@@ -116,7 +116,7 @@ export interface Interface {
   readonly entries: () => Effect.Effect<Entry[]>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/v2/Config") {}
+export class Service extends Context.Service<Service, Interface>()("@openlegion/v2/Config") {}
 
 export const layer = Layer.effect(
   Service,
@@ -125,7 +125,7 @@ export const layer = Layer.effect(
     const global = yield* Global.Service
     const location = yield* Location.Service
     const policy = yield* Policy.Service
-    const names = ["config.json", "opencode.json", "opencode.jsonc"]
+    const names = ["config.json", "openlegion.json", "openlegion.jsonc"]
 
     const loadFile = Effect.fnUntraced(function* (filepath: string) {
       const text = yield* fs.readFileStringSafe(filepath)
@@ -172,7 +172,7 @@ export const layer = Layer.effect(
       ? []
       : yield* fs
           .up({
-            targets: [".opencode", ...names.toReversed()],
+            targets: [".openlegion", ...names.toReversed()],
             start: location.directory,
             stop: location.project.directory,
           })
@@ -180,20 +180,20 @@ export const layer = Layer.effect(
     const directories = [
       globalDirectory,
       ...discovered
-        .filter((item) => path.basename(item) === ".opencode")
+        .filter((item) => path.basename(item) === ".openlegion")
         .toReversed()
         .map((directory) => AbsolutePath.make(directory)),
     ]
     // A config closer to the opened directory should win over one higher up.
     // Search starts nearby, so reverse the results before applying them.
-    const directPaths = discovered.filter((item) => path.basename(item) !== ".opencode").toReversed()
+    const directPaths = discovered.filter((item) => path.basename(item) !== ".openlegion").toReversed()
     const direct = yield* Effect.forEach(directPaths, loadFile).pipe(
       Effect.orDie,
       Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)),
     )
     const supplementary = yield* Effect.forEach(directories, loadDirectory).pipe(Effect.orDie)
     // Apply general settings first and more specific settings last:
-    // global config, project files, then `.opencode` files.
+    // global config, project files, then `.openlegion` files.
     const configs = [...(supplementary[0] ?? []), ...direct, ...supplementary.slice(1).flat()]
     // Rules use the opposite order so a user-global rule can override a
     // repository rule. Statement order inside each file stays unchanged.

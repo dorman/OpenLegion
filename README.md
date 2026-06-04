@@ -1,129 +1,186 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-<p align="center">The open source AI coding agent.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# OpenLegion
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+**Local desktop platform for running Docker workloads with sandboxed, security-aware agents.**
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+OpenLegion helps **DevOps engineers** and **security teams** design container images safely, spin up multiple containers, and get guided help from AI agents—without sending your environment to the cloud. Think **Docker Desktop**, but oriented toward secure defaults, clearer workflows, and agents that understand your compose files, Dockerfiles, and runtime posture.
+
+Everything runs **on your machine**. There is no hosted control plane; data, credentials, and workloads stay local.
+
+[![Build status](https://img.shields.io/github/actions/workflow/status/dorman/OpenLegion/publish.yml?style=flat-square&branch=dev)](https://github.com/dorman/OpenLegion/actions/workflows/publish.yml)
 
 ---
 
-### Installation
+## Who this is for
 
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
+| Audience | What you get |
+|----------|----------------|
+| **DevOps engineers** | A desktop surface to run and manage many containers, with agents that help author Dockerfiles, Compose stacks, and run/debug commands in context. |
+| **Security teams** | Workflows that bias toward least privilege, explicit approvals, and reviewable changes before images or containers go live on a laptop or lab host. |
 
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
-```
-
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
-
-### Desktop App (BETA)
-
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
-
-```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
-```
-
-#### Installation Directory
-
-The install script respects the following priority order for the installation path:
-
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
-
-```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
-```
-
-### Agents
-
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
-
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
-
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
-
-Learn more about [agents](https://opencode.ai/docs/agents).
-
-### Documentation
-
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
-
-### Contributing
-
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
-
-### Building on OpenCode
-
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+OpenLegion is **not** a SaaS product. It is a **local-only** management and agent platform you install and run yourself.
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+## The product vision
+
+```mermaid
+flowchart LR
+  subgraph local ["Your machine (local only)"]
+    Desktop["OpenLegion Desktop"]
+    Agent["Sandboxed agents"]
+    Docker["Docker Engine"]
+    Desktop --> Agent
+    Desktop --> Docker
+    Agent --> Docker
+  end
+```
+
+1. **Desktop-first** — Primary experience is the Electron app (`bun run dev:desktop`): see containers, projects, and agent sessions in one place.
+2. **Many containers** — Run and manage multiple Docker containers (and stacks) from that UI, similar in spirit to Docker Desktop but with agent-assisted flows.
+3. **Agents that help** — Sandboxed agents assist with writing Dockerfiles, hardening images, explaining `docker`/`compose` output, and proposing fixes—always subject to permission rules and your approval.
+4. **Security by design** — Agents run with constrained scope; risky operations require confirmation. The goal is secure **design** and **bring-up**, not unconstrained shell access on the host.
+
+Branding uses a Robin Hood motif: defend operators and workloads against opaque, insecure defaults—give teams control on their own hardware.
+
+---
+
+## What exists today vs. what we are building
+
+This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. The agent runtime, permissions model, desktop shell, and HTTP API are largely in place; **Docker-centric management UI and container-native agent tools are the main work ahead.**
+
+### Available now
+
+| Component | Command / location | Notes |
+|-----------|-------------------|--------|
+| **Desktop app** | `bun run dev:desktop` | Electron UI—foundation for the management platform |
+| **CLI / TUI** | `bun run dev` | Terminal agent (upstream OpenCode behavior) |
+| **Web UI** | `bun run dev:web` | Same app shell in the browser for development |
+| **Agent runtime** | `packages/openlegion` | Sessions, tools, providers, MCP, plugins |
+| **Permissions** | `~/.openlegion` | Gates for files, shell, and tools |
+| **Built-in agents** | TUI: **Tab** to switch | `build`, `plan` (read-only + asks before shell), `general` (`@general`) |
+
+Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per repo. See [`.openlegion/`](./.openlegion/) for sample agents and commands.
+
+### Roadmap (product focus)
+
+- [ ] **Docker integration in desktop** — list/start/stop containers and compose projects from the UI
+- [ ] **Multi-container workspace** — run several stacks side by side with clear isolation boundaries
+- [ ] **Sandboxed agent execution** — agents scoped to container filesystem/network context where possible
+- [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run
+- [ ] **Security-team views** — audit-friendly session logs and policy hints for common misconfigurations
+
+The [`packages/containers`](./packages/containers/) directory is **CI build images** for GitHub Actions only—not the end-user runtime.
+
+---
+
+## How it compares
+
+| | Docker Desktop | OpenLegion (target) |
+|---|----------------|---------------------|
+| **Runs where** | Local | **Local only** |
+| **Primary goal** | Run containers | Run containers **and** help secure/design them with agents |
+| **AI assistance** | Limited / separate tools | **Built-in**, permissioned, sandboxed agents |
+| **Audience** | General developers | **DevOps + security** teams |
+
+---
+
+## Requirements
+
+- [Bun](https://bun.sh) **1.3.14+**
+- [Docker](https://docs.docker.com/get-docker/) (for upcoming container features; install now if you plan to contribute)
+- macOS, Linux, or Windows (desktop development is most tested on **macOS** today)
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/dorman/OpenLegion.git
+cd OpenLegion
+bun install
+
+# Management desktop (primary product direction)
+bun run dev:desktop
+
+# Terminal agent (also useful for debugging)
+bun run dev
+```
+
+Future CLI install (when published): `npm i -g openlegion-ai`.
+
+---
+
+## Agents and security
+
+Agents inherit OpenCode’s model and will tighten for container work:
+
+| Agent | Role |
+|-------|------|
+| **build** | Implementation agent—edits and commands allowed per your permission config |
+| **plan** | Read-only analysis—ideal for reviewing Dockerfiles and compose before changes |
+| **general** | Multi-step search subagent (`@general` in prompts) |
+
+**Security direction:** default-deny tooling, explicit approval for shell and deploy actions, sandboxed context per container/project, and local-only storage of secrets and session history—no telemetry requirement for core use.
+
+---
+
+## Monorepo layout
+
+```
+packages/
+  openlegion/     # CLI, TUI, local HTTP server, agent + tool runtime
+  core/           # Shared logic (permissions, DB, providers, …)
+  app/            # SolidJS UI (used inside desktop)
+  desktop/        # Electron management shell
+  ui/             # Components and brand assets
+  plugin/         # Plugin SDK
+  sdk/            # JS client for the local API
+  containers/     # CI images only (not the product runtime)
+```
+
+Default branch: **`dev`**. Conventions: [AGENTS.md](./AGENTS.md), contributions: [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+---
+
+## Configuration
+
+| Path | Purpose |
+|------|---------|
+| `~/.openlegion/` | Global settings, auth, custom agents/commands |
+| `.openlegion/` | Per-project overrides |
+
+Environment variables: `OPENLEGION_*` prefix (e.g. `OPENLEGION_BIN_PATH`).
+
+---
+
+## Development
+
+| Command | Description |
+|---------|-------------|
+| `bun run dev:desktop` | Desktop management app |
+| `bun run dev` | CLI / TUI agent |
+| `bun run dev:web` | Web UI dev server |
+| `bun run lint` | Oxlint |
+| `bun run typecheck` | Turbo typecheck |
+
+Regenerate app icons after updating `packages/ui/src/assets/brand/openlegion-icon.png`:
+
+```bash
+cd packages/desktop
+bun ./scripts/generate-brand-icons.ts
+bun ./scripts/copy-icons.ts dev
+```
+
+---
+
+## Fork lineage
+
+OpenLegion forks [OpenCode](https://github.com/anomalyco/opencode) and diverges toward **local Docker management + security agents**. It is not affiliated with Docker Inc. or the OpenCode team. Third-party projects with “opencode” in the name are unrelated.
+
+MIT — see [LICENSE](./LICENSE). Upstream OpenCode remains MIT; attribution appreciated.
+
+---
+
+## Contributing
+
+Security, Docker, and desktop UX contributions are especially welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md). Commit format: `type(scope): summary` (e.g. `feat(desktop): list running containers`).

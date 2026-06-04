@@ -1,17 +1,17 @@
 <p align="center">
-  <a href="https://opencode.ai">
+  <a href="https://openlegion.dev">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="Logo OpenCode">
+      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="Logo OpenLegion">
     </picture>
   </a>
 </p>
 <p align="center">L’agente di coding AI open source.</p>
 <p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
+  <a href="https://openlegion.dev/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://www.npmjs.com/package/openlegion-ai"><img alt="npm" src="https://img.shields.io/npm/v/openlegion-ai?style=flat-square" /></a>
+  <a href="https://github.com/dorman/OpenLegion/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/dorman/OpenLegion/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
 <p align="center">
@@ -39,7 +39,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+[![OpenLegion Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://openlegion.dev)
 
 ---
 
@@ -47,18 +47,18 @@
 
 ```bash
 # YOLO
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://openlegion.dev/install | bash
 
 # Package manager
-npm i -g opencode-ai@latest        # oppure bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS e Linux (consigliato, sempre aggiornato)
-brew install opencode              # macOS e Linux (formula brew ufficiale, aggiornata meno spesso)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Qualsiasi OS
-nix run nixpkgs#opencode           # oppure github:anomalyco/opencode per l’ultima branch di sviluppo
+npm i -g openlegion-ai@latest        # oppure bun/pnpm/yarn
+scoop install openlegion             # Windows
+choco install openlegion             # Windows
+brew install anomalyco/tap/openlegion # macOS e Linux (consigliato, sempre aggiornato)
+brew install openlegion              # macOS e Linux (formula brew ufficiale, aggiornata meno spesso)
+sudo pacman -S openlegion            # Arch Linux (Stable)
+paru -S openlegion-bin               # Arch Linux (Latest from AUR)
+mise use -g openlegion               # Qualsiasi OS
+nix run nixpkgs#openlegion           # oppure github:dorman/OpenLegion per l’ultima branch di sviluppo
 ```
 
 > [!TIP]
@@ -66,40 +66,40 @@ nix run nixpkgs#opencode           # oppure github:anomalyco/opencode per l’ul
 
 ### App Desktop (BETA)
 
-OpenCode è disponibile anche come applicazione desktop. Puoi scaricarla direttamente dalla [pagina delle release](https://github.com/anomalyco/opencode/releases) oppure da [opencode.ai/download](https://opencode.ai/download).
+OpenLegion è disponibile anche come applicazione desktop. Puoi scaricarla direttamente dalla [pagina delle release](https://github.com/dorman/OpenLegion/releases) oppure da [openlegion.dev/download](https://openlegion.dev/download).
 
 | Piattaforma           | Download                           |
 | --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
+| macOS (Apple Silicon) | `openlegion-desktop-mac-arm64.dmg`   |
+| macOS (Intel)         | `openlegion-desktop-mac-x64.dmg`     |
+| Windows               | `openlegion-desktop-windows-x64.exe` |
 | Linux                 | `.deb`, `.rpm`, oppure AppImage    |
 
 ```bash
 # macOS (Homebrew)
-brew install --cask opencode-desktop
+brew install --cask openlegion-desktop
 # Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+scoop bucket add extras; scoop install extras/openlegion-desktop
 ```
 
 #### Directory di installazione
 
 Lo script di installazione rispetta il seguente ordine di priorità per il percorso di installazione:
 
-1. `$OPENCODE_INSTALL_DIR` – Directory di installazione personalizzata
+1. `$OPENLEGION_INSTALL_DIR` – Directory di installazione personalizzata
 2. `$XDG_BIN_DIR` – Percorso conforme alla XDG Base Directory Specification
 3. `$HOME/bin` – Directory binaria standard dell’utente (se esiste o può essere creata)
-4. `$HOME/.opencode/bin` – Fallback predefinito
+4. `$HOME/.openlegion/bin` – Fallback predefinito
 
 ```bash
 # Esempi
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+OPENLEGION_INSTALL_DIR=/usr/local/bin curl -fsSL https://openlegion.dev/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://openlegion.dev/install | bash
 ```
 
 ### Agenti
 
-OpenCode include due agenti integrati tra cui puoi passare usando il tasto `Tab`.
+OpenLegion include due agenti integrati tra cui puoi passare usando il tasto `Tab`.
 
 - **build** – Predefinito, agente con accesso completo per il lavoro di sviluppo
 - **plan** – Agente in sola lettura per analisi ed esplorazione del codice
@@ -110,20 +110,20 @@ OpenCode include due agenti integrati tra cui puoi passare usando il tasto `Tab`
 È inoltre incluso un sotto-agente **general** per ricerche complesse e attività multi-step.
 Viene utilizzato internamente e può essere invocato usando `@general` nei messaggi.
 
-Scopri di più sugli [agenti](https://opencode.ai/docs/agents).
+Scopri di più sugli [agenti](https://openlegion.dev/docs/agents).
 
 ### Documentazione
 
-Per maggiori informazioni su come configurare OpenCode, [**consulta la nostra documentazione**](https://opencode.ai/docs).
+Per maggiori informazioni su come configurare OpenLegion, [**consulta la nostra documentazione**](https://openlegion.dev/docs).
 
 ### Contribuire
 
-Se sei interessato a contribuire a OpenCode, leggi la nostra [guida alla contribuzione](./CONTRIBUTING.md) prima di inviare una pull request.
+Se sei interessato a contribuire a OpenLegion, leggi la nostra [guida alla contribuzione](./CONTRIBUTING.md) prima di inviare una pull request.
 
-### Costruire su OpenCode
+### Costruire su OpenLegion
 
-Se stai lavorando a un progetto correlato a OpenCode e che utilizza “opencode” come parte del nome (ad esempio “opencode-dashboard” o “opencode-mobile”), aggiungi una nota nel tuo README per chiarire che non è sviluppato dal team OpenCode e che non è affiliato in alcun modo con noi.
+Se stai lavorando a un progetto correlato a OpenLegion e che utilizza “openlegion” come parte del nome (ad esempio “openlegion-dashboard” o “openlegion-mobile”), aggiungi una nota nel tuo README per chiarire che non è sviluppato dal team OpenLegion e che non è affiliato in alcun modo con noi.
 
 ---
 
-**Unisciti alla nostra community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+**Unisciti alla nostra community** [Discord](https://discord.gg/openlegion) | [X.com](https://x.com/openlegion)

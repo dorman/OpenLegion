@@ -1,7 +1,7 @@
 import { CliApi } from "./cli-api"
 
-export const Api = CliApi.make("opencode", {
-  description: "OpenCode command line interface",
+export const Api = CliApi.make("openlegion", {
+  description: "OpenLegion command line interface",
   commands: [
     CliApi.make("debug", {
       description: "Debugging and troubleshooting tools",

@@ -1,13 +1,13 @@
 import { Component, Show, createMemo, createResource, onMount, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Button } from "@opencode-ai/ui/button"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Select } from "@opencode-ai/ui/select"
-import { Switch } from "@opencode-ai/ui/switch"
-import { TextField } from "@opencode-ai/ui/text-field"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { Button } from "@openlegion-ai/ui/button"
+import { Icon } from "@openlegion-ai/ui/icon"
+import { Select } from "@openlegion-ai/ui/select"
+import { Switch } from "@openlegion-ai/ui/switch"
+import { TextField } from "@openlegion-ai/ui/text-field"
+import { Tooltip } from "@openlegion-ai/ui/tooltip"
+import { useTheme, type ColorScheme } from "@openlegion-ai/ui/theme/context"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { showToast } from "@/utils/toast"
 import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/context/language"
@@ -524,7 +524,7 @@ export const SettingsGeneral: Component = () => {
           description={
             <>
               {language.t("settings.general.row.theme.description")}{" "}
-              <Link href="https://opencode.ai/docs/themes/">{language.t("common.learnMore")}</Link>
+              <Link href="https://openlegion.dev/docs/themes/">{language.t("common.learnMore")}</Link>
             </>
           }
         >

@@ -2,7 +2,7 @@
 import * as mod from "./logo"
 
 const docs = `### Overview
-OpenCode logo assets: mark, splash, and wordmark.
+OpenLegion logo assets: mark, splash, and wordmark.
 
 Use Mark for compact spaces, Logo for headers, Splash for hero sections.
 
@@ -46,11 +46,11 @@ export const Basic = {
       </div>
       <div>
         <div style={{ color: "var(--text-weak)", "font-size": "12px" }}>Splash</div>
-        <mod.Splash style={{ width: "80px", height: "100px" }} />
+        <mod.Splash class="size-20 object-contain" />
       </div>
       <div>
         <div style={{ color: "var(--text-weak)", "font-size": "12px" }}>Logo</div>
-        <mod.Logo style={{ width: "200px" }} />
+        <mod.Logo class="max-w-[200px] h-auto object-contain" />
       </div>
     </div>
   ),

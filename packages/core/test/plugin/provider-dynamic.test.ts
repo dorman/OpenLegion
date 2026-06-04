@@ -1,15 +1,15 @@
-import { Npm } from "@opencode-ai/core/npm"
+import { Npm } from "@openlegion-ai/core/npm"
 import { describe, expect } from "bun:test"
 import { Cause, Effect, Layer, Option } from "effect"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
-import { AISDK } from "@opencode-ai/core/aisdk"
-import { EventV2 } from "@opencode-ai/core/event"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { PluginV2 } from "@opencode-ai/core/plugin"
-import { DynamicProviderPlugin } from "@opencode-ai/core/plugin/provider/dynamic"
+import { AISDK } from "@openlegion-ai/core/aisdk"
+import { EventV2 } from "@openlegion-ai/core/event"
+import { ModelV2 } from "@openlegion-ai/core/model"
+import { PluginV2 } from "@openlegion-ai/core/plugin"
+import { DynamicProviderPlugin } from "@openlegion-ai/core/plugin/provider/dynamic"
 import { testEffect } from "../lib/effect"
 import { fixtureProvider, it, model, npmLayer } from "./provider-helper"
 
@@ -36,7 +36,7 @@ function dynamicPlugin(layer = npmLayer) {
 function tempEntrypoint(source: string) {
   return Effect.acquireRelease(
     Effect.promise(async () => {
-      const directory = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-provider-dynamic-"))
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), "openlegion-provider-dynamic-"))
       const entrypoint = path.join(directory, "provider.mjs")
       await Bun.write(entrypoint, source)
       return { directory, entrypoint }

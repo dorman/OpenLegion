@@ -3,9 +3,9 @@ import { DateTime } from "luxon"
 import { useSync } from "@/context/sync"
 import { useSDK } from "@/context/sdk"
 import { useLanguage } from "@/context/language"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Mark } from "@opencode-ai/ui/logo"
-import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
+import { Icon } from "@openlegion-ai/ui/icon"
+import { Mark } from "@openlegion-ai/ui/logo"
+import { getDirectory, getFilename } from "@openlegion-ai/core/util/path"
 
 const MAIN_WORKTREE = "main"
 const CREATE_WORKTREE = "create"
@@ -53,7 +53,7 @@ export function NewSessionView(props: NewSessionViewProps) {
       <div class="flex-1 px-6 pb-30 flex items-center justify-center text-center">
         <div class="w-full max-w-200 flex flex-col items-center text-center gap-4">
           <div class="flex flex-col items-center gap-6">
-            <Mark class="w-10" />
+            <Mark class="size-10 object-contain" />
             <div class="text-20-medium text-text-strong">{language.t("session.new.title")}</div>
           </div>
           <div class="w-full flex flex-col gap-4 items-center">

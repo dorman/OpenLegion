@@ -24,14 +24,14 @@ jobs:
         id: setup-git-committer
         uses: ./.github/actions/setup-git-committer
         with:
-          opencode-app-id: ${{ vars.OPENCODE_APP_ID }}
-          opencode-app-secret: ${{ secrets.OPENCODE_APP_SECRET }}
+          openlegion-app-id: ${{ vars.OPENLEGION_APP_ID }}
+          openlegion-app-secret: ${{ secrets.OPENLEGION_APP_SECRET }}
 
-      - name: Install OpenCode
-        run: bun i -g opencode-ai
+      - name: Install OpenLegion
+        run: bun i -g openlegion-ai
 
       - name: Sync beta branch
         env:
           GH_TOKEN: ${{ steps.setup-git-committer.outputs.token }}
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENLEGION_API_KEY: ${{ secrets.OPENLEGION_API_KEY }}
         run: bun script/beta.ts

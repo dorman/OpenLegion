@@ -1,12 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode-ai/cli",
+  "name": "@openlegion-ai/cli",
   "version": "1.15.13",
   "private": true,
   "type": "module",
   "license": "MIT",
   "bin": {
-    "opencode": "./src/index.ts"
+    "openlegion": "./src/index.ts"
   },
   "scripts": {
     "build": "bun run script/build.ts",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@opencode-ai/core": "workspace:*",
+    "@openlegion-ai/core": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

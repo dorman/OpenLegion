@@ -1,8 +1,8 @@
-import { Button } from "@opencode-ai/ui/button"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Switch } from "@opencode-ai/ui/switch"
-import { Tabs } from "@opencode-ai/ui/tabs"
+import { Button } from "@openlegion-ai/ui/button"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
+import { Icon } from "@openlegion-ai/ui/icon"
+import { Switch } from "@openlegion-ai/ui/switch"
+import { Tabs } from "@openlegion-ai/ui/tabs"
 import { useMutation, useQueryClient } from "@tanstack/solid-query"
 import { showToast } from "@/utils/toast"
 import { useNavigate } from "@solidjs/router"
@@ -327,7 +327,7 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
     (sync.data.config.plugin ?? []).map((item) => (typeof item === "string" ? item : item[0])),
   )
   const pluginCount = createMemo(() => plugins().length)
-  const pluginEmpty = createMemo(() => pluginEmptyMessage(language.t("dialog.plugins.empty"), "opencode.json"))
+  const pluginEmpty = createMemo(() => pluginEmptyMessage(language.t("dialog.plugins.empty"), "openlegion.json"))
 
   return (
     <div class="flex items-center gap-1 w-[360px] rounded-xl shadow-[var(--shadow-lg-border-base)]">

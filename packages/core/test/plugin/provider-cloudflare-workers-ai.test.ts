@@ -1,15 +1,15 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
-import { Auth } from "@opencode-ai/core/auth"
-import { Catalog } from "@opencode-ai/core/catalog"
-import { Location } from "@opencode-ai/core/location"
-import { EventV2 } from "@opencode-ai/core/event"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { PluginV2 } from "@opencode-ai/core/plugin"
-import { AccountPlugin } from "@opencode-ai/core/plugin/account"
-import { CloudflareWorkersAIPlugin } from "@opencode-ai/core/plugin/provider/cloudflare-workers-ai"
-import { ProviderV2 } from "@opencode-ai/core/provider"
-import { AbsolutePath } from "@opencode-ai/core/schema"
+import { Auth } from "@openlegion-ai/core/auth"
+import { Catalog } from "@openlegion-ai/core/catalog"
+import { Location } from "@openlegion-ai/core/location"
+import { EventV2 } from "@openlegion-ai/core/event"
+import { ModelV2 } from "@openlegion-ai/core/model"
+import { PluginV2 } from "@openlegion-ai/core/plugin"
+import { AccountPlugin } from "@openlegion-ai/core/plugin/account"
+import { CloudflareWorkersAIPlugin } from "@openlegion-ai/core/plugin/provider/cloudflare-workers-ai"
+import { ProviderV2 } from "@openlegion-ai/core/provider"
+import { AbsolutePath } from "@openlegion-ai/core/schema"
 import { location } from "../fixture/location"
 import { testEffect } from "../lib/effect"
 import { fakeSelectorSdk, it, model, npmLayer, withEnv } from "./provider-helper"
@@ -210,7 +210,7 @@ describe("CloudflareWorkersAIPlugin", () => {
         const headers = yield* Effect.promise(() => Promise.resolve(cloudflareHeaders(result.sdk)))
         expect(headers.authorization).toBe("Bearer env-key")
         expect(headers.custom).toBe("header")
-        expect(headers["user-agent"]).toMatch(/^opencode\/.* cloudflare-workers-ai \(.+\) ai-sdk\/openai-compatible\//)
+        expect(headers["user-agent"]).toMatch(/^openlegion\/.* cloudflare-workers-ai \(.+\) ai-sdk\/openai-compatible\//)
       }),
     ),
   )

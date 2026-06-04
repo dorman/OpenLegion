@@ -1,4 +1,4 @@
-import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
+import type { DesktopMenuAction } from "@openlegion-ai/app/desktop-menu"
 
 export type ServerReadyData = {
   url: string
