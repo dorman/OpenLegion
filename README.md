@@ -4,6 +4,12 @@
 
 OpenLegion helps **DevOps engineers** and **security teams** design container images safely, spin up multiple containers, and get guided help from AI agents—without sending your environment to the cloud. Think **Docker Desktop**, but oriented toward secure defaults, clearer workflows, and agents that understand your compose files, Dockerfiles, and runtime posture.
 
+OpenLegion is fork of [OpenCode](https://github.com/anomalyco/opencode) and diverges toward **local Docker management + security agents**. It is not affiliated with Docker Inc. or OpenCode. Third-party projects with “opencode” in the name are also unrelated.
+
+MIT — see [LICENSE](./LICENSE). Upstream OpenCode remains MIT; attribution appreciated.
+
+---
+
 Everything runs **on your machine**. There is no hosted control plane; data, credentials, and workloads stay local.
 
 [![Build status](https://img.shields.io/github/actions/workflow/status/dorman/OpenLegion/publish.yml?style=flat-square&branch=dev)](https://github.com/dorman/OpenLegion/actions/workflows/publish.yml)
@@ -12,10 +18,10 @@ Everything runs **on your machine**. There is no hosted control plane; data, cre
 
 ## Who this is for
 
-| Audience | What you get |
-|----------|----------------|
-| **DevOps engineers** | A desktop surface to run and manage many containers, with agents that help author Dockerfiles, Compose stacks, and run/debug commands in context. |
-| **Security teams** | Workflows that bias toward least privilege, explicit approvals, and reviewable changes before images or containers go live on a laptop or lab host. |
+| Audience             | What you get                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DevOps engineers** | A desktop surface to run and manage many containers, with agents that help author Dockerfiles, Compose stacks, and run/debug commands in context.   |
+| **Security teams**   | Workflows that bias toward least privilege, explicit approvals, and reviewable changes before images or containers go live on a laptop or lab host. |
 
 OpenLegion is **not** a SaaS product. It is a **local-only** management and agent platform you install and run yourself.
 
@@ -50,13 +56,13 @@ This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. Th
 
 ### Available now
 
-| Component | Command / location | Notes |
-|-----------|-------------------|--------|
-| **Desktop app** | `bun run dev:desktop` | Electron UI—foundation for the management platform |
-| **CLI / TUI** | `bun run dev` | Terminal agent (upstream OpenCode behavior) |
-| **Web UI** | `bun run dev:web` | Same app shell in the browser for development |
-| **Agent runtime** | `packages/openlegion` | Sessions, tools, providers, MCP, plugins |
-| **Permissions** | `~/.openlegion` | Gates for files, shell, and tools |
+| Component           | Command / location     | Notes                                                                   |
+| ------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| **Desktop app**     | `bun run dev:desktop`  | Electron UI—foundation for the management platform                      |
+| **CLI / TUI**       | `bun run dev`          | Terminal agent (upstream OpenCode behavior)                             |
+| **Web UI**          | `bun run dev:web`      | Same app shell in the browser for development                           |
+| **Agent runtime**   | `packages/openlegion`  | Sessions, tools, providers, MCP, plugins                                |
+| **Permissions**     | `~/.openlegion`        | Gates for files, shell, and tools                                       |
 | **Built-in agents** | TUI: **Tab** to switch | `build`, `plan` (read-only + asks before shell), `general` (`@general`) |
 
 Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per repo. See [`.openlegion/`](./.openlegion/) for sample agents and commands.
@@ -75,12 +81,12 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 
 ## How it compares
 
-| | Docker Desktop | OpenLegion (target) |
-|---|----------------|---------------------|
-| **Runs where** | Local | **Local only** |
-| **Primary goal** | Run containers | Run containers **and** help secure/design them with agents |
-| **AI assistance** | Limited / separate tools | **Built-in**, permissioned, sandboxed agents |
-| **Audience** | General developers | **DevOps + security** teams |
+|                   | Docker Desktop           | OpenLegion (target)                                        |
+| ----------------- | ------------------------ | ---------------------------------------------------------- |
+| **Runs where**    | Local                    | **Local only**                                             |
+| **Primary goal**  | Run containers           | Run containers **and** help secure/design them with agents |
+| **AI assistance** | Limited / separate tools | **Built-in**, permissioned, sandboxed agents               |
+| **Audience**      | General developers       | **DevOps + security** teams                                |
 
 ---
 
@@ -114,11 +120,11 @@ Future CLI install (when published): `npm i -g openlegion-ai`.
 
 Agents inherit OpenCode’s model and will tighten for container work:
 
-| Agent | Role |
-|-------|------|
-| **build** | Implementation agent—edits and commands allowed per your permission config |
-| **plan** | Read-only analysis—ideal for reviewing Dockerfiles and compose before changes |
-| **general** | Multi-step search subagent (`@general` in prompts) |
+| Agent       | Role                                                                          |
+| ----------- | ----------------------------------------------------------------------------- |
+| **build**   | Implementation agent—edits and commands allowed per your permission config    |
+| **plan**    | Read-only analysis—ideal for reviewing Dockerfiles and compose before changes |
+| **general** | Multi-step search subagent (`@general` in prompts)                            |
 
 **Security direction:** default-deny tooling, explicit approval for shell and deploy actions, sandboxed context per container/project, and local-only storage of secrets and session history—no telemetry requirement for core use.
 
@@ -144,10 +150,10 @@ Default branch: **`dev`**. Conventions: [AGENTS.md](./AGENTS.md), contributions:
 
 ## Configuration
 
-| Path | Purpose |
-|------|---------|
+| Path             | Purpose                                       |
+| ---------------- | --------------------------------------------- |
 | `~/.openlegion/` | Global settings, auth, custom agents/commands |
-| `.openlegion/` | Per-project overrides |
+| `.openlegion/`   | Per-project overrides                         |
 
 Environment variables: `OPENLEGION_*` prefix (e.g. `OPENLEGION_BIN_PATH`).
 
@@ -155,13 +161,13 @@ Environment variables: `OPENLEGION_*` prefix (e.g. `OPENLEGION_BIN_PATH`).
 
 ## Development
 
-| Command | Description |
-|---------|-------------|
+| Command               | Description            |
+| --------------------- | ---------------------- |
 | `bun run dev:desktop` | Desktop management app |
-| `bun run dev` | CLI / TUI agent |
-| `bun run dev:web` | Web UI dev server |
-| `bun run lint` | Oxlint |
-| `bun run typecheck` | Turbo typecheck |
+| `bun run dev`         | CLI / TUI agent        |
+| `bun run dev:web`     | Web UI dev server      |
+| `bun run lint`        | Oxlint                 |
+| `bun run typecheck`   | Turbo typecheck        |
 
 Regenerate app icons after updating `packages/ui/src/assets/brand/openlegion-icon.png`:
 
@@ -170,16 +176,6 @@ cd packages/desktop
 bun ./scripts/generate-brand-icons.ts
 bun ./scripts/copy-icons.ts dev
 ```
-
----
-
-## Fork lineage
-
-OpenLegion forks [OpenCode](https://github.com/anomalyco/opencode) and diverges toward **local Docker management + security agents**. It is not affiliated with Docker Inc. or the OpenCode team. Third-party projects with “opencode” in the name are unrelated.
-
-MIT — see [LICENSE](./LICENSE). Upstream OpenCode remains MIT; attribution appreciated.
-
----
 
 ## Contributing
 
