@@ -1,4 +1,5 @@
 import { AccountID, OrgID } from "@/account/schema"
+import { Container } from "@/container"
 import { MCP } from "@/mcp"
 
 import { Session } from "@/session/session"
@@ -71,6 +72,18 @@ export class WorktreeApiError extends Schema.ErrorClass<WorktreeApiError>("Workt
   },
   { httpApiStatus: 400 },
 ) {}
+const ContainerErrorName = Schema.Union([
+  Schema.Literal("ContainerRuntimeNotFoundError"),
+  Schema.Literal("ContainerRuntimeUnavailableError"),
+  Schema.Literal("ContainerCreateFailedError"),
+])
+export class ContainerApiError extends Schema.ErrorClass<ContainerApiError>("ContainerError")(
+  {
+    name: ContainerErrorName,
+    data: Schema.Struct({ message: Schema.String }),
+  },
+  { httpApiStatus: 400 },
+) {}
 export const SessionListQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   roots: Schema.optional(QueryBoolean),
@@ -87,6 +100,7 @@ export const ExperimentalPaths = {
   consoleSwitch: "/experimental/console/switch",
   tool: "/experimental/tool",
   toolIDs: "/experimental/tool/ids",
+  container: "/experimental/container",
   worktree: "/experimental/worktree",
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
@@ -153,6 +167,18 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "List tool IDs",
             description:
               "Get a list of all available tool IDs, including both built-in tools and dynamically registered tools.",
+          }),
+        ),
+        HttpApiEndpoint.post("containerCreate", ExperimentalPaths.container, {
+          query: WorkspaceRoutingQuery,
+          payload: Container.CreateInput,
+          success: described(Container.Info, "Container created"),
+          error: ContainerApiError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "container.create",
+            summary: "Create container",
+            description: "Create a new local container using the first available runtime (docker or podman).",
           }),
         ),
         HttpApiEndpoint.get("worktree", ExperimentalPaths.worktree, {

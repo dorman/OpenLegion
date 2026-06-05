@@ -2034,6 +2034,38 @@ export type ToolList = Array<ToolListItem>
 
 export type ToolIds = Array<string>
 
+export type ContainerCreateInput = {
+  image: string
+  name?: string
+  env?: {
+    [key: string]: string
+  }
+  ports?: Array<{
+    host: string
+    container: string
+  }>
+  volumes?: Array<{
+    host: string
+    container: string
+    readOnly?: boolean
+  }>
+  command?: Array<string>
+}
+
+export type ContainerInfo = {
+  id: string
+  runtime: "docker" | "podman"
+  image: string
+  name?: string
+}
+
+export type ContainerError = {
+  name: "ContainerRuntimeNotFoundError" | "ContainerRuntimeUnavailableError" | "ContainerCreateFailedError"
+  data: {
+    message: string
+  }
+}
+
 export type WorktreeError = {
   name:
     | "WorktreeNotGitError"
@@ -5077,6 +5109,34 @@ export type ToolIdsResponses = {
 }
 
 export type ToolIdsResponse = ToolIdsResponses[keyof ToolIdsResponses]
+
+export type ContainerCreateData = {
+  body?: ContainerCreateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/container"
+}
+
+export type ContainerCreateErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type ContainerCreateError = ContainerCreateErrors[keyof ContainerCreateErrors]
+
+export type ContainerCreateResponses = {
+  /**
+   * Container created
+   */
+  200: ContainerInfo
+}
+
+export type ContainerCreateResponse = ContainerCreateResponses[keyof ContainerCreateResponses]
 
 export type WorktreeRemoveData = {
   body?: WorktreeRemoveInput

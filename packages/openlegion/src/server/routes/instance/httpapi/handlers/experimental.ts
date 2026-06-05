@@ -1,5 +1,6 @@
 import { Account } from "@/account/account"
 import { Agent } from "@/agent/agent"
+import { Container } from "@/container"
 import { Config } from "@/config/config"
 import { InstanceState } from "@/effect/instance-state"
 import { MCP } from "@/mcp"
@@ -12,11 +13,23 @@ import { Effect, Option } from "effect"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ConsoleSwitchPayload, SessionListQuery, ToolListQuery, WorktreeApiError } from "../groups/experimental"
+import {
+  ConsoleSwitchPayload,
+  ContainerApiError,
+  SessionListQuery,
+  ToolListQuery,
+  WorktreeApiError,
+} from "../groups/experimental"
 
 function mapWorktreeError<A, R>(self: Effect.Effect<A, Worktree.Error, R>) {
   return self.pipe(
     Effect.mapError((error) => new WorktreeApiError({ name: error._tag, data: { message: error.message } })),
+  )
+}
+
+function mapContainerError<A, R>(self: Effect.Effect<A, Container.Error, R>) {
+  return self.pipe(
+    Effect.mapError((error) => new ContainerApiError({ name: error._tag, data: { message: error.message } })),
   )
 }
 
@@ -25,6 +38,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const account = yield* Account.Service
     const agents = yield* Agent.Service
     const config = yield* Config.Service
+    const container = yield* Container.Service
     const mcp = yield* MCP.Service
     const project = yield* Project.Service
     const registry = yield* ToolRegistry.Service
@@ -104,6 +118,12 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* project.sandboxes(ctx.project.id)
     })
 
+    const containerCreate = Effect.fn("ExperimentalHttpApi.containerCreate")(function* (ctx: {
+      payload: typeof Container.CreateInput.Type
+    }) {
+      return yield* mapContainerError(container.create(ctx.payload))
+    })
+
     const worktreeCreate = Effect.fn("ExperimentalHttpApi.worktreeCreate")(function* (ctx: {
       payload: typeof Worktree.CreateInput.Type | void
     }) {
@@ -156,6 +176,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("consoleSwitch", switchConsole)
       .handle("tool", tool)
       .handle("toolIDs", toolIDs)
+      .handle("containerCreate", containerCreate)
       .handle("worktree", worktree)
       .handle("worktreeCreate", worktreeCreate)
       .handle("worktreeRemove", worktreeRemove)

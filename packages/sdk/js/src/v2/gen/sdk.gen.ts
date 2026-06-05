@@ -24,6 +24,9 @@ import type {
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
+  ContainerCreateErrors,
+  ContainerCreateInput,
+  ContainerCreateResponses,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -1449,6 +1452,45 @@ export class Tool extends HeyApiClient {
       url: "/experimental/tool/ids",
       ...options,
       ...params,
+    })
+  }
+}
+
+export class Container extends HeyApiClient {
+  /**
+   * Create container
+   *
+   * Create a new local container using the first available runtime (docker or podman).
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      containerCreateInput?: ContainerCreateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "containerCreateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ContainerCreateResponses, ContainerCreateErrors, ThrowOnError>({
+      url: "/experimental/container",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }
@@ -5505,6 +5547,11 @@ export class OpencodeClient extends HeyApiClient {
   private _tool?: Tool
   get tool(): Tool {
     return (this._tool ??= new Tool({ client: this.client }))
+  }
+
+  private _container?: Container
+  get container(): Container {
+    return (this._container ??= new Container({ client: this.client }))
   }
 
   private _worktree?: Worktree

@@ -15,6 +15,7 @@ import { Agent } from "@/agent/agent"
 import { Auth } from "@/auth"
 import { Config } from "@/config/config"
 import { Command } from "@/command"
+import { Container } from "@/container"
 import * as Observability from "@openlegion-ai/core/effect/observability"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { Format } from "@/format"
@@ -198,6 +199,7 @@ export function createRoutes(
       Agent.defaultLayer,
       Auth.defaultLayer,
       Command.defaultLayer,
+      Container.defaultLayer,
       Config.defaultLayer,
       Format.defaultLayer,
       LSP.defaultLayer,
