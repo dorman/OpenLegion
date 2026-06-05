@@ -27,6 +27,8 @@ import type {
   ContainerCreateErrors,
   ContainerCreateInput,
   ContainerCreateResponses,
+  ContainerListErrors,
+  ContainerListResponses,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -1457,6 +1459,36 @@ export class Tool extends HeyApiClient {
 }
 
 export class Container extends HeyApiClient {
+  /**
+   * List containers
+   *
+   * List local containers using the first available runtime (docker or podman).
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ContainerListResponses, ContainerListErrors, ThrowOnError>({
+      url: "/experimental/container",
+      ...options,
+      ...params,
+    })
+  }
+
   /**
    * Create container
    *

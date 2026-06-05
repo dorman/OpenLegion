@@ -2060,11 +2060,17 @@ export type ContainerInfo = {
 }
 
 export type ContainerError = {
-  name: "ContainerRuntimeNotFoundError" | "ContainerRuntimeUnavailableError" | "ContainerCreateFailedError"
+  name:
+    | "ContainerRuntimeNotFoundError"
+    | "ContainerRuntimeUnavailableError"
+    | "ContainerCreateFailedError"
+    | "ContainerListFailedError"
   data: {
     message: string
   }
 }
+
+export type ContainerListOutput = Array<ContainerInfo>
 
 export type WorktreeError = {
   name:
@@ -5109,6 +5115,34 @@ export type ToolIdsResponses = {
 }
 
 export type ToolIdsResponse = ToolIdsResponses[keyof ToolIdsResponses]
+
+export type ContainerListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/container"
+}
+
+export type ContainerListErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type ContainerListError = ContainerListErrors[keyof ContainerListErrors]
+
+export type ContainerListResponses = {
+  /**
+   * Containers
+   */
+  200: ContainerListOutput
+}
+
+export type ContainerListResponse = ContainerListResponses[keyof ContainerListResponses]
 
 export type ContainerCreateData = {
   body?: ContainerCreateInput

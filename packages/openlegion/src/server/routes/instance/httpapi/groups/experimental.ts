@@ -76,6 +76,7 @@ const ContainerErrorName = Schema.Union([
   Schema.Literal("ContainerRuntimeNotFoundError"),
   Schema.Literal("ContainerRuntimeUnavailableError"),
   Schema.Literal("ContainerCreateFailedError"),
+  Schema.Literal("ContainerListFailedError"),
 ])
 export class ContainerApiError extends Schema.ErrorClass<ContainerApiError>("ContainerError")(
   {
@@ -179,6 +180,17 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "container.create",
             summary: "Create container",
             description: "Create a new local container using the first available runtime (docker or podman).",
+          }),
+        ),
+        HttpApiEndpoint.get("containerList", ExperimentalPaths.container, {
+          query: WorkspaceRoutingQuery,
+          success: described(Container.ListOutput, "Containers"),
+          error: ContainerApiError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "container.list",
+            summary: "List containers",
+            description: "List local containers using the first available runtime (docker or podman).",
           }),
         ),
         HttpApiEndpoint.get("worktree", ExperimentalPaths.worktree, {

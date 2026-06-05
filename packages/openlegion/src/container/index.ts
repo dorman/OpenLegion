@@ -52,11 +52,19 @@ export class CreateFailedError extends Schema.TaggedErrorClass<CreateFailedError
   message: Schema.String,
 }) {}
 
-export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError
+export class ListFailedError extends Schema.TaggedErrorClass<ListFailedError>()("ContainerListFailedError", {
+  message: Schema.String,
+}) {}
+
+export const ListOutput = Schema.Array(Info).annotate({ identifier: "ContainerListOutput" })
+export type ListOutput = typeof ListOutput.Type
+
+export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError | ListFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
+  readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
 }
 
@@ -80,6 +88,24 @@ function buildCreateArgs(input: CreateInput) {
   })
   const command = input.command ?? []
   return ["container", "create", ...name, ...env, ...ports, ...volumes, input.image, ...command]
+}
+
+function parseListOutput(stdout: string, runtime: Runtime) {
+  return stdout
+    .split("\n")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .flatMap((line) => {
+      try {
+        const data = JSON.parse(line) as { ID?: unknown; Image?: unknown; Names?: unknown; Name?: unknown }
+        if (typeof data.ID !== "string") return []
+        if (typeof data.Image !== "string") return []
+        const name = typeof data.Names === "string" ? data.Names : typeof data.Name === "string" ? data.Name : undefined
+        return [{ id: data.ID, image: data.Image, runtime, name }] satisfies ListOutput
+      } catch {
+        return []
+      }
+    })
 }
 
 export const layer = Layer.effect(
@@ -128,6 +154,18 @@ export const layer = Layer.effect(
       })
     })
 
+    const list = Effect.fn("Container.list")(function* () {
+      const runtime = yield* detectRuntime()
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["container", "ls", "--all", "--format", "{{json .}}"])
+      if (result.code !== 0) {
+        return yield* new ListFailedError({
+          message: normalizeMessage(result, "Failed to list containers"),
+        })
+      }
+      return parseListOutput(result.stdout, runtime)
+    })
+
     const create = Effect.fn("Container.create")(function* (input: CreateInput) {
       const runtime = yield* detectRuntime()
       yield* ensureRuntimeAvailable(runtime)
@@ -154,7 +192,7 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ create })
+    return Service.of({ list, create })
   }),
 )
 
