@@ -30,6 +30,23 @@ export const CreateInput = Schema.Struct({
 }).annotate({ identifier: "ContainerCreateInput" })
 export type CreateInput = typeof CreateInput.Type
 
+export const StartInput = Schema.Struct({
+  id: Schema.String,
+}).annotate({ identifier: "ContainerStartInput" })
+export type StartInput = typeof StartInput.Type
+
+export const StopInput = Schema.Struct({
+  id: Schema.String,
+}).annotate({ identifier: "ContainerStopInput" })
+export type StopInput = typeof StopInput.Type
+
+export const RemoveInput = Schema.Struct({
+  id: Schema.String,
+  force: Schema.optional(Schema.Boolean),
+  volumes: Schema.optional(Schema.Boolean),
+}).annotate({ identifier: "ContainerRemoveInput" })
+export type RemoveInput = typeof RemoveInput.Type
+
 export const Info = Schema.Struct({
   id: Schema.String,
   runtime: Runtime,
@@ -56,16 +73,38 @@ export class ListFailedError extends Schema.TaggedErrorClass<ListFailedError>()(
   message: Schema.String,
 }) {}
 
+export class StartFailedError extends Schema.TaggedErrorClass<StartFailedError>()("ContainerStartFailedError", {
+  message: Schema.String,
+}) {}
+
+export class StopFailedError extends Schema.TaggedErrorClass<StopFailedError>()("ContainerStopFailedError", {
+  message: Schema.String,
+}) {}
+
+export class RemoveFailedError extends Schema.TaggedErrorClass<RemoveFailedError>()("ContainerRemoveFailedError", {
+  message: Schema.String,
+}) {}
+
 export const ListOutput = Schema.Array(Info).annotate({ identifier: "ContainerListOutput" })
 export type ListOutput = typeof ListOutput.Type
 
-export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError | ListFailedError
+export type Error =
+  | RuntimeNotFoundError
+  | RuntimeUnavailableError
+  | CreateFailedError
+  | ListFailedError
+  | StartFailedError
+  | StopFailedError
+  | RemoveFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
   readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
+  readonly start: (input: StartInput) => Effect.Effect<boolean, Error>
+  readonly stop: (input: StopInput) => Effect.Effect<boolean, Error>
+  readonly remove: (input: RemoveInput) => Effect.Effect<boolean, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -88,6 +127,12 @@ function buildCreateArgs(input: CreateInput) {
   })
   const command = input.command ?? []
   return ["container", "create", ...name, ...env, ...ports, ...volumes, input.image, ...command]
+}
+
+function buildRemoveArgs(input: RemoveInput) {
+  const force = input.force ? ["--force"] : []
+  const volumes = input.volumes ? ["--volumes"] : []
+  return ["container", "rm", ...force, ...volumes, input.id]
 }
 
 function parseListOutput(stdout: string, runtime: Runtime) {
@@ -192,7 +237,37 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, create })
+    const start = Effect.fn("Container.start")(function* (input: StartInput) {
+      const runtime = yield* detectRuntime()
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["container", "start", input.id])
+      if (result.code === 0) return true
+      return yield* new StartFailedError({
+        message: normalizeMessage(result, `Failed to start container ${input.id}`),
+      })
+    })
+
+    const stop = Effect.fn("Container.stop")(function* (input: StopInput) {
+      const runtime = yield* detectRuntime()
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["container", "stop", input.id])
+      if (result.code === 0) return true
+      return yield* new StopFailedError({
+        message: normalizeMessage(result, `Failed to stop container ${input.id}`),
+      })
+    })
+
+    const remove = Effect.fn("Container.remove")(function* (input: RemoveInput) {
+      const runtime = yield* detectRuntime()
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, buildRemoveArgs(input))
+      if (result.code === 0) return true
+      return yield* new RemoveFailedError({
+        message: normalizeMessage(result, `Failed to remove container ${input.id}`),
+      })
+    })
+
+    return Service.of({ list, create, start, stop, remove })
   }),
 )
 

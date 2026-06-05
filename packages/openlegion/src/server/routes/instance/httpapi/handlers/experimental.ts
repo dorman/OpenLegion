@@ -128,6 +128,24 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* mapContainerError(container.list())
     })
 
+    const containerStart = Effect.fn("ExperimentalHttpApi.containerStart")(function* (ctx: {
+      payload: typeof Container.StartInput.Type
+    }) {
+      return yield* mapContainerError(container.start(ctx.payload))
+    })
+
+    const containerStop = Effect.fn("ExperimentalHttpApi.containerStop")(function* (ctx: {
+      payload: typeof Container.StopInput.Type
+    }) {
+      return yield* mapContainerError(container.stop(ctx.payload))
+    })
+
+    const containerRemove = Effect.fn("ExperimentalHttpApi.containerRemove")(function* (ctx: {
+      payload: typeof Container.RemoveInput.Type
+    }) {
+      return yield* mapContainerError(container.remove(ctx.payload))
+    })
+
     const worktreeCreate = Effect.fn("ExperimentalHttpApi.worktreeCreate")(function* (ctx: {
       payload: typeof Worktree.CreateInput.Type | void
     }) {
@@ -182,6 +200,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("toolIDs", toolIDs)
       .handle("containerCreate", containerCreate)
       .handle("containerList", containerList)
+      .handle("containerStart", containerStart)
+      .handle("containerStop", containerStop)
+      .handle("containerRemove", containerRemove)
       .handle("worktree", worktree)
       .handle("worktreeCreate", worktreeCreate)
       .handle("worktreeRemove", worktreeRemove)

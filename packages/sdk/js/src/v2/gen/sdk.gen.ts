@@ -29,6 +29,15 @@ import type {
   ContainerCreateResponses,
   ContainerListErrors,
   ContainerListResponses,
+  ContainerRemoveErrors,
+  ContainerRemoveInput,
+  ContainerRemoveResponses,
+  ContainerStartErrors,
+  ContainerStartInput,
+  ContainerStartResponses,
+  ContainerStopErrors,
+  ContainerStopInput,
+  ContainerStopResponses,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -1460,6 +1469,43 @@ export class Tool extends HeyApiClient {
 
 export class Container extends HeyApiClient {
   /**
+   * Remove container
+   *
+   * Remove a local container using the first available runtime (docker or podman).
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      containerRemoveInput?: ContainerRemoveInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "containerRemoveInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<ContainerRemoveResponses, ContainerRemoveErrors, ThrowOnError>({
+      url: "/experimental/container",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
    * List containers
    *
    * List local containers using the first available runtime (docker or podman).
@@ -1516,6 +1562,80 @@ export class Container extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<ContainerCreateResponses, ContainerCreateErrors, ThrowOnError>({
       url: "/experimental/container",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Start container
+   *
+   * Start a local container using the first available runtime (docker or podman).
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      containerStartInput?: ContainerStartInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "containerStartInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ContainerStartResponses, ContainerStartErrors, ThrowOnError>({
+      url: "/experimental/container/start",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Stop container
+   *
+   * Stop a local container using the first available runtime (docker or podman).
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      containerStopInput?: ContainerStopInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "containerStopInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<ContainerStopResponses, ContainerStopErrors, ThrowOnError>({
+      url: "/experimental/container/stop",
       ...options,
       ...params,
       headers: {

@@ -512,6 +512,30 @@ const scenarios: Scenario[] = [
       headers: ctx.headers({ "x-openlegion-directory": "/openlegion-httpapi-missing" }),
     }))
     .status(400),
+  http.protected
+    .post("/experimental/container/start", "container.start")
+    .at((ctx) => ({
+      path: "/experimental/container/start",
+      headers: ctx.headers(),
+      body: {},
+    }))
+    .status(400),
+  http.protected
+    .post("/experimental/container/stop", "container.stop")
+    .at((ctx) => ({
+      path: "/experimental/container/stop",
+      headers: ctx.headers(),
+      body: {},
+    }))
+    .status(400),
+  http.protected
+    .delete("/experimental/container", "container.remove")
+    .at((ctx) => ({
+      path: "/experimental/container",
+      headers: ctx.headers(),
+      body: {},
+    }))
+    .status(400),
   http.protected.get("/experimental/worktree", "worktree.list").json(200, array),
   http.protected
     .post("/experimental/worktree", "worktree.create")

@@ -2065,12 +2065,29 @@ export type ContainerError = {
     | "ContainerRuntimeUnavailableError"
     | "ContainerCreateFailedError"
     | "ContainerListFailedError"
+    | "ContainerStartFailedError"
+    | "ContainerStopFailedError"
+    | "ContainerRemoveFailedError"
   data: {
     message: string
   }
 }
 
 export type ContainerListOutput = Array<ContainerInfo>
+
+export type ContainerStartInput = {
+  id: string
+}
+
+export type ContainerStopInput = {
+  id: string
+}
+
+export type ContainerRemoveInput = {
+  id: string
+  force?: boolean
+  volumes?: boolean
+}
 
 export type WorktreeError = {
   name:
@@ -5116,6 +5133,34 @@ export type ToolIdsResponses = {
 
 export type ToolIdsResponse = ToolIdsResponses[keyof ToolIdsResponses]
 
+export type ContainerRemoveData = {
+  body?: ContainerRemoveInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/container"
+}
+
+export type ContainerRemoveErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type ContainerRemoveError = ContainerRemoveErrors[keyof ContainerRemoveErrors]
+
+export type ContainerRemoveResponses = {
+  /**
+   * Container removed
+   */
+  200: boolean
+}
+
+export type ContainerRemoveResponse = ContainerRemoveResponses[keyof ContainerRemoveResponses]
+
 export type ContainerListData = {
   body?: never
   path?: never
@@ -5171,6 +5216,62 @@ export type ContainerCreateResponses = {
 }
 
 export type ContainerCreateResponse = ContainerCreateResponses[keyof ContainerCreateResponses]
+
+export type ContainerStartData = {
+  body?: ContainerStartInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/container/start"
+}
+
+export type ContainerStartErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type ContainerStartError = ContainerStartErrors[keyof ContainerStartErrors]
+
+export type ContainerStartResponses = {
+  /**
+   * Container started
+   */
+  200: boolean
+}
+
+export type ContainerStartResponse = ContainerStartResponses[keyof ContainerStartResponses]
+
+export type ContainerStopData = {
+  body?: ContainerStopInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/container/stop"
+}
+
+export type ContainerStopErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type ContainerStopError = ContainerStopErrors[keyof ContainerStopErrors]
+
+export type ContainerStopResponses = {
+  /**
+   * Container stopped
+   */
+  200: boolean
+}
+
+export type ContainerStopResponse = ContainerStopResponses[keyof ContainerStopResponses]
 
 export type WorktreeRemoveData = {
   body?: WorktreeRemoveInput

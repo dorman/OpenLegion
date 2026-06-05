@@ -77,6 +77,9 @@ const ContainerErrorName = Schema.Union([
   Schema.Literal("ContainerRuntimeUnavailableError"),
   Schema.Literal("ContainerCreateFailedError"),
   Schema.Literal("ContainerListFailedError"),
+  Schema.Literal("ContainerStartFailedError"),
+  Schema.Literal("ContainerStopFailedError"),
+  Schema.Literal("ContainerRemoveFailedError"),
 ])
 export class ContainerApiError extends Schema.ErrorClass<ContainerApiError>("ContainerError")(
   {
@@ -102,6 +105,8 @@ export const ExperimentalPaths = {
   tool: "/experimental/tool",
   toolIDs: "/experimental/tool/ids",
   container: "/experimental/container",
+  containerStart: "/experimental/container/start",
+  containerStop: "/experimental/container/stop",
   worktree: "/experimental/worktree",
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
@@ -191,6 +196,42 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "container.list",
             summary: "List containers",
             description: "List local containers using the first available runtime (docker or podman).",
+          }),
+        ),
+        HttpApiEndpoint.post("containerStart", ExperimentalPaths.containerStart, {
+          query: WorkspaceRoutingQuery,
+          payload: Container.StartInput,
+          success: described(Schema.Boolean, "Container started"),
+          error: ContainerApiError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "container.start",
+            summary: "Start container",
+            description: "Start a local container using the first available runtime (docker or podman).",
+          }),
+        ),
+        HttpApiEndpoint.post("containerStop", ExperimentalPaths.containerStop, {
+          query: WorkspaceRoutingQuery,
+          payload: Container.StopInput,
+          success: described(Schema.Boolean, "Container stopped"),
+          error: ContainerApiError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "container.stop",
+            summary: "Stop container",
+            description: "Stop a local container using the first available runtime (docker or podman).",
+          }),
+        ),
+        HttpApiEndpoint.delete("containerRemove", ExperimentalPaths.container, {
+          query: WorkspaceRoutingQuery,
+          payload: Container.RemoveInput,
+          success: described(Schema.Boolean, "Container removed"),
+          error: ContainerApiError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "container.remove",
+            summary: "Remove container",
+            description: "Remove a local container using the first available runtime (docker or podman).",
           }),
         ),
         HttpApiEndpoint.get("worktree", ExperimentalPaths.worktree, {
