@@ -2,7 +2,7 @@ import { AppProcess } from "@openlegion-ai/core/process"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 
-export const Runtime = Schema.Literal("docker", "podman")
+export const Runtime = Schema.Literals(["docker", "podman"])
 export type Runtime = typeof Runtime.Type
 
 export const CreateInput = Schema.Struct({
