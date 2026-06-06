@@ -1,42 +1,17 @@
 import { AppProcess } from "@openlegion-ai/core/process"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
+import * as MicroVMClient from "./microvm-client"
+import type * as ContainerSchema from "./schema"
 
-export const Runtime = Schema.Literals(["docker", "podman"])
-export type Runtime = typeof Runtime.Type
+export * from "./schema"
 
-export const CreateInput = Schema.Struct({
-  image: Schema.String,
-  name: Schema.optional(Schema.String),
-  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-  ports: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        host: Schema.String,
-        container: Schema.String,
-      }),
-    ),
-  ),
-  volumes: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        host: Schema.String,
-        container: Schema.String,
-        readOnly: Schema.optional(Schema.Boolean),
-      }),
-    ),
-  ),
-  command: Schema.optional(Schema.Array(Schema.String)),
-}).annotate({ identifier: "ContainerCreateInput" })
-export type CreateInput = typeof CreateInput.Type
+type CreateInput = ContainerSchema.CreateInput
+type Info = ContainerSchema.Info
+type ListOutput = ContainerSchema.ListOutput
+type Runtime = ContainerSchema.Runtime
 
-export const Info = Schema.Struct({
-  id: Schema.String,
-  runtime: Runtime,
-  image: Schema.String,
-  name: Schema.optional(Schema.String),
-}).annotate({ identifier: "ContainerInfo" })
-export type Info = typeof Info.Type
+type CliRuntime = "docker" | "podman"
 
 export class RuntimeNotFoundError extends Schema.TaggedErrorClass<RuntimeNotFoundError>()(
   "ContainerRuntimeNotFoundError",
@@ -52,11 +27,16 @@ export class CreateFailedError extends Schema.TaggedErrorClass<CreateFailedError
   message: Schema.String,
 }) {}
 
-export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError
+export class ListFailedError extends Schema.TaggedErrorClass<ListFailedError>()("ContainerListFailedError", {
+  message: Schema.String,
+}) {}
+
+export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError | ListFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
+  readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
 }
 
@@ -82,13 +62,32 @@ function buildCreateArgs(input: CreateInput) {
   return ["container", "create", ...name, ...env, ...ports, ...volumes, input.image, ...command]
 }
 
+function parseListOutput(stdout: string, runtime: CliRuntime) {
+  return stdout
+    .split("\n")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .flatMap((line) => {
+      try {
+        const data = JSON.parse(line) as { ID?: unknown; Image?: unknown; Names?: unknown; Name?: unknown }
+        if (typeof data.ID !== "string") return []
+        if (typeof data.Image !== "string") return []
+        const name = typeof data.Names === "string" ? data.Names : typeof data.Name === "string" ? data.Name : undefined
+        return [{ id: data.ID, image: data.Image, runtime, name }] satisfies ListOutput
+      } catch {
+        return []
+      }
+    })
+}
+
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const appProcess = yield* AppProcess.Service
+    const microvmClient = yield* MicroVMClient.Service
 
     const run = Effect.fnUntraced(
-      function* (runtime: Runtime, args: string[]) {
+      function* (runtime: CliRuntime, args: string[]) {
         const result = yield* appProcess.run(
           ChildProcess.make(runtime, args, {
             extendEnv: true,
@@ -111,16 +110,45 @@ export const layer = Layer.effect(
     )
 
     const detectRuntime = Effect.fnUntraced(function* () {
+      const preferred = process.env.OPENLEGION_CONTAINER_RUNTIME?.trim().toLowerCase()
+
+      if (preferred === "microvm") {
+        if (yield* microvmClient.health()) return "microvm" as const
+        return yield* new RuntimeNotFoundError({
+          message: "OPENLEGION_CONTAINER_RUNTIME=microvm but the sandbox daemon is unavailable",
+        })
+      }
+
+      if (preferred === "docker") {
+        const docker = yield* run("docker", ["--version"])
+        if (docker.code === 0) return "docker" as const
+        return yield* new RuntimeNotFoundError({ message: "docker is not available on PATH" })
+      }
+
+      if (preferred === "podman") {
+        const podman = yield* run("podman", ["--version"])
+        if (podman.code === 0) return "podman" as const
+        return yield* new RuntimeNotFoundError({ message: "podman is not available on PATH" })
+      }
+
+      if (yield* microvmClient.health()) return "microvm" as const
+
       const docker = yield* run("docker", ["--version"])
       if (docker.code === 0) return "docker" as const
       const podman = yield* run("podman", ["--version"])
       if (podman.code === 0) return "podman" as const
       return yield* new RuntimeNotFoundError({
-        message: "Neither docker nor podman is available on PATH",
+        message: "Neither the sandbox daemon, docker, nor podman is available",
       })
     })
 
     const ensureRuntimeAvailable = Effect.fnUntraced(function* (runtime: Runtime) {
+      if (runtime === "microvm") {
+        if (yield* microvmClient.health()) return
+        return yield* new RuntimeUnavailableError({
+          message: "microvm daemon is unavailable",
+        })
+      }
       const result = yield* run(runtime, ["info"])
       if (result.code === 0) return
       return yield* new RuntimeUnavailableError({
@@ -128,8 +156,30 @@ export const layer = Layer.effect(
       })
     })
 
+    const list = Effect.fn("Container.list")(function* () {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.list().pipe(
+          Effect.mapError((message) => new ListFailedError({ message })),
+        )
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["container", "ls", "--all", "--format", "{{json .}}"])
+      if (result.code !== 0) {
+        return yield* new ListFailedError({
+          message: normalizeMessage(result, "Failed to list containers"),
+        })
+      }
+      return parseListOutput(result.stdout, runtime)
+    })
+
     const create = Effect.fn("Container.create")(function* (input: CreateInput) {
       const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.create(input).pipe(
+          Effect.mapError((message) => new CreateFailedError({ message })),
+        )
+      }
       yield* ensureRuntimeAvailable(runtime)
       const result = yield* run(runtime, buildCreateArgs(input))
       if (result.code !== 0) {
@@ -154,10 +204,10 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ create })
+    return Service.of({ list, create })
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(AppProcess.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(AppProcess.defaultLayer), Layer.provide(MicroVMClient.defaultLayer))
 
 export * as Container from "."
