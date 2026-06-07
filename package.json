@@ -132,6 +132,9 @@
     "electron"
   ],
   "overrides": {
+    "@opencode-ai/plugin": "file:./packages/plugin",
+    "@opencode-ai/sdk": "file:./packages/sdk/js",
+    "@opencode-ai/script": "file:./packages/script",
     "@opentui/core": "catalog:",
     "@opentui/keymap": "catalog:",
     "@opentui/solid": "catalog:",
