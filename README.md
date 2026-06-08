@@ -41,10 +41,10 @@ flowchart LR
   end
 ```
 
-1. **Desktop-first** — Primary experience is the Electron app (`bun run dev:desktop`): see containers, projects, and agent sessions in one place.
-2. **Many containers** — Run and manage multiple Docker containers (and stacks) from that UI, similar in spirit to Docker Desktop but with agent-assisted flows.
+1. **Desktop-first** — Primary experience is the Electron app (`bun run dev:desktop`): manage containers, open agent sessions, and review recent work in one place.
+2. **Many containers** — List, create, stop, and remove Docker workloads from the desktop UI or CLI, with optional per-workload network isolation via the sandbox daemon.
 3. **Agents that help** — Sandboxed agents assist with writing Dockerfiles, hardening images, explaining `docker`/`compose` output, and proposing fixes—always subject to permission rules and your approval.
-4. **Security by design** — Agents run with constrained scope; risky operations require confirmation. The goal is secure **design** and **bring-up**, not unconstrained shell access on the host.
+4. **Security by design** — Linked sessions run file and shell tools inside the container; risky operations require confirmation. The goal is secure **design** and **bring-up**, not unconstrained host access.
 
 Branding uses a Robin Hood motif: defend operators and workloads against opaque, insecure defaults—give teams control on their own hardware.
 
@@ -52,26 +52,53 @@ Branding uses a Robin Hood motif: defend operators and workloads against opaque,
 
 ## What exists today vs. what we are building
 
-This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. The agent runtime, permissions model, desktop shell, and HTTP API are largely in place; **Docker-centric management UI and container-native agent tools are the main work ahead.**
+This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. The agent runtime, permissions model, desktop shell, and HTTP API are in place. **Container management, sandbox runtimes, and in-container agent tools are now implemented** on the path to the full Docker Desktop + security-agent vision.
 
 ### Available now
 
-| Component           | Command / location     | Notes                                                                   |
-| ------------------- | ---------------------- | ----------------------------------------------------------------------- |
-| **Desktop app**     | `bun run dev:desktop`  | Electron UI—foundation for the management platform                      |
-| **CLI / TUI**       | `bun run dev`          | Terminal agent (upstream OpenCode behavior)                             |
-| **Web UI**          | `bun run dev:web`      | Same app shell in the browser for development                           |
-| **Agent runtime**   | `packages/openlegion`  | Sessions, tools, providers, MCP, plugins                                |
-| **Permissions**     | `~/.openlegion`        | Gates for files, shell, and tools                                       |
+| Component | Command / location | Notes |
+| --- | --- | --- |
+| **Desktop app** | `bun run dev:desktop` | Electron UI with Containers, Agents, and Settings navigation |
+| **Containers UI** | Desktop → **Containers** | List running/stopped workloads, create containers, open agent sessions |
+| **Sandbox daemon** | `go run ./cmd/openlegion-microvm` | Per-workload isolated Docker networks ([daemon README](./cmd/openlegion-microvm/README.md)) |
+| **Container runtime** | `packages/openlegion/src/container/` | Auto-detects microvm daemon, Docker, or Podman (`OPENLEGION_CONTAINER_RUNTIME`) |
+| **Container HTTP API** | `GET/POST /global/containers` | List, create, stop, and remove containers via the local sidecar |
+| **Container workspaces** | `GET/PUT /global/container-workspaces` | Persist bind mounts and session links per container |
+| **Container CLI** | `openlegion container list\|create\|stop\|remove` | Manage workloads from the terminal |
+| **CLI / TUI** | `bun run dev` | Terminal agent (upstream OpenCode behavior) |
+| **Web UI** | `bun run dev:web` | Same app shell in the browser for development |
+| **Agent runtime** | `packages/openlegion` | Sessions, tools, providers, MCP, plugins |
+| **Permissions** | `~/.openlegion` | Gates for files, shell, and tools |
 | **Built-in agents** | TUI: **Tab** to switch | `build`, `plan` (read-only + asks before shell), `general` (`@general`) |
 
 Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per repo. See [`.openlegion/`](./.openlegion/) for sample agents and commands.
 
+### Container & sandbox features
+
+| Feature | Description |
+| --- | --- |
+| **Create containers** | Desktop dialog or CLI—image, name, command, ports, bind mounts |
+| **Isolated sandboxes** | `openlegion-microvm` places each workload on its own Docker network |
+| **Open agent session** | Bind a host project directory into a container and start/resume an agent session with `openlegion.container` metadata |
+| **In-container file tools** | When a session has container metadata, `read`, `write`, and `edit` run inside the container via `docker exec` (not on the host) |
+| **In-container shell** | Shell tool wraps commands in `docker exec` for sandboxed sessions |
+| **Session sandbox badge** | Session header shows when a session is linked to a container |
+| **Container workspaces** | Stored in `~/.openlegion/data/container-workspaces.json` |
+| **Runtime status** | Desktop can check Docker / sandbox daemon availability and start the daemon |
+
+### Desktop UI
+
+- **Containers page** — card layout with running/stopped status, network label, and actions (open session, stop, remove)
+- **Agents page** — recent agent sessions (`/agents`)
+- **Settings** — in-app settings dialog from the sidebar
+- **Dev channel badge** — neon green `DEV` indicator in the titlebar (dev builds)
+- **Theme** — dark charcoal shell with green accents and monospace typography on desktop
+
 ### Roadmap (product focus)
 
-- [ ] **Docker integration in desktop** — list/start/stop containers and compose projects from the UI
-- [ ] **Multi-container workspace** — run several stacks side by side with clear isolation boundaries
-- [ ] **Sandboxed agent execution** — agents scoped to container filesystem/network context where possible
+- [ ] **Compose project management** — create and manage multi-service stacks from the desktop UI
+- [ ] **Multi-container workspace** — run several stacks side by side with clear isolation boundaries in the UI
+- [ ] **Project sandboxes** — register container host paths as project sandboxes in the sidebar
 - [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run
 - [ ] **Security-team views** — audit-friendly session logs and policy hints for common misconfigurations
 
@@ -93,7 +120,8 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 ## Requirements
 
 - [Bun](https://bun.sh) **1.3.14+**
-- [Docker](https://docs.docker.com/get-docker/) (for upcoming container features; install now if you plan to contribute)
+- [Docker](https://docs.docker.com/get-docker/) (or Podman) for container features
+- [Go](https://go.dev) **1.22+** (to build/run the sandbox daemon locally)
 - macOS, Linux, or Windows (desktop development is most tested on **macOS** today)
 
 ---
@@ -110,6 +138,12 @@ bun run dev:desktop
 
 # Terminal agent (also useful for debugging)
 bun run dev
+
+# Optional: sandbox daemon (isolated networks per container)
+go run ./cmd/openlegion-microvm
+
+# Container CLI (with local server or daemon running)
+bun run dev -- container list
 ```
 
 Future CLI install (when published): `npm i -g openlegion-ai`.
@@ -118,13 +152,15 @@ Future CLI install (when published): `npm i -g openlegion-ai`.
 
 ## Agents and security
 
-Agents inherit OpenCode’s model and will tighten for container work:
+Agents inherit OpenCode’s model and tighten for container work:
 
 | Agent       | Role                                                                          |
 | ----------- | ----------------------------------------------------------------------------- |
 | **build**   | Implementation agent—edits and commands allowed per your permission config    |
 | **plan**    | Read-only analysis—ideal for reviewing Dockerfiles and compose before changes |
 | **general** | Multi-step search subagent (`@general` in prompts)                            |
+
+When a session is linked to a container (`openlegion.container` metadata), file and shell tools operate **inside the container** at the mapped workspace path. Permission prompts include container context (container id and runtime).
 
 **Security direction:** default-deny tooling, explicit approval for shell and deploy actions, sandboxed context per container/project, and local-only storage of secrets and session history—no telemetry requirement for core use.
 
@@ -133,15 +169,18 @@ Agents inherit OpenCode’s model and will tighten for container work:
 ## Monorepo layout
 
 ```
+cmd/
+  openlegion-microvm/   # Go sandbox daemon (isolated Docker networks)
+internal/               # Daemon engine, Docker client, sandbox networking
 packages/
-  openlegion/     # CLI, TUI, local HTTP server, agent + tool runtime
-  core/           # Shared logic (permissions, DB, providers, …)
-  app/            # SolidJS UI (used inside desktop)
-  desktop/        # Electron management shell
-  ui/             # Components and brand assets
-  plugin/         # Plugin SDK
-  sdk/            # JS client for the local API
-  containers/     # CI images only (not the product runtime)
+  openlegion/           # CLI, TUI, local HTTP server, agent + tool runtime
+  core/                 # Shared logic (permissions, DB, providers, …)
+  app/                  # SolidJS UI (containers page, desktop shell, dialogs)
+  desktop/              # Electron management shell + container runtime IPC
+  ui/                   # Components and brand assets
+  plugin/               # Plugin SDK
+  sdk/                  # JS client for the local API
+  containers/           # CI images only (not the product runtime)
 ```
 
 Default branch: **`dev`**. Conventions: [AGENTS.md](./AGENTS.md), contributions: [CONTRIBUTING.md](./CONTRIBUTING.md).
@@ -155,7 +194,14 @@ Default branch: **`dev`**. Conventions: [AGENTS.md](./AGENTS.md), contributions:
 | `~/.openlegion/` | Global settings, auth, custom agents/commands |
 | `.openlegion/`   | Per-project overrides                         |
 
-Environment variables: `OPENLEGION_*` prefix (e.g. `OPENLEGION_BIN_PATH`).
+Environment variables: `OPENLEGION_*` prefix. Container-related examples:
+
+| Variable | Purpose |
+| --- | --- |
+| `OPENLEGION_CONTAINER_RUNTIME` | Prefer `microvm`, `docker`, or `podman` |
+| `OPENLEGION_MICROVM_URL` | Sandbox daemon URL (default `http://127.0.0.1:7420`) |
+| `OPENLEGION_MICROVM_LISTEN` | Daemon listen address |
+| `OPENLEGION_SANDBOX_ROOT` | Sandbox metadata directory (default `~/.openlegion/sandboxes`) |
 
 ---
 
