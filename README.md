@@ -1,5 +1,5 @@
 # OpenLegion
-[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/main)
+[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/dev.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/dev)
 ![MIT License](https://img.shields.io/badge/LICENSE-MIT-%234183C4.svg?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TYPESCRIPT-%233178C6.svg?style=for-the-badge&logo=typescript&logoColor=white)
 ![Electron](https://img.shields.io/badge/ELECTRON-%2347848F.svg?style=for-the-badge&logo=electron&logoColor=white)
