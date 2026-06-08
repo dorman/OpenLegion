@@ -42,3 +42,14 @@ export type Info = typeof Info.Type
 
 export const ListOutput = Schema.Array(Info).annotate({ identifier: "ContainerListOutput" })
 export type ListOutput = typeof ListOutput.Type
+
+export const LogsOutput = Schema.Struct({
+  logs: Schema.String,
+}).annotate({ identifier: "ContainerLogsOutput" })
+export type LogsOutput = typeof LogsOutput.Type
+
+export const ShellOutput = Schema.Struct({
+  command: Schema.String,
+  runtime: Runtime,
+}).annotate({ identifier: "ContainerShellOutput" })
+export type ShellOutput = typeof ShellOutput.Type

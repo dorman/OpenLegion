@@ -288,6 +288,15 @@ const createPlatform = (): Platform => {
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
 
+    containerPty: {
+      create: (command, size) => window.api.containerPtyCreate({ command, ...size }),
+      write: (id, data) => window.api.containerPtyWrite(id, data),
+      resize: (id, cols, rows) => window.api.containerPtyResize(id, cols, rows),
+      close: (id) => window.api.containerPtyClose(id),
+      onData: (cb) => window.api.onContainerPtyData(cb),
+      onExit: (cb) => window.api.onContainerPtyExit(cb),
+    },
+
     async readClipboardImage() {
       const image = await window.api.readClipboardImage().catch(() => null)
       if (!image) return null

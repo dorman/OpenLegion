@@ -24,6 +24,17 @@ export type EnsureMicrovmDaemonResult = {
   error?: string
 }
 
+export type ContainerPtyCreateResult = { id: string } | { error: string }
+
+export type ContainerPty = {
+  create(command: string, size: { cols: number; rows: number }): Promise<ContainerPtyCreateResult>
+  write(id: string, data: string): Promise<void>
+  resize(id: string, cols: number, rows: number): Promise<void>
+  close(id: string): Promise<void>
+  onData(cb: (id: string, data: string) => void): () => void
+  onExit(cb: (id: string, code: number) => void): () => void
+}
+
 export type FatalRendererErrorLog = {
   error: string
   url: string
@@ -131,6 +142,9 @@ export type Platform = {
 
   /** Start the local sandbox daemon when possible (desktop only) */
   ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
+
+  /** Interactive container shell bridged through the desktop main process (desktop only) */
+  containerPty?: ContainerPty
 }
 
 export type DisplayBackend = "auto" | "wayland"

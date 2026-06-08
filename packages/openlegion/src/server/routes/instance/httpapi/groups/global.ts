@@ -6,11 +6,15 @@ import "@openlegion-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { CreateInput, Info, ListOutput } from "@/container/schema"
+import { CreateInput, Info, ListOutput, LogsOutput, ShellOutput } from "@/container/schema"
 import { UpsertPayload, Workspace } from "@/container/workspace"
 import { described } from "./metadata"
 
 const ContainerID = Schema.String
+
+const ContainerLogsQuery = Schema.Struct({
+  tail: Schema.optional(Schema.NumberFromString),
+})
 
 const GlobalHealth = Schema.Struct({
   healthy: Schema.Literal(true),
@@ -73,6 +77,8 @@ export const GlobalPaths = {
   upgrade: "/global/upgrade",
   containers: "/global/containers",
   containerStop: "/global/containers/:id/stop",
+  containerLogs: "/global/containers/:id/logs",
+  containerShell: "/global/containers/:id/shell",
   containerRemove: "/global/containers/:id",
   containerWorkspaces: "/global/container-workspaces",
   containerWorkspace: "/global/container-workspaces/:containerId",
@@ -169,6 +175,29 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.containers.stop",
           summary: "Stop container",
           description: "Stop a sandbox container by id.",
+        }),
+      ),
+      HttpApiEndpoint.get("containerLogs", GlobalPaths.containerLogs, {
+        params: { id: ContainerID },
+        query: ContainerLogsQuery,
+        success: described(LogsOutput, "Container logs"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.logs",
+          summary: "Container logs",
+          description: "Fetch recent stdout/stderr logs for a sandbox container.",
+        }),
+      ),
+      HttpApiEndpoint.get("containerShell", GlobalPaths.containerShell, {
+        params: { id: ContainerID },
+        success: described(ShellOutput, "Container shell command"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.shell",
+          summary: "Container shell command",
+          description: "Resolve the local command used to open an interactive shell in a sandbox container.",
         }),
       ),
       HttpApiEndpoint.delete("containerRemove", GlobalPaths.containerRemove, {

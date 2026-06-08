@@ -13,12 +13,23 @@ const VmInfo = Schema.Struct({
 
 const VmList = Schema.Array(VmInfo)
 
+const LogsResponse = Schema.Struct({
+  logs: Schema.String,
+})
+
+const ShellResponse = Schema.Struct({
+  command: Schema.String,
+  runtime: Schema.String,
+})
+
 export interface Interface {
   readonly health: () => Effect.Effect<boolean>
   readonly create: (input: typeof CreateInput.Type) => Effect.Effect<Info, string>
   readonly list: () => Effect.Effect<Array<Info>, string>
   readonly stop: (id: string) => Effect.Effect<void, string>
   readonly remove: (id: string) => Effect.Effect<void, string>
+  readonly logs: (id: string, tail: number) => Effect.Effect<{ logs: string }, string>
+  readonly shell: (id: string) => Effect.Effect<{ command: string; runtime: "docker" | "podman" | "microvm" }, string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container/MicroVMClient") {}
@@ -90,7 +101,30 @@ export const layer = Layer.effect(
       )
     })
 
-    return Service.of({ health, create, list, stop, remove })
+    const logs = Effect.fnUntraced(function* (id: string, tail: number) {
+      const query = tail > 0 ? `?tail=${encodeURIComponent(String(tail))}` : ""
+      return yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/logs${query}`).pipe(
+        HttpClientRequest.acceptJson,
+        http.execute,
+        Effect.flatMap(HttpClientResponse.schemaBodyJson(LogsResponse)),
+        Effect.mapError((error) => errorMessage(error, "Failed to fetch microvm logs")),
+      )
+    })
+
+    const shell = Effect.fnUntraced(function* (id: string) {
+      return yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/shell`).pipe(
+        HttpClientRequest.acceptJson,
+        http.execute,
+        Effect.flatMap(HttpClientResponse.schemaBodyJson(ShellResponse)),
+        Effect.map((item) => ({
+          command: item.command,
+          runtime: item.runtime === "podman" ? ("podman" as const) : ("microvm" as const),
+        })),
+        Effect.mapError((error) => errorMessage(error, "Failed to resolve microvm shell command")),
+      )
+    })
+
+    return Service.of({ health, create, list, stop, remove, logs, shell })
   }),
 )
 

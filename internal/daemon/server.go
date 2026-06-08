@@ -3,6 +3,7 @@ package daemon
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/dorman/openlegion/internal/daemon/store"
@@ -29,6 +30,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /vms", s.handleCreate)
 	mux.HandleFunc("POST /vms/{id}/stop", s.handleStop)
 	mux.HandleFunc("DELETE /vms/{id}", s.handleDelete)
+	mux.HandleFunc("GET /vms/{id}/logs", s.handleLogs)
+	mux.HandleFunc("GET /vms/{id}/shell", s.handleShell)
 	return mux
 }
 
@@ -116,6 +119,51 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 	s.store.Delete(id)
 	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
+}
+
+func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	tail := 200
+	if raw := strings.TrimSpace(r.URL.Query().Get("tail")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			writeError(w, http.StatusBadRequest, "tail must be a non-negative integer")
+			return
+		}
+		tail = parsed
+	}
+
+	logs, err := s.engine.Logs(r.Context(), id, tail)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, types.LogsResponse{Logs: logs})
+}
+
+func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	command, err := s.engine.ShellCommand(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, types.ShellResponse{
+		Command: command,
+		Runtime: "docker",
+	})
 }
 
 func toVMInfo(vm store.VM) types.VMInfo {

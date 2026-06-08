@@ -71,6 +71,20 @@ const api: ElectronAPI = {
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   containerRuntimeStatus: () => ipcRenderer.invoke("container-runtime-status"),
   ensureMicrovmDaemon: () => ipcRenderer.invoke("ensure-microvm-daemon"),
+  containerPtyCreate: (input) => ipcRenderer.invoke("container-pty-create", input),
+  containerPtyWrite: (id, data) => ipcRenderer.invoke("container-pty-write", id, data),
+  containerPtyResize: (id, cols, rows) => ipcRenderer.invoke("container-pty-resize", id, cols, rows),
+  containerPtyClose: (id) => ipcRenderer.invoke("container-pty-close", id),
+  onContainerPtyData: (cb) => {
+    const handler = (_: unknown, id: string, data: string) => cb(id, data)
+    ipcRenderer.on("container-pty-data", handler)
+    return () => ipcRenderer.removeListener("container-pty-data", handler)
+  },
+  onContainerPtyExit: (cb) => {
+    const handler = (_: unknown, id: string, code: number) => cb(id, code)
+    ipcRenderer.on("container-pty-exit", handler)
+    return () => ipcRenderer.removeListener("container-pty-exit", handler)
+  },
 }
 
 contextBridge.exposeInMainWorld("api", api)

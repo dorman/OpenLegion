@@ -13,6 +13,8 @@ function runContainer<A, R>(effect: Effect.Effect<A, Container.Error, R>) {
     Effect.catchTag("ContainerListFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerStopFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerRemoveFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerLogsFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerShellFailedError", (error) => fail(error.message)),
   )
 }
 
@@ -25,6 +27,8 @@ export const ContainerCommand = cmd({
       .command(ContainerCreateCommand)
       .command(ContainerStopCommand)
       .command(ContainerRemoveCommand)
+      .command(ContainerLogsCommand)
+      .command(ContainerShellCommand)
       .demandCommand(),
   async handler() {},
 })
@@ -130,6 +134,45 @@ export const ContainerStopCommand = effectCmd({
   handler: Effect.fn("Cli.container.stop")(function* (args) {
     yield* runContainer(Container.Service.use((svc) => svc.stop(args.id)))
     UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Stopped ${args.id}` + UI.Style.TEXT_NORMAL)
+  }),
+})
+
+export const ContainerLogsCommand = effectCmd({
+  command: "logs <id>",
+  describe: "fetch container logs",
+  instance: false,
+  builder: (yargs) =>
+    yargs
+      .positional("id", {
+        describe: "container or sandbox id",
+        type: "string",
+        demandOption: true,
+      })
+      .option("tail", {
+        describe: "number of lines to fetch",
+        type: "number",
+        default: 200,
+      }),
+  handler: Effect.fn("Cli.container.logs")(function* (args) {
+    const result = yield* runContainer(Container.Service.use((svc) => svc.logs(args.id, { tail: args.tail })))
+    process.stdout.write(result.logs)
+    if (!result.logs.endsWith("\n")) console.log()
+  }),
+})
+
+export const ContainerShellCommand = effectCmd({
+  command: "shell <id>",
+  describe: "print the command to open an interactive shell",
+  instance: false,
+  builder: (yargs) =>
+    yargs.positional("id", {
+      describe: "container or sandbox id",
+      type: "string",
+      demandOption: true,
+    }),
+  handler: Effect.fn("Cli.container.shell")(function* (args) {
+    const result = yield* runContainer(Container.Service.use((svc) => svc.shell(args.id)))
+    console.log(result.command)
   }),
 })
 

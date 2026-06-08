@@ -33,3 +33,12 @@ type ErrorResponse struct {
 type HealthResponse struct {
 	OK bool `json:"ok"`
 }
+
+type LogsResponse struct {
+	Logs string `json:"logs"`
+}
+
+type ShellResponse struct {
+	Command string `json:"command"`
+	Runtime string `json:"runtime"`
+}

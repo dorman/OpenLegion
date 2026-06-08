@@ -34,6 +34,13 @@ import {
   setDockIcon,
 } from "./windows"
 import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
+import {
+  closeAllContainerPtys,
+  closeContainerPty,
+  createContainerPty,
+  resizeContainerPty,
+  writeContainerPty,
+} from "./container-pty"
 import { migrate } from "./migrate"
 import { checkUpdate, checkForUpdates, installUpdate, setupAutoUpdater } from "./updater"
 import { Deferred, Effect, Fiber } from "effect"
@@ -180,6 +187,7 @@ const main = Effect.gen(function* () {
   })
 
   app.on("before-quit", () => {
+    closeAllContainerPtys()
     void killSidecar()
   })
 
@@ -241,6 +249,22 @@ const main = Effect.gen(function* () {
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
+    containerPtyCreate: (event, input) => {
+      try {
+        let id = ""
+        id = createContainerPty({
+          ...input,
+          onData: (data) => event.sender.send("container-pty-data", id, data),
+          onExit: (code) => event.sender.send("container-pty-exit", id, code),
+        })
+        return { id }
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+    containerPtyWrite: (id, data) => writeContainerPty(id, data),
+    containerPtyResize: (id, cols, rows) => resizeContainerPty(id, cols, rows),
+    containerPtyClose: (id) => closeContainerPty(id),
   })
 
   yield* Effect.promise(() => app.whenReady())

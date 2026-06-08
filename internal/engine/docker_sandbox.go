@@ -94,6 +94,22 @@ func (e *DockerSandbox) Stop(ctx context.Context, id string) error {
 	return e.docker.StopContainer(ctx, record.ID)
 }
 
+func (e *DockerSandbox) Logs(ctx context.Context, id string, tail int) (string, error) {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return e.docker.ContainerLogs(ctx, record.ID, tail)
+}
+
+func (e *DockerSandbox) ShellCommand(ctx context.Context, id string) (string, error) {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return e.docker.ExecShellCommand(record.ID), nil
+}
+
 func (e *DockerSandbox) Delete(ctx context.Context, id string) error {
 	record, err := e.findRecord(ctx, id)
 	if err != nil {
@@ -157,6 +173,8 @@ func buildCreateArgs(req types.CreateVMRequest, envelope sandbox.Envelope) ([]st
 		}
 		args = append(args, "--volume", fmt.Sprintf("%s:%s%s", volume.Host, volume.Container, suffix))
 	}
+
+	args = append(args, sandbox.HardeningArgs()...)
 
 	args = append(args, req.Image)
 	args = append(args, req.Command...)

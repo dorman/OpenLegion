@@ -13,6 +13,8 @@ describe("container", () => {
       expect(svc.create).toBeTypeOf("function")
       expect(svc.stop).toBeTypeOf("function")
       expect(svc.remove).toBeTypeOf("function")
+      expect(svc.logs).toBeTypeOf("function")
+      expect(svc.shell).toBeTypeOf("function")
     }),
   )
 

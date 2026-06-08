@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/solid-query"
 import { Navigate, useNavigate } from "@solidjs/router"
 import { createMemo, For, Show } from "solid-js"
 import { DialogContainerCreate } from "@/components/dialog-container-create"
+import { DialogContainerInspect } from "@/components/dialog-container-inspect"
 import { DialogContainerOpenSession } from "@/components/dialog-container-open-session"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
@@ -145,6 +146,10 @@ export default function ContainersPage() {
     ))
   }
 
+  function showInspect(container: ContainerInfo) {
+    dialog.show(() => <DialogContainerInspect container={container} />)
+  }
+
   async function handleStop(id: string) {
     const http = server.current?.http
     if (!http) return
@@ -205,6 +210,7 @@ export default function ContainersPage() {
                     workspace={workspaceForContainer(workspaces.data ?? [], item)}
                     language={language}
                     onOpenSession={() => showOpenSession(item)}
+                    onInspect={() => showInspect(item)}
                     onStop={() => void handleStop(item.id)}
                     onRemove={() => void handleRemove(item.id)}
                   />
@@ -248,6 +254,7 @@ function ContainerCard(props: {
   workspace?: ContainerWorkspace
   language: ReturnType<typeof useLanguage>
   onOpenSession: () => void
+  onInspect: () => void
   onStop: () => void
   onRemove: () => void
 }) {
@@ -271,6 +278,9 @@ function ContainerCard(props: {
       <div class="mt-2 flex flex-wrap gap-2">
         <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession}>
           {props.language.t("containers.openSession")}
+        </ButtonV2>
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
+          {props.language.t("containers.inspect")}
         </ButtonV2>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running()}>
           {props.language.t("containers.stop")}

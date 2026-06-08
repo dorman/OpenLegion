@@ -178,4 +178,12 @@
   [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"] {
     overflow-y: auto;
   }
+
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
+    height: min(90vh, 720px);
+  }
+
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-body"] {
+    overflow-y: auto;
+  }
 }

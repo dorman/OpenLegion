@@ -156,6 +156,17 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return HttpApiSchema.NoContent.make()
     })
 
+    const containerLogs = Effect.fn("GlobalHttpApi.containerLogs")(function* (ctx: {
+      params: { id: string }
+      query: { tail?: number }
+    }) {
+      return yield* mapContainerError(container.logs(ctx.params.id, { tail: ctx.query.tail }))
+    })
+
+    const containerShell = Effect.fn("GlobalHttpApi.containerShell")(function* (ctx: { params: { id: string } }) {
+      return yield* mapContainerError(container.shell(ctx.params.id))
+    })
+
     const containerWorkspaces = Effect.fn("GlobalHttpApi.containerWorkspaces")(function* () {
       return yield* workspaces.list().pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
     })
@@ -197,6 +208,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("containers", containers)
       .handle("containerCreate", containerCreate)
       .handle("containerStop", containerStop)
+      .handle("containerLogs", containerLogs)
+      .handle("containerShell", containerShell)
       .handle("containerRemove", containerRemove)
       .handle("containerWorkspaces", containerWorkspaces)
       .handle("containerWorkspaceUpsert", containerWorkspaceUpsert)

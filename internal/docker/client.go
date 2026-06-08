@@ -65,6 +65,19 @@ func (c *Client) RemoveContainer(ctx context.Context, id string) error {
 	return err
 }
 
+func (c *Client) ContainerLogs(ctx context.Context, id string, tail int) (string, error) {
+	args := []string{"logs"}
+	if tail > 0 {
+		args = append(args, "--tail", fmt.Sprintf("%d", tail))
+	}
+	args = append(args, id)
+	return c.run(ctx, args...)
+}
+
+func (c *Client) ExecShellCommand(containerID string) string {
+	return c.Runtime + " exec -it " + containerID + " sh"
+}
+
 func (c *Client) ListSandboxContainers(ctx context.Context) ([]ContainerRecord, error) {
 	out, err := c.run(ctx, "ps", "-a", "--filter", "label="+labelPrefix, "--format", "{{json .}}")
 	if err != nil {

@@ -77,6 +77,25 @@ export async function removeContainer(server: ServerConnection.HttpBase, id: str
   await containerFetch(server, `/global/containers/${encodeURIComponent(id)}`, { method: "DELETE" })
 }
 
+export async function fetchContainerLogs(server: ServerConnection.HttpBase, id: string, tail = 200) {
+  const response = await containerFetch(
+    server,
+    `/global/containers/${encodeURIComponent(id)}/logs?tail=${encodeURIComponent(String(tail))}`,
+  )
+  const json = (await response.json()) as { logs: string }
+  return json.logs
+}
+
+export type ContainerShellInfo = {
+  command: string
+  runtime: ContainerRuntime
+}
+
+export async function fetchContainerShell(server: ServerConnection.HttpBase, id: string) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/shell`)
+  return (await response.json()) as ContainerShellInfo
+}
+
 export function containerIdsMatch(left: string, right: string) {
   return left === right || left.startsWith(right) || right.startsWith(left)
 }

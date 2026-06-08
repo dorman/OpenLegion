@@ -12,4 +12,6 @@ type Engine interface {
 	List(ctx context.Context) ([]types.VMInfo, error)
 	Stop(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
+	Logs(ctx context.Context, id string, tail int) (string, error)
+	ShellCommand(ctx context.Context, id string) (string, error)
 }

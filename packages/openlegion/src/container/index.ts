@@ -39,6 +39,14 @@ export class RemoveFailedError extends Schema.TaggedErrorClass<RemoveFailedError
   message: Schema.String,
 }) {}
 
+export class LogsFailedError extends Schema.TaggedErrorClass<LogsFailedError>()("ContainerLogsFailedError", {
+  message: Schema.String,
+}) {}
+
+export class ShellFailedError extends Schema.TaggedErrorClass<ShellFailedError>()("ContainerShellFailedError", {
+  message: Schema.String,
+}) {}
+
 export type Error =
   | RuntimeNotFoundError
   | RuntimeUnavailableError
@@ -46,6 +54,8 @@ export type Error =
   | ListFailedError
   | StopFailedError
   | RemoveFailedError
+  | LogsFailedError
+  | ShellFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
@@ -54,6 +64,8 @@ export interface Interface {
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
   readonly stop: (id: string) => Effect.Effect<void, Error>
   readonly remove: (id: string) => Effect.Effect<void, Error>
+  readonly logs: (id: string, input?: { tail?: number }) => Effect.Effect<ContainerSchema.LogsOutput, Error>
+  readonly shell: (id: string) => Effect.Effect<ContainerSchema.ShellOutput, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -257,7 +269,36 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, create, stop, remove })
+    const logs = Effect.fn("Container.logs")(function* (id: string, input?: { tail?: number }) {
+      const runtime = yield* detectRuntime()
+      const tail = input?.tail ?? 200
+      if (runtime === "microvm") {
+        return yield* microvmClient.logs(id, tail).pipe(Effect.mapError((message) => new LogsFailedError({ message })))
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const args = tail > 0 ? ["logs", "--tail", String(tail), id] : ["logs", id]
+      const result = yield* run(runtime, args)
+      if (result.code !== 0) {
+        return yield* new LogsFailedError({
+          message: normalizeMessage(result, "Failed to fetch container logs"),
+        })
+      }
+      return { logs: result.stdout }
+    })
+
+    const shell = Effect.fn("Container.shell")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.shell(id).pipe(Effect.mapError((message) => new ShellFailedError({ message })))
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      return {
+        command: `${runtime} exec -it ${id} sh`,
+        runtime,
+      }
+    })
+
+    return Service.of({ list, create, stop, remove, logs, shell })
   }),
 )
 

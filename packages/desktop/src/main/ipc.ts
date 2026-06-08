@@ -12,6 +12,12 @@ import type {
   WindowConfig,
   WslConfig,
 } from "../preload/types"
+import {
+  closeContainerPty,
+  createContainerPty,
+  resizeContainerPty,
+  writeContainerPty,
+} from "./container-pty"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { getStore } from "./store"
 import { getPinchZoomEnabled, setPinchZoomEnabled, setTitlebar, updateTitlebar } from "./windows"
@@ -44,6 +50,13 @@ type Deps = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  containerPtyCreate: (
+    event: IpcMainInvokeEvent,
+    input: { command: string; cols: number; rows: number },
+  ) => { id: string } | { error: string }
+  containerPtyWrite: (id: string, data: string) => void
+  containerPtyResize: (id: string, cols: number, rows: number) => void
+  containerPtyClose: (id: string) => void
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -77,6 +90,19 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
   ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
+  ipcMain.handle(
+    "container-pty-create",
+    (event: IpcMainInvokeEvent, input: { command: string; cols: number; rows: number }) =>
+      deps.containerPtyCreate(event, input),
+  )
+  ipcMain.handle("container-pty-write", (_event: IpcMainInvokeEvent, id: string, data: string) =>
+    deps.containerPtyWrite(id, data),
+  )
+  ipcMain.handle(
+    "container-pty-resize",
+    (_event: IpcMainInvokeEvent, id: string, cols: number, rows: number) => deps.containerPtyResize(id, cols, rows),
+  )
+  ipcMain.handle("container-pty-close", (_event: IpcMainInvokeEvent, id: string) => deps.containerPtyClose(id))
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     try {
       const store = getStore(name)

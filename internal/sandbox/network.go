@@ -10,7 +10,8 @@ import (
 )
 
 // Envelope is the per-container sandbox boundary. Today this is an isolated
-// Docker network plus metadata directory; swap Provider for Lima/Kata/etc.
+// Docker network plus metadata directory with optional hardening flags
+// (see HardeningArgs). Swap Provider for Lima/Kata/etc. when available.
 type Envelope struct {
 	ID          string
 	NetworkName string

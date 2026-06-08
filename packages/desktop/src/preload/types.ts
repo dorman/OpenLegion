@@ -100,4 +100,14 @@ export type ElectronAPI = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  containerPtyCreate: (input: {
+    command: string
+    cols: number
+    rows: number
+  }) => Promise<{ id: string } | { error: string }>
+  containerPtyWrite: (id: string, data: string) => Promise<void>
+  containerPtyResize: (id: string, cols: number, rows: number) => Promise<void>
+  containerPtyClose: (id: string) => Promise<void>
+  onContainerPtyData: (cb: (id: string, data: string) => void) => () => void
+  onContainerPtyExit: (cb: (id: string, code: number) => void) => () => void
 }
