@@ -28,11 +28,15 @@ export const CreateInput = Schema.Struct({
 }).annotate({ identifier: "ContainerCreateInput" })
 export type CreateInput = typeof CreateInput.Type
 
+export const Status = Schema.Literals(["running", "stopped"])
+export type Status = typeof Status.Type
+
 export const Info = Schema.Struct({
   id: Schema.String,
   runtime: Runtime,
   image: Schema.String,
   name: Schema.optional(Schema.String),
+  status: Schema.optional(Status),
 }).annotate({ identifier: "ContainerInfo" })
 export type Info = typeof Info.Type
 

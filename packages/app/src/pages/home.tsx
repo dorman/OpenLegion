@@ -13,7 +13,7 @@ import { IconButtonV2 } from "@openlegion-ai/ui/v2/icon-button-v2"
 import { MenuV2 } from "@openlegion-ai/ui/v2/menu-v2"
 import { TabStateIndicator } from "@openlegion-ai/ui/v2/tab-state-indicator"
 import { getProjectAvatarVariant, useLayout, type LocalProject } from "@/context/layout"
-import { useNavigate } from "@solidjs/router"
+import { A, useNavigate } from "@solidjs/router"
 import { base64Encode } from "@openlegion-ai/core/util/encode"
 import { Icon } from "@openlegion-ai/ui/icon"
 import { usePlatform } from "@/context/platform"
@@ -112,6 +112,7 @@ function HomeDesign() {
   const sync = useServerSync()
   const layout = useLayout()
   const platform = usePlatform()
+  const desktopShell = createMemo(() => platform.platform === "desktop")
   const dialog = useDialog()
   const navigate = useNavigate()
   const server = useServer()
@@ -270,27 +271,45 @@ function HomeDesign() {
   }
 
   return (
-    <div class="rounded-[10px] shadow-[var(--v2-elevation-raised)] m-2 bg-background-base self-stretch flex-1">
-      <div class="mx-auto grid w-full h-full max-w-[1080px] gap-8 px-6 pb-16 lg:grid-cols-[280px_minmax(0,720px)]">
-        <HomeProjectColumn
-          projects={projects()}
-          selected={selectedProject()?.worktree}
-          selectProject={selectProject}
-          openNewSession={openProjectNewSession}
-          chooseProject={(conn) => void chooseProject(conn)}
-          editProject={editProject}
-          closeProject={(directory) => {
-            layout.projects.close(directory)
-            if (state.project === directory) setState("project", undefined)
-          }}
-          clearNotifications={clearNotifications}
-          unseenCount={unseenCount}
-          openSettings={openSettings}
-          openHelp={() => platform.openLink("https://openlegion.dev/desktop-feedback")}
-          language={language}
-        />
+    <div
+      classList={{
+        "rounded-[10px] shadow-[var(--v2-elevation-raised)] m-2 bg-background-base self-stretch flex-1": !desktopShell(),
+        "bg-v2-background-bg-deep self-stretch flex-1 min-h-0": desktopShell(),
+      }}
+    >
+      <div
+        classList={{
+          "mx-auto grid w-full h-full max-w-[1080px] gap-8 px-6 pb-16 lg:grid-cols-[280px_minmax(0,720px)]": !desktopShell(),
+          "mx-auto flex w-full h-full max-w-3xl flex-col gap-8 px-8 pb-16 pt-10": desktopShell(),
+        }}
+      >
+        <Show when={!desktopShell()}>
+          <HomeProjectColumn
+            projects={projects()}
+            selected={selectedProject()?.worktree}
+            selectProject={selectProject}
+            openNewSession={openProjectNewSession}
+            chooseProject={(conn) => void chooseProject(conn)}
+            editProject={editProject}
+            closeProject={(directory) => {
+              layout.projects.close(directory)
+              if (state.project === directory) setState("project", undefined)
+            }}
+            clearNotifications={clearNotifications}
+            unseenCount={unseenCount}
+            openSettings={openSettings}
+            openHelp={() => platform.openLink("https://openlegion.dev/desktop-feedback")}
+            language={language}
+          />
+        </Show>
 
-        <section class="min-w-0 flex-1 flex flex-col pt-12" aria-label={language.t("sidebar.project.recentSessions")}>
+        <section
+          classList={{
+            "min-w-0 flex-1 flex flex-col pt-12": !desktopShell(),
+            "min-w-0 flex-1 flex flex-col": desktopShell(),
+          }}
+          aria-label={language.t("sidebar.project.recentSessions")}
+        >
           <HomeSessionSearch
             value={state.search}
             placeholder={language.t("home.sessions.search.placeholder")}
@@ -360,6 +379,7 @@ function HomeProjectColumn(props: {
   language: ReturnType<typeof useLanguage>
 }) {
   const global = useGlobal()
+  const platform = usePlatform()
   return (
     <aside class="flex min-w-0 flex-col lg:pt-[52px] mt-14 gap-4" aria-label={props.language.t("home.projects")}>
       <div class="flex h-7 min-w-0 items-center justify-between pl-1.5">

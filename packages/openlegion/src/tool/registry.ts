@@ -33,6 +33,7 @@ import { pathToFileURL } from "url"
 import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
+import { ContainerFiles } from "@/container/files"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { Format } from "../format"
@@ -100,6 +101,7 @@ export const layer: Layer.Layer<
   | EventV2Bridge.Service
   | HttpClient.HttpClient
   | ChildProcessSpawner
+  | ContainerFiles.Service
   | Ripgrep.Service
   | Format.Service
   | Truncate.Service
@@ -384,6 +386,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(EventV2Bridge.defaultLayer),
       Layer.provide(FetchHttpClient.layer),
       Layer.provide(Format.defaultLayer),
+      Layer.provide(ContainerFiles.defaultLayer),
       Layer.provide(CrossSpawnSpawner.defaultLayer),
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),

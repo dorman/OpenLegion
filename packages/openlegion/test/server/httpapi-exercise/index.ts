@@ -65,6 +65,18 @@ const scenarios: Scenario[] = [
     ),
   http.protected.get("/global/config", "global.config.get").global().json(),
   http.protected
+    .get("/global/containers", "global.containers.list")
+    .global()
+    .json(200, (body) => {
+      array(body)
+    }),
+  http.protected
+    .get("/global/container-workspaces", "global.containerWorkspaces.list")
+    .global()
+    .json(200, (body) => {
+      array(body)
+    }),
+  http.protected
     .patch("/global/config", "global.config.update")
     .global()
     .seeded(() =>

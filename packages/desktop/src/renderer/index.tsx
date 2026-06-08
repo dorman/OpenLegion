@@ -284,6 +284,10 @@ const createPlatform = (): Platform => {
       return window.api.checkAppExists(appName)
     },
 
+    containerRuntimeStatus: () => window.api.containerRuntimeStatus(),
+
+    ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
+
     async readClipboardImage() {
       const image = await window.api.readClipboardImage().catch(() => null)
       if (!image) return null
@@ -371,8 +375,10 @@ render(() => {
   }
 
   onMount(() => {
+    document.documentElement.dataset.platform = "desktop"
     document.addEventListener("click", handleClick)
     onCleanup(() => {
+      delete document.documentElement.dataset.platform
       document.removeEventListener("click", handleClick)
     })
   })

@@ -22,6 +22,8 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import { Session } from "@/session/session"
+import { containerExecArgs, hostPathToContainerPath, sessionContainer } from "@/container/session"
 
 export { Parameters } from "./shell/prompt"
 
@@ -299,7 +301,26 @@ const ask = Effect.fn("ShellTool.ask")(function* (
   })
 })
 
-function cmd(shell: string, command: string, cwd: string, env: NodeJS.ProcessEnv) {
+function cmd(
+  shell: string,
+  command: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  container?: ReturnType<typeof sessionContainer>,
+) {
+  if (container) {
+    const exec = containerExecArgs({
+      container,
+      containerCwd: hostPathToContainerPath(cwd, container),
+      command,
+    })
+    return ChildProcess.make(exec.bin, exec.args, {
+      env,
+      stdin: "ignore",
+      detached: false,
+    })
+  }
+
   if (process.platform === "win32" && Shell.ps(shell)) {
     return ChildProcess.make(shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], {
       cwd,
@@ -348,6 +369,7 @@ export const ShellTool = Tool.define(
   ShellID.ToolID,
   Effect.gen(function* () {
     const config = yield* Config.Service
+    const sessions = yield* Session.Service
     const spawner = yield* ChildProcessSpawner
     const fs = yield* FSUtil.Service
     const trunc = yield* Truncate.Service
@@ -442,6 +464,7 @@ export const ShellTool = Tool.define(
         env: NodeJS.ProcessEnv
         timeout: number
         description: string
+        container?: ReturnType<typeof sessionContainer>
       },
       ctx: Tool.Context,
     ) {
@@ -492,7 +515,9 @@ export const ShellTool = Tool.define(
       const code: number | null = yield* Effect.scoped(
         Effect.gen(function* () {
           yield* Effect.addFinalizer(closeSink)
-          const handle = yield* spawner.spawn(cmd(input.shell, input.command, input.cwd, input.env))
+          const handle = yield* spawner.spawn(
+            cmd(input.shell, input.command, input.cwd, input.env, input.container),
+          )
 
           yield* Effect.forkScoped(
             Stream.runForEach(Stream.decodeText(handle.all), (chunk) => {
@@ -642,6 +667,9 @@ export const ShellTool = Tool.define(
                 }),
               )
 
+              const info = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
+              const container = sessionContainer(info.metadata)
+
               return yield* run(
                 {
                   shell,
@@ -650,6 +678,7 @@ export const ShellTool = Tool.define(
                   env: yield* shellEnv(ctx, cwd),
                   timeout,
                   description: params.description,
+                  container,
                 },
                 ctx,
               )

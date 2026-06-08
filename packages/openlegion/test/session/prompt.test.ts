@@ -48,6 +48,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import * as Log from "@openlegion-ai/core/util/log"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
+import { ContainerFiles } from "@/container/files"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { Format } from "../../src/format"
 import { Reference } from "../../src/reference/reference"
@@ -197,6 +198,7 @@ function makePrompt(input?: { processor?: "blocking" }) {
     Layer.provide(Reference.defaultLayer),
     Layer.provide(Ripgrep.defaultLayer),
     Layer.provide(Format.defaultLayer),
+    Layer.provide(ContainerFiles.defaultLayer),
     Layer.provide(RuntimeFlags.layer({ experimentalEventSystem: true })),
     Layer.provideMerge(todo),
     Layer.provideMerge(question),

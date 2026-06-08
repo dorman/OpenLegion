@@ -6,7 +6,11 @@ import "@openlegion-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { CreateInput, Info, ListOutput } from "@/container/schema"
+import { UpsertPayload, Workspace } from "@/container/workspace"
 import { described } from "./metadata"
+
+const ContainerID = Schema.String
 
 const GlobalHealth = Schema.Struct({
   healthy: Schema.Literal(true),
@@ -67,6 +71,11 @@ export const GlobalPaths = {
   config: "/global/config",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  containers: "/global/containers",
+  containerStop: "/global/containers/:id/stop",
+  containerRemove: "/global/containers/:id",
+  containerWorkspaces: "/global/container-workspaces",
+  containerWorkspace: "/global/container-workspaces/:containerId",
 } as const
 
 export const GlobalApi = HttpApi.make("global").add(
@@ -128,6 +137,71 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.upgrade",
           summary: "Upgrade openlegion",
           description: "Upgrade openlegion to the specified version or latest if not specified.",
+        }),
+      ),
+      HttpApiEndpoint.get("containers", GlobalPaths.containers, {
+        success: described(ListOutput, "Sandbox containers"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.list",
+          summary: "List containers",
+          description: "List sandbox containers managed by the local runtime.",
+        }),
+      ),
+      HttpApiEndpoint.post("containerCreate", GlobalPaths.containers, {
+        payload: CreateInput,
+        success: described(Info, "Created container"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.create",
+          summary: "Create container",
+          description: "Create and start a sandbox container.",
+        }),
+      ),
+      HttpApiEndpoint.post("containerStop", GlobalPaths.containerStop, {
+        params: { id: ContainerID },
+        success: HttpApiSchema.NoContent,
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.stop",
+          summary: "Stop container",
+          description: "Stop a sandbox container by id.",
+        }),
+      ),
+      HttpApiEndpoint.delete("containerRemove", GlobalPaths.containerRemove, {
+        params: { id: ContainerID },
+        success: HttpApiSchema.NoContent,
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.remove",
+          summary: "Remove container",
+          description: "Remove a sandbox container and its isolation boundary.",
+        }),
+      ),
+      HttpApiEndpoint.get("containerWorkspaces", GlobalPaths.containerWorkspaces, {
+        success: described(Schema.Array(Workspace), "Container workspaces"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containerWorkspaces.list",
+          summary: "List container workspaces",
+          description: "List persisted container workspace metadata used to link sandboxes to agent sessions.",
+        }),
+      ),
+      HttpApiEndpoint.put("containerWorkspaceUpsert", GlobalPaths.containerWorkspace, {
+        params: { containerId: ContainerID },
+        payload: UpsertPayload,
+        success: described(Workspace, "Container workspace"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containerWorkspaces.upsert",
+          summary: "Upsert container workspace",
+          description: "Create or update workspace metadata for a sandbox container.",
         }),
       ),
     )

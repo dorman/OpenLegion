@@ -27,6 +27,7 @@ import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover, StatusPopoverV2 } from "../status-popover"
 import { IconButtonV2 } from "@openlegion-ai/ui/v2/icon-button-v2"
 import { Icon as IconV2 } from "@openlegion-ai/ui/v2/icon"
+import { sessionContainerFromMetadata } from "@/utils/container-workspaces"
 
 const OPEN_APPS = [
   "vscode",
@@ -233,6 +234,11 @@ export function SessionHeader() {
   const tint = createMemo(() =>
     messageAgentColor(params.id ? sync.data.message[params.id] : undefined, sync.data.agent),
   )
+  const sessionContainer = createMemo(() => {
+    const id = params.id
+    if (!id) return undefined
+    return sessionContainerFromMetadata(sync.session.get(id)?.metadata)
+  })
   const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
     statusVisible: status(),
     statusLabel: language.t("status.popover.trigger"),
@@ -240,6 +246,11 @@ export function SessionHeader() {
     reviewKeybind: command.keybind("review.toggle"),
     reviewOpened: view().reviewPanel.opened(),
     onReviewToggle: () => view().reviewPanel.toggle(),
+    container: sessionContainer(),
+    containerLabel: language.t("session.header.container"),
+    containerTooltip: sessionContainer()
+      ? language.t("session.header.container.tooltip", { id: sessionContainer()!.id })
+      : "",
   }))
 
   const selectApp = (app: OpenApp) => {
@@ -439,6 +450,18 @@ export function SessionHeader() {
                     </div>
                   </Show>
                   <div class="flex items-center gap-1">
+                    <Show when={sessionContainer()}>
+                      {(container) => (
+                        <Tooltip
+                          placement="bottom"
+                          value={language.t("session.header.container.tooltip", { id: container().id })}
+                        >
+                          <div class="hidden xl:flex h-6 max-w-40 items-center rounded-md border border-border-weak-base bg-surface-panel px-2 text-12-regular text-text-weak truncate">
+                            {language.t("session.header.container")}
+                          </div>
+                        </Tooltip>
+                      )}
+                    </Show>
                     <Show when={status()}>
                       <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
                         <StatusPopover />
@@ -526,11 +549,21 @@ type SessionHeaderV2ActionsState = {
   reviewKeybind: string
   reviewOpened: boolean
   onReviewToggle: () => void
+  container?: ReturnType<typeof sessionContainerFromMetadata>
+  containerLabel: string
+  containerTooltip: string
 }
 
 function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
   return (
     <div class="flex items-center gap-2">
+      <Show when={props.state.container}>
+        <Tooltip placement="bottom" value={props.state.containerTooltip}>
+          <div class="hidden md:flex h-7 max-w-44 items-center rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-2 text-xs text-v2-text-text-muted truncate">
+            {props.state.containerLabel}
+          </div>
+        </Tooltip>
+      </Show>
       <Show when={props.state.statusVisible}>
         <Tooltip placement="bottom" value={props.state.statusLabel}>
           <StatusPopoverV2 />

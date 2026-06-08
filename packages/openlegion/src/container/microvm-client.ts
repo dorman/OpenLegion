@@ -17,6 +17,8 @@ export interface Interface {
   readonly health: () => Effect.Effect<boolean>
   readonly create: (input: typeof CreateInput.Type) => Effect.Effect<Info, string>
   readonly list: () => Effect.Effect<Array<Info>, string>
+  readonly stop: (id: string) => Effect.Effect<void, string>
+  readonly remove: (id: string) => Effect.Effect<void, string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container/MicroVMClient") {}
@@ -72,7 +74,23 @@ export const layer = Layer.effect(
       )
     })
 
-    return Service.of({ health, create, list })
+    const stop = Effect.fnUntraced(function* (id: string) {
+      return yield* HttpClientRequest.post(`${baseUrl}/vms/${encodeURIComponent(id)}/stop`).pipe(
+        http.execute,
+        Effect.asVoid,
+        Effect.mapError((error) => errorMessage(error, "Failed to stop microvm")),
+      )
+    })
+
+    const remove = Effect.fnUntraced(function* (id: string) {
+      return yield* HttpClientRequest.delete(`${baseUrl}/vms/${encodeURIComponent(id)}`).pipe(
+        http.execute,
+        Effect.asVoid,
+        Effect.mapError((error) => errorMessage(error, "Failed to remove microvm")),
+      )
+    })
+
+    return Service.of({ health, create, list, stop, remove })
   }),
 )
 

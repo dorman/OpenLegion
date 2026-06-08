@@ -41,6 +41,7 @@ import { ModelsProvider } from "@/context/models"
 import { NotificationProvider } from "@/context/notification"
 import { PermissionProvider } from "@/context/permission"
 import { PromptProvider } from "@/context/prompt"
+import { usePlatform } from "@/context/platform"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TerminalProvider } from "@/context/terminal"
@@ -50,6 +51,7 @@ import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 
 const HomeRoute = lazy(() => import("@/pages/home"))
+const ContainersRoute = lazy(() => import("@/pages/containers"))
 const Session = lazy(() => import("@/pages/session"))
 
 const SessionRoute = Object.assign(
@@ -60,6 +62,15 @@ const SessionRoute = Object.assign(
   ),
   { preload: Session.preload },
 )
+
+function DesktopRoot() {
+  const platform = usePlatform()
+  return (
+    <Show when={platform.platform === "desktop"} fallback={<HomeRoute />}>
+      <Navigate href="/containers" />
+    </Show>
+  )
+}
 
 function UiI18nBridge(props: ParentProps) {
   const language = useLanguage()
@@ -326,7 +337,9 @@ export function AppInterface(props: {
                     component={props.router ?? Router}
                     root={(routerProps) => <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>}
                   >
-                    <Route path="/" component={HomeRoute} />
+                    <Route path="/" component={DesktopRoot} />
+                    <Route path="/agents" component={HomeRoute} />
+                    <Route path="/containers" component={ContainersRoute} />
                     <Route path="/:dir" component={DirectoryLayout}>
                       <Route path="/" component={() => <Navigate href="session" />} />
                       <Route path="/session/:id?" component={SessionRoute} />

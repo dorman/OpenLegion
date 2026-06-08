@@ -52,6 +52,7 @@ import { memoMap } from "@openlegion-ai/core/effect/memo-map"
 import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { Container } from "@/container"
 
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
@@ -102,6 +103,9 @@ export const AppLayer = Layer.mergeAll(
   Installation.defaultLayer,
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
+  Container.defaultLayer,
+  Container.ContainerWorkspace.defaultLayer,
+  Container.ContainerFiles.defaultLayer,
 ).pipe(Layer.provideMerge(InstanceLayer.layer), Layer.provideMerge(Observability.layer))
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })

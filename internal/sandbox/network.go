@@ -26,17 +26,24 @@ type NetworkProvider struct {
 	RootDir string
 }
 
-func NewNetworkProvider() *NetworkProvider {
+func SandboxRootDir() string {
 	root := os.Getenv("OPENLEGION_SANDBOX_ROOT")
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			root = os.TempDir()
-		} else {
-			root = filepath.Join(home, ".openlegion", "sandboxes")
-		}
+	if root != "" {
+		return root
 	}
-	return &NetworkProvider{RootDir: root}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return os.TempDir()
+	}
+	return filepath.Join(home, ".openlegion", "sandboxes")
+}
+
+func WorkDirFor(id string) string {
+	return filepath.Join(SandboxRootDir(), id)
+}
+
+func NewNetworkProvider() *NetworkProvider {
+	return &NetworkProvider{RootDir: SandboxRootDir()}
 }
 
 func (p *NetworkProvider) Provision(ctx context.Context, client *docker.Client) (Envelope, error) {
@@ -56,6 +63,10 @@ func (p *NetworkProvider) Provision(ctx context.Context, client *docker.Client) 
 		NetworkName: networkName,
 		WorkDir:     workDir,
 	}, nil
+}
+
+func (p *NetworkProvider) WorkDir(id string) string {
+	return filepath.Join(p.RootDir, id)
 }
 
 func (p *NetworkProvider) Release(ctx context.Context, client *docker.Client, envelope Envelope) error {

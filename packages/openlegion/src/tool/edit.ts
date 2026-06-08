@@ -18,6 +18,14 @@ import { Snapshot } from "@/snapshot"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { FSUtil } from "@openlegion-ai/core/fs-util"
 import * as Bom from "@/util/bom"
+import { ContainerFiles } from "@/container/files"
+import { Session } from "@/session/session"
+import {
+  containerPermissionMetadata,
+  hostPathInContainerMount,
+  resolveSessionContainer,
+  toContainerPath,
+} from "./container-io"
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -59,6 +67,8 @@ export const EditTool = Tool.define(
   "edit",
   Effect.gen(function* () {
     const lsp = yield* LSP.Service
+    const containerFiles = yield* ContainerFiles.Service
+    const sessions = yield* Session.Service
     const afs = yield* FSUtil.Service
     const format = yield* Format.Service
     const events = yield* EventV2Bridge.Service
@@ -77,10 +87,17 @@ export const EditTool = Tool.define(
           }
 
           const instance = yield* InstanceState.context
+          const container = yield* resolveSessionContainer(sessions, ctx)
           const filePath = path.isAbsolute(params.filePath)
             ? params.filePath
             : path.join(instance.directory, params.filePath)
           yield* assertExternalDirectoryEffect(ctx, filePath)
+
+          if (container && !hostPathInContainerMount(filePath, container)) {
+            throw new Error(`Path is outside the container workspace mount: ${filePath}`)
+          }
+
+          const containerPath = container ? toContainerPath(filePath, container) : undefined
 
           let diff = ""
           let contentOld = ""
@@ -88,8 +105,17 @@ export const EditTool = Tool.define(
           yield* lock(filePath).withPermits(1)(
             Effect.gen(function* () {
               if (params.oldString === "") {
-                const existed = yield* afs.existsSafe(filePath)
-                const source = existed ? yield* Bom.readFile(afs, filePath) : { bom: false, text: "" }
+                const existed = container
+                  ? yield* containerFiles.stat(container, containerPath!).pipe(
+                      Effect.map(() => true),
+                      Effect.catch(() => Effect.succeed(false)),
+                    )
+                  : yield* afs.existsSafe(filePath)
+                const source = existed
+                  ? container
+                    ? { bom: false, text: yield* containerFiles.readText(container, containerPath!) }
+                    : yield* Bom.readFile(afs, filePath)
+                  : { bom: false, text: "" }
                 const next = Bom.split(params.newString)
                 const desiredBom = source.bom || next.bom
                 contentOld = source.text
@@ -102,10 +128,15 @@ export const EditTool = Tool.define(
                   metadata: {
                     filepath: filePath,
                     diff,
+                    ...containerPermissionMetadata(container),
                   },
                 })
-                yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-                if (yield* format.file(filePath)) {
+                if (container) {
+                  yield* containerFiles.writeText(container, containerPath!, Bom.join(contentNew, desiredBom))
+                } else {
+                  yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
+                }
+                if (!container && (yield* format.file(filePath))) {
                   contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
                 }
                 yield* events.publish(FileSystem.Event.Edited, { file: filePath })
@@ -116,10 +147,17 @@ export const EditTool = Tool.define(
                 return
               }
 
-              const info = yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+              const info = container
+                ? yield* containerFiles.stat(container, containerPath!).pipe(
+                    Effect.map((value) => ({ type: value.type })),
+                    Effect.catch(() => Effect.succeed(undefined)),
+                  )
+                : yield* afs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(undefined)))
               if (!info) throw new Error(`File ${filePath} not found`)
               if (info.type === "Directory") throw new Error(`Path is a directory, not a file: ${filePath}`)
-              const source = yield* Bom.readFile(afs, filePath)
+              const source = container
+                ? { bom: false, text: yield* containerFiles.readText(container, containerPath!) }
+                : yield* Bom.readFile(afs, filePath)
               contentOld = source.text
 
               const ending = detectLineEnding(contentOld)
@@ -145,11 +183,16 @@ export const EditTool = Tool.define(
                 metadata: {
                   filepath: filePath,
                   diff,
+                  ...containerPermissionMetadata(container),
                 },
               })
 
-              yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
-              if (yield* format.file(filePath)) {
+              if (container) {
+                yield* containerFiles.writeText(container, containerPath!, Bom.join(contentNew, desiredBom))
+              } else {
+                yield* afs.writeWithDirs(filePath, Bom.join(contentNew, desiredBom))
+              }
+              if (!container && (yield* format.file(filePath))) {
                 contentNew = yield* Bom.syncFile(afs, filePath, desiredBom)
               }
               yield* events.publish(FileSystem.Event.Edited, { file: filePath })

@@ -874,11 +874,21 @@ function TitlebarBrand() {
 }
 
 function ChannelIndicator() {
+  const platform = usePlatform()
+  const channel = import.meta.env.VITE_OPENLEGION_CHANNEL
+  const desktopDev = () => platform.platform === "desktop" && channel === "dev"
+
   return (
     <>
-      {["beta", "dev"].includes(import.meta.env.VITE_OPENLEGION_CHANNEL) && (
-        <div class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono">
-          {import.meta.env.VITE_OPENLEGION_CHANNEL.toUpperCase()}
+      {["beta", "dev"].includes(channel) && (
+        <div
+          classList={{
+            "font-medium px-2 rounded-sm uppercase font-mono": true,
+            "bg-icon-interactive-base text-[#FFF]": !desktopDev(),
+            "desktop-dev-badge": desktopDev(),
+          }}
+        >
+          {channel.toUpperCase()}
         </div>
       )}
     </>

@@ -71,6 +71,12 @@ func (s *Store) Get(id string) (VM, error) {
 	return *vm, nil
 }
 
+func (s *Store) Delete(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.vms, id)
+}
+
 func newID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

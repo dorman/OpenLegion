@@ -24,6 +24,8 @@ import type {
   ConfigProvidersResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
+  ContainerCreateInput,
+  ContainerWorkspaceUpsertPayload,
   EventSubscribeResponses,
   EventTuiCommandExecute,
   EventTuiPromptAppend,
@@ -78,6 +80,18 @@ import type {
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
   GlobalConfigUpdateResponses,
+  GlobalContainersCreateErrors,
+  GlobalContainersCreateResponses,
+  GlobalContainersListErrors,
+  GlobalContainersListResponses,
+  GlobalContainersRemoveErrors,
+  GlobalContainersRemoveResponses,
+  GlobalContainersStopErrors,
+  GlobalContainersStopResponses,
+  GlobalContainerWorkspacesListErrors,
+  GlobalContainerWorkspacesListResponses,
+  GlobalContainerWorkspacesUpsertErrors,
+  GlobalContainerWorkspacesUpsertResponses,
   GlobalDisposeErrors,
   GlobalDisposeResponses,
   GlobalEventErrors,
@@ -554,6 +568,149 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Containers extends HeyApiClient {
+  /**
+   * List containers
+   *
+   * List sandbox containers managed by the local runtime.
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<
+      GlobalContainersListResponses,
+      GlobalContainersListErrors,
+      ThrowOnError
+    >({ url: "/global/containers", ...options })
+  }
+
+  /**
+   * Create container
+   *
+   * Create and start a sandbox container.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      containerCreateInput?: ContainerCreateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ key: "containerCreateInput", map: "body" }] }])
+    return (options?.client ?? this.client).post<
+      GlobalContainersCreateResponses,
+      GlobalContainersCreateErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Stop container
+   *
+   * Stop a sandbox container by id.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).post<
+      GlobalContainersStopResponses,
+      GlobalContainersStopErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Remove container
+   *
+   * Remove a sandbox container and its isolation boundary.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).delete<
+      GlobalContainersRemoveResponses,
+      GlobalContainersRemoveErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class ContainerWorkspaces extends HeyApiClient {
+  /**
+   * List container workspaces
+   *
+   * List persisted container workspace metadata used to link sandboxes to agent sessions.
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<
+      GlobalContainerWorkspacesListResponses,
+      GlobalContainerWorkspacesListErrors,
+      ThrowOnError
+    >({ url: "/global/container-workspaces", ...options })
+  }
+
+  /**
+   * Upsert container workspace
+   *
+   * Create or update workspace metadata for a sandbox container.
+   */
+  public upsert<ThrowOnError extends boolean = false>(
+    parameters: {
+      containerId: string
+      containerWorkspaceUpsertPayload?: ContainerWorkspaceUpsertPayload
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "containerId" },
+            { key: "containerWorkspaceUpsertPayload", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).put<
+      GlobalContainerWorkspacesUpsertResponses,
+      GlobalContainerWorkspacesUpsertErrors,
+      ThrowOnError
+    >({
+      url: "/global/container-workspaces/{containerId}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -618,6 +775,16 @@ export class Global extends HeyApiClient {
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _containers?: Containers
+  get containers(): Containers {
+    return (this._containers ??= new Containers({ client: this.client }))
+  }
+
+  private _containerWorkspaces?: ContainerWorkspaces
+  get containerWorkspaces(): ContainerWorkspaces {
+    return (this._containerWorkspaces ??= new ContainerWorkspaces({ client: this.client }))
   }
 }
 

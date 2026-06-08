@@ -31,6 +31,7 @@ import * as Truncate from "@/tool/truncate"
 import { InstanceState } from "@/effect/instance-state"
 import { Reference } from "@/reference/reference"
 import { RepositoryCache } from "@/reference/repository-cache"
+import { ContainerFiles } from "@/container/files"
 
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { MessageID, SessionID } from "@/session/schema"
@@ -67,9 +68,7 @@ const registryLayer = (opts: RegistryLayerOptions = {}) =>
       Layer.provide(EventV2Bridge.defaultLayer),
       Layer.provide(FetchHttpClient.layer),
       Layer.provide(Format.defaultLayer),
-      Layer.provide(Layer.mergeAll(node, Database.defaultLayer)),
-      Layer.provide(Ripgrep.defaultLayer),
-      Layer.provide(Truncate.defaultLayer),
+      Layer.provide(Layer.mergeAll(node, Database.defaultLayer, ContainerFiles.defaultLayer, Ripgrep.defaultLayer, Truncate.defaultLayer)),
     )
     .pipe(Layer.provide(RuntimeFlags.layer(opts.flags ?? {})))
 

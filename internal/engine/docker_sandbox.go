@@ -51,6 +51,12 @@ func (e *DockerSandbox) Create(ctx context.Context, req types.CreateVMRequest) (
 		return Result{}, err
 	}
 
+	if err := e.docker.StartContainer(ctx, containerID); err != nil {
+		_ = e.docker.RemoveContainer(ctx, containerID)
+		_ = e.sandbox.Release(ctx, e.docker, envelope)
+		return Result{}, err
+	}
+
 	return Result{
 		ID:          envelope.ID,
 		ContainerID: containerID,
@@ -78,6 +84,52 @@ func (e *DockerSandbox) List(ctx context.Context) ([]types.VMInfo, error) {
 		})
 	}
 	return out, nil
+}
+
+func (e *DockerSandbox) Stop(ctx context.Context, id string) error {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return err
+	}
+	return e.docker.StopContainer(ctx, record.ID)
+}
+
+func (e *DockerSandbox) Delete(ctx context.Context, id string) error {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	_ = e.docker.StopContainer(ctx, record.ID)
+	if err := e.docker.RemoveContainer(ctx, record.ID); err != nil {
+		return err
+	}
+
+	sandboxID := record.SandboxID
+	if sandboxID == "" {
+		sandboxID = id
+	}
+
+	return e.sandbox.Release(ctx, e.docker, sandbox.Envelope{
+		ID:          sandboxID,
+		NetworkName: "openlegion-sandbox-" + sandboxID,
+		WorkDir:     sandbox.WorkDirFor(sandboxID),
+	})
+}
+
+func (e *DockerSandbox) findRecord(ctx context.Context, id string) (docker.ContainerRecord, error) {
+	records, err := e.docker.ListSandboxContainers(ctx)
+	if err != nil {
+		return docker.ContainerRecord{}, err
+	}
+
+	for _, record := range records {
+		if record.SandboxID == id || record.ID == id || strings.HasPrefix(record.ID, id) {
+			return record, nil
+		}
+	}
+
+	return docker.ContainerRecord{}, fmt.Errorf("vm %q not found", id)
 }
 
 func buildCreateArgs(req types.CreateVMRequest, envelope sandbox.Envelope) ([]string, error) {

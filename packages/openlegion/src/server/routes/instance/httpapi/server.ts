@@ -51,6 +51,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { lazy } from "@/util/lazy"
 import { Vcs } from "@/project/vcs"
 import { Worktree } from "@/worktree"
+import { Container } from "@/container"
 import { Workspace } from "@/control-plane/workspace"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
@@ -232,6 +233,8 @@ export function createRoutes(
       Vcs.defaultLayer,
       Workspace.defaultLayer,
       Worktree.appLayer,
+      Container.defaultLayer,
+      Container.ContainerWorkspace.defaultLayer,
       FSUtil.defaultLayer,
       FetchHttpClient.layer,
       HttpServer.layerServices,

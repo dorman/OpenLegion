@@ -10,6 +10,14 @@ import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
 import { Reference } from "@/reference/reference"
+import { ContainerFiles } from "@/container/files"
+import { Session } from "@/session/session"
+import {
+  containerPermissionMetadata,
+  hostPathInContainerMount,
+  resolveSessionContainer,
+  toContainerPath,
+} from "./container-io"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -65,11 +73,13 @@ type Metadata = {
 export const ReadTool = Tool.define<
   typeof Parameters,
   Metadata,
-  FSUtil.Service | Instruction.Service | LSP.Service | Reference.Service | Scope.Scope
+  FSUtil.Service | Instruction.Service | LSP.Service | Reference.Service | Scope.Scope | Session.Service | ContainerFiles.Service
 >(
   "read",
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
+    const containerFiles = yield* ContainerFiles.Service
+    const sessions = yield* Session.Service
     const instruction = yield* Instruction.Service
     const lsp = yield* LSP.Service
     const reference = yield* Reference.Service
@@ -181,6 +191,32 @@ export const ReadTool = Tool.define<
       return { raw, count: flags.count, cut: flags.cut, more: flags.more, offset: opts.offset }
     })
 
+    const linesFromText = (text: string, opts: { limit: number; offset: number }) => {
+      const allLines = text.split("\n")
+      const start = opts.offset - 1
+      const raw: string[] = []
+      let bytes = 0
+      let cut = false
+      let more = false
+
+      for (let index = start; index < allLines.length && raw.length < opts.limit; index++) {
+        const line = allLines[index] ?? ""
+        const next =
+          line.length > MAX_LINE_LENGTH ? line.substring(0, MAX_LINE_LENGTH) + MAX_LINE_SUFFIX : line
+        const size = Buffer.byteLength(next, "utf-8") + (raw.length > 0 ? 1 : 0)
+        if (bytes + size > MAX_BYTES) {
+          cut = true
+          more = true
+          break
+        }
+        raw.push(next)
+        bytes += size
+      }
+
+      if (start + raw.length < allLines.length) more = true
+      return { raw, count: allLines.length, cut, more, offset: opts.offset }
+    }
+
     const isBinaryFile = (filepath: string, bytes: Uint8Array) => {
       const ext = path.extname(filepath).toLowerCase()
       switch (ext) {
@@ -233,6 +269,7 @@ export const ReadTool = Tool.define<
       ctx: Tool.Context<Metadata>,
     ) {
       const instance = yield* InstanceState.context
+      const container = yield* resolveSessionContainer(sessions, ctx)
       let filepath = params.filePath
       if (!path.isAbsolute(filepath)) {
         filepath = path.resolve(instance.directory, filepath)
@@ -242,30 +279,44 @@ export const ReadTool = Tool.define<
       }
       yield* reference.ensure(filepath)
       const title = path.relative(instance.worktree, filepath)
+      const permission = containerPermissionMetadata(container)
 
-      const stat = yield* fs.stat(filepath).pipe(
-        Effect.catchIf(
-          (err) => "reason" in err && err.reason._tag === "NotFound",
-          () => Effect.succeed(undefined),
-        ),
-      )
+      const stat = container
+        ? yield* containerFiles.stat(container, toContainerPath(filepath, container)).pipe(
+            Effect.map((value) => ({ type: value.type, size: BigInt(value.size) })),
+            Effect.catch(() => Effect.succeed(undefined)),
+          )
+        : yield* fs.stat(filepath).pipe(
+            Effect.catchIf(
+              (err) => "reason" in err && err.reason._tag === "NotFound",
+              () => Effect.succeed(undefined),
+            ),
+          )
 
       yield* assertExternalDirectoryEffect(ctx, filepath, {
         bypass: Boolean(ctx.extra?.["bypassCwdCheck"]) || (yield* reference.contains(filepath)),
         kind: stat?.type === "Directory" ? "directory" : "file",
       })
 
+      if (container && !hostPathInContainerMount(filepath, container)) {
+        return yield* Effect.fail(
+          new Error(`Path is outside the container workspace mount: ${filepath}`),
+        )
+      }
+
       yield* ctx.ask({
         permission: "read",
         patterns: [path.relative(instance.worktree, filepath)],
         always: ["*"],
-        metadata: {},
+        metadata: permission,
       })
 
       if (!stat) return yield* miss(filepath)
 
       if (stat.type === "Directory") {
-        const items = yield* list(filepath)
+        const items = container
+          ? yield* containerFiles.listDirectory(container, toContainerPath(filepath, container))
+          : yield* list(filepath)
         const limit = params.limit ?? DEFAULT_READ_LIMIT
         const offset = params.offset || 1
         const start = offset - 1
@@ -301,13 +352,17 @@ export const ReadTool = Tool.define<
       }
 
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
-      const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
+      const sample = container
+        ? yield* containerFiles.readHead(container, toContainerPath(filepath, container), SAMPLE_BYTES)
+        : yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
 
       const mime = sniffAttachmentMime(sample, FSUtil.mimeType(filepath))
       const isImage = SUPPORTED_IMAGE_MIMES.has(mime)
 
       if (isImage || isPdfAttachment(mime)) {
-        const bytes = yield* fs.readFile(filepath)
+        const bytes = container
+          ? yield* containerFiles.readBytes(container, toContainerPath(filepath, container))
+          : yield* fs.readFile(filepath)
         const msg = isPdfAttachment(mime) ? "PDF read successfully" : "Image read successfully"
         return {
           title,
@@ -331,7 +386,12 @@ export const ReadTool = Tool.define<
         return yield* Effect.fail(new Error(`Cannot read binary file: ${filepath}`))
       }
 
-      const file = yield* lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 })
+      const file = container
+        ? linesFromText(yield* containerFiles.readText(container, toContainerPath(filepath, container)), {
+            limit: params.limit ?? DEFAULT_READ_LIMIT,
+            offset: params.offset || 1,
+          })
+        : yield* lines(filepath, { limit: params.limit ?? DEFAULT_READ_LIMIT, offset: params.offset || 1 })
       if (file.count < file.offset && !(file.count === 0 && file.offset === 1)) {
         return yield* Effect.fail(
           new Error(`Offset ${file.offset} is out of range for this file (${file.count} lines)`),

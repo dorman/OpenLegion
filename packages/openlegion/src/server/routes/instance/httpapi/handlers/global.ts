@@ -11,8 +11,11 @@ import * as Stream from "effect/Stream"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
+import { Container } from "@/container"
+import { Service as ContainerWorkspace, UpsertPayload } from "@/container/workspace"
 import { RootHttpApi } from "../api"
 import { GlobalUpgradeInput } from "../groups/global"
+import { HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 
 const log = Log.create({ service: "server" })
 
@@ -69,8 +72,13 @@ function eventResponse() {
 export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handlers) =>
   Effect.gen(function* () {
     const config = yield* Config.Service
+    const container = yield* Container.Service
+    const workspaces = yield* ContainerWorkspace
     const installation = yield* Installation.Service
     const bridge = yield* EffectBridge.make()
+
+    const mapContainerError = <A, R>(effect: Effect.Effect<A, Container.Error, R>) =>
+      effect.pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
 
     const health = Effect.fn("GlobalHttpApi.health")(function* () {
       return { healthy: true as const, version: InstallationVersion }
@@ -127,6 +135,40 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return result
     })
 
+    const containers = Effect.fn("GlobalHttpApi.containers")(function* () {
+      return yield* mapContainerError(container.list())
+    })
+
+    const containerCreate = Effect.fn("GlobalHttpApi.containerCreate")(function* (ctx: {
+      payload: typeof Container.CreateInput.Type
+    }) {
+      return yield* mapContainerError(container.create(ctx.payload))
+    })
+
+    const containerStop = Effect.fn("GlobalHttpApi.containerStop")(function* (ctx: { params: { id: string } }) {
+      yield* mapContainerError(container.stop(ctx.params.id))
+      return HttpApiSchema.NoContent.make()
+    })
+
+    const containerRemove = Effect.fn("GlobalHttpApi.containerRemove")(function* (ctx: { params: { id: string } }) {
+      yield* mapContainerError(container.remove(ctx.params.id))
+      yield* workspaces.remove(ctx.params.id).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      return HttpApiSchema.NoContent.make()
+    })
+
+    const containerWorkspaces = Effect.fn("GlobalHttpApi.containerWorkspaces")(function* () {
+      return yield* workspaces.list().pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+    })
+
+    const containerWorkspaceUpsert = Effect.fn("GlobalHttpApi.containerWorkspaceUpsert")(function* (ctx: {
+      params: { containerId: string }
+      payload: typeof UpsertPayload.Type
+    }) {
+      return yield* workspaces
+        .upsert({ containerId: ctx.params.containerId, ...ctx.payload })
+        .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+    })
+
     const upgradeRaw = Effect.fn("GlobalHttpApi.upgradeRaw")(function* (ctx: {
       request: HttpServerRequest.HttpServerRequest
     }) {
@@ -152,6 +194,12 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configGet", configGet)
       .handle("configUpdate", configUpdate)
       .handle("dispose", dispose)
+      .handle("containers", containers)
+      .handle("containerCreate", containerCreate)
+      .handle("containerStop", containerStop)
+      .handle("containerRemove", containerRemove)
+      .handle("containerWorkspaces", containerWorkspaces)
+      .handle("containerWorkspaceUpsert", containerWorkspaceUpsert)
       .handleRaw("upgrade", upgradeRaw)
   }),
 )

@@ -5,7 +5,9 @@ import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
 import { EditTool } from "../../src/tool/edit"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { LSP } from "@/lsp/lsp"
+import { ProjectV2 } from "@openlegion-ai/core/project"
 import { FSUtil } from "@openlegion-ai/core/fs-util"
+import { Session } from "@/session/session"
 import { Format } from "../../src/format"
 import { Agent } from "../../src/agent/agent"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
@@ -14,6 +16,7 @@ import { SessionID, MessageID } from "../../src/session/schema"
 import * as Tool from "../../src/tool/tool"
 import { testEffect } from "../lib/effect"
 import { Watcher } from "@openlegion-ai/core/filesystem/watcher"
+import { ContainerFiles } from "@/container/files"
 
 const ctx = {
   sessionID: SessionID.make("ses_test-edit-session"),
@@ -30,13 +33,26 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
+const shellSession = {
+  slug: "test",
+  projectID: ProjectV2.ID.make("project_edit_test"),
+  directory: process.cwd(),
+  title: "test",
+  version: "1",
+  time: { created: Date.now(), updated: Date.now() },
+}
+
 const layer = Layer.mergeAll(
   LSP.defaultLayer,
   FSUtil.defaultLayer,
-  Format.defaultLayer,
+    Format.defaultLayer,
   EventV2Bridge.defaultLayer,
+  ContainerFiles.defaultLayer,
   Truncate.defaultLayer,
   Agent.defaultLayer,
+  Layer.mock(Session.Service)({
+    get: (sessionID) => Effect.succeed({ id: sessionID, ...shellSession }),
+  }),
 )
 
 const it = testEffect(layer)

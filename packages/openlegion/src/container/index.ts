@@ -31,13 +31,29 @@ export class ListFailedError extends Schema.TaggedErrorClass<ListFailedError>()(
   message: Schema.String,
 }) {}
 
-export type Error = RuntimeNotFoundError | RuntimeUnavailableError | CreateFailedError | ListFailedError
+export class StopFailedError extends Schema.TaggedErrorClass<StopFailedError>()("ContainerStopFailedError", {
+  message: Schema.String,
+}) {}
+
+export class RemoveFailedError extends Schema.TaggedErrorClass<RemoveFailedError>()("ContainerRemoveFailedError", {
+  message: Schema.String,
+}) {}
+
+export type Error =
+  | RuntimeNotFoundError
+  | RuntimeUnavailableError
+  | CreateFailedError
+  | ListFailedError
+  | StopFailedError
+  | RemoveFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
   readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
+  readonly stop: (id: string) => Effect.Effect<void, Error>
+  readonly remove: (id: string) => Effect.Effect<void, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -69,11 +85,13 @@ function parseListOutput(stdout: string, runtime: CliRuntime) {
     .filter((item) => item.length > 0)
     .flatMap((line) => {
       try {
-        const data = JSON.parse(line) as { ID?: unknown; Image?: unknown; Names?: unknown; Name?: unknown }
+        const data = JSON.parse(line) as { ID?: unknown; Image?: unknown; Names?: unknown; Name?: unknown; State?: unknown }
         if (typeof data.ID !== "string") return []
         if (typeof data.Image !== "string") return []
         const name = typeof data.Names === "string" ? data.Names : typeof data.Name === "string" ? data.Name : undefined
-        return [{ id: data.ID, image: data.Image, runtime, name }] satisfies ListOutput
+        const state = typeof data.State === "string" ? data.State.toLowerCase() : "running"
+        const status = state === "running" ? ("running" as const) : ("stopped" as const)
+        return [{ id: data.ID, image: data.Image, runtime, name, status }] satisfies ListOutput
       } catch {
         return []
       }
@@ -196,6 +214,13 @@ export const layer = Layer.effect(
           message: "Container runtime returned an empty container id",
         })
       }
+      const start = yield* run(runtime, ["start", id])
+      if (start.code !== 0) {
+        yield* run(runtime, ["rm", "-f", id])
+        return yield* new CreateFailedError({
+          message: normalizeMessage(start, "Failed to start container"),
+        })
+      }
       return {
         id,
         runtime,
@@ -204,10 +229,42 @@ export const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, create })
+    const stop = Effect.fn("Container.stop")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.stop(id).pipe(Effect.mapError((message) => new StopFailedError({ message })))
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["stop", id])
+      if (result.code !== 0) {
+        return yield* new StopFailedError({
+          message: normalizeMessage(result, "Failed to stop container"),
+        })
+      }
+    })
+
+    const remove = Effect.fn("Container.remove")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.remove(id).pipe(Effect.mapError((message) => new RemoveFailedError({ message })))
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, ["rm", "-f", id])
+      if (result.code !== 0) {
+        return yield* new RemoveFailedError({
+          message: normalizeMessage(result, "Failed to remove container"),
+        })
+      }
+    })
+
+    return Service.of({ list, create, stop, remove })
   }),
 )
 
 export const defaultLayer = layer.pipe(Layer.provide(AppProcess.defaultLayer), Layer.provide(MicroVMClient.defaultLayer))
+
+export * from "./session"
+export * as ContainerFiles from "./files"
+export * as ContainerWorkspace from "./workspace"
 
 export * as Container from "."

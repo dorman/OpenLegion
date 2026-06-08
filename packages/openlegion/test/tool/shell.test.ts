@@ -20,6 +20,17 @@ import { testEffect } from "../lib/effect"
 import { Tool } from "@/tool/tool"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceStore } from "@/project/instance-store"
+import { Session } from "@/session/session"
+import { ProjectV2 } from "@openlegion-ai/core/project"
+
+const shellSession = {
+  slug: "test",
+  projectID: ProjectV2.ID.make("project_shell_test"),
+  directory: process.cwd(),
+  title: "test",
+  version: "1",
+  time: { created: Date.now(), updated: Date.now() },
+}
 
 const shellLayer = Layer.mergeAll(
   CrossSpawnSpawner.defaultLayer,
@@ -30,6 +41,9 @@ const shellLayer = Layer.mergeAll(
   Agent.defaultLayer,
   RuntimeFlags.defaultLayer,
   testInstanceStoreLayer,
+  Layer.mock(Session.Service)({
+    get: (sessionID) => Effect.succeed({ id: sessionID, ...shellSession }),
+  }),
 )
 const it = testEffect(shellLayer)
 type ShellTestServices =

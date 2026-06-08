@@ -33,6 +33,7 @@ import {
   setBackgroundColor,
   setDockIcon,
 } from "./windows"
+import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
 import { migrate } from "./migrate"
 import { checkUpdate, checkForUpdates, installUpdate, setupAutoUpdater } from "./updater"
 import { Deferred, Effect, Fiber } from "effect"
@@ -238,6 +239,8 @@ const main = Effect.gen(function* () {
     setBackgroundColor: (color) => setBackgroundColor(color),
     exportDebugLogs: () => exportDebugLogs(),
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
+    containerRuntimeStatus: () => containerRuntimeStatus(),
+    ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
   })
 
   yield* Effect.promise(() => app.whenReady())
@@ -312,6 +315,10 @@ const main = Effect.gen(function* () {
         }),
       ),
     )
+
+    void ensureMicrovmDaemon().then((result) => {
+      if (!result.ok) logger.warn("sandbox daemon unavailable", result)
+    })
 
     logger.log("loading task finished")
   }).pipe(Effect.forkChild)

@@ -27,6 +27,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("GET /vms", s.handleList)
 	mux.HandleFunc("POST /vms", s.handleCreate)
+	mux.HandleFunc("POST /vms/{id}/stop", s.handleStop)
+	mux.HandleFunc("DELETE /vms/{id}", s.handleDelete)
 	return mux
 }
 
@@ -83,6 +85,37 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusCreated, toVMInfo(vm))
+}
+
+func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	if err := s.engine.Stop(r.Context(), id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
+}
+
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	if err := s.engine.Delete(r.Context(), id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	s.store.Delete(id)
+	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
 }
 
 func toVMInfo(vm store.VM) types.VMInfo {

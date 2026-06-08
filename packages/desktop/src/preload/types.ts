@@ -8,6 +8,18 @@ export type ServerReadyData = {
 
 export type WslConfig = { enabled: boolean }
 
+export type ContainerRuntimeStatus = {
+  docker: boolean
+  microvm: boolean
+  microvmUrl: string
+}
+
+export type EnsureMicrovmDaemonResult = {
+  ok: boolean
+  url: string
+  error?: string
+}
+
 export type LinuxDisplayBackend = "wayland" | "auto"
 export type TitlebarTheme = {
   mode: "light" | "dark"
@@ -86,4 +98,6 @@ export type ElectronAPI = {
   setBackgroundColor: (color: string) => Promise<void>
   exportDebugLogs: () => Promise<string>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
+  containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
+  ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
 }

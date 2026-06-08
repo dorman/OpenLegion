@@ -50,6 +50,21 @@ func (c *Client) CreateContainer(ctx context.Context, args []string) (string, er
 	return id, nil
 }
 
+func (c *Client) StartContainer(ctx context.Context, id string) error {
+	_, err := c.run(ctx, "start", id)
+	return err
+}
+
+func (c *Client) StopContainer(ctx context.Context, id string) error {
+	_, err := c.run(ctx, "stop", id)
+	return err
+}
+
+func (c *Client) RemoveContainer(ctx context.Context, id string) error {
+	_, err := c.run(ctx, "rm", "-f", id)
+	return err
+}
+
 func (c *Client) ListSandboxContainers(ctx context.Context) ([]ContainerRecord, error) {
 	out, err := c.run(ctx, "ps", "-a", "--filter", "label="+labelPrefix, "--format", "{{json .}}")
 	if err != nil {

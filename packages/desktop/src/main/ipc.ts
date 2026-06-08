@@ -3,7 +3,15 @@ import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } f
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import type { DesktopMenuAction } from "@openlegion-ai/app/desktop-menu"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme, WindowConfig, WslConfig } from "../preload/types"
+import type {
+  ContainerRuntimeStatus,
+  EnsureMicrovmDaemonResult,
+  FatalRendererError,
+  ServerReadyData,
+  TitlebarTheme,
+  WindowConfig,
+  WslConfig,
+} from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { getStore } from "./store"
 import { getPinchZoomEnabled, setPinchZoomEnabled, setTitlebar, updateTitlebar } from "./windows"
@@ -34,6 +42,8 @@ type Deps = {
   setBackgroundColor: (color: string) => void
   exportDebugLogs: () => Promise<string>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
+  containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
+  ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
 }
 
 export function registerIpcHandlers(deps: Deps) {
@@ -65,6 +75,8 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("record-fatal-renderer-error", (_event: IpcMainInvokeEvent, error: FatalRendererError) =>
     deps.recordFatalRendererError(error),
   )
+  ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
+  ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
   ipcMain.handle("store-get", (_event: IpcMainInvokeEvent, name: string, key: string) => {
     try {
       const store = getStore(name)

@@ -1917,6 +1917,53 @@ export type Config = {
   }
 }
 
+export type ContainerInfo = {
+  id: string
+  runtime: "docker" | "podman" | "microvm"
+  image: string
+  name?: string
+}
+
+export type ContainerListOutput = Array<ContainerInfo>
+
+export type ContainerCreateInput = {
+  image: string
+  name?: string
+  env?: {
+    [key: string]: string
+  }
+  ports?: Array<{
+    host: string
+    container: string
+  }>
+  volumes?: Array<{
+    host: string
+    container: string
+    readOnly?: boolean
+  }>
+  command?: Array<string>
+}
+
+export type ContainerWorkspace = {
+  containerId: string
+  image: string
+  name?: string
+  runtime: "docker" | "podman" | "microvm"
+  hostMount?: string
+  containerMount?: string
+  sessionId?: string
+  createdAt: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type ContainerWorkspaceUpsertPayload = {
+  image: string
+  name?: string
+  runtime: "docker" | "podman" | "microvm"
+  hostMount?: string
+  containerMount?: string
+  sessionId?: string
+}
+
 export type Model = {
   id: string
   providerID: string
@@ -4813,6 +4860,166 @@ export type GlobalUpgradeResponses = {
 }
 
 export type GlobalUpgradeResponse = GlobalUpgradeResponses[keyof GlobalUpgradeResponses]
+
+export type GlobalContainersListData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/containers"
+}
+
+export type GlobalContainersListErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersListError = GlobalContainersListErrors[keyof GlobalContainersListErrors]
+
+export type GlobalContainersListResponses = {
+  /**
+   * Sandbox containers
+   */
+  200: ContainerListOutput
+}
+
+export type GlobalContainersListResponse = GlobalContainersListResponses[keyof GlobalContainersListResponses]
+
+export type GlobalContainersCreateData = {
+  body?: ContainerCreateInput
+  path?: never
+  query?: never
+  url: "/global/containers"
+}
+
+export type GlobalContainersCreateErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersCreateError = GlobalContainersCreateErrors[keyof GlobalContainersCreateErrors]
+
+export type GlobalContainersCreateResponses = {
+  /**
+   * Created container
+   */
+  200: ContainerInfo
+}
+
+export type GlobalContainersCreateResponse = GlobalContainersCreateResponses[keyof GlobalContainersCreateResponses]
+
+export type GlobalContainersStopData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/global/containers/{id}/stop"
+}
+
+export type GlobalContainersStopErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersStopError = GlobalContainersStopErrors[keyof GlobalContainersStopErrors]
+
+export type GlobalContainersStopResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type GlobalContainersStopResponse = GlobalContainersStopResponses[keyof GlobalContainersStopResponses]
+
+export type GlobalContainersRemoveData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/global/containers/{id}"
+}
+
+export type GlobalContainersRemoveErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersRemoveError = GlobalContainersRemoveErrors[keyof GlobalContainersRemoveErrors]
+
+export type GlobalContainersRemoveResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type GlobalContainersRemoveResponse = GlobalContainersRemoveResponses[keyof GlobalContainersRemoveResponses]
+
+export type GlobalContainerWorkspacesListData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/container-workspaces"
+}
+
+export type GlobalContainerWorkspacesListErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainerWorkspacesListError =
+  GlobalContainerWorkspacesListErrors[keyof GlobalContainerWorkspacesListErrors]
+
+export type GlobalContainerWorkspacesListResponses = {
+  /**
+   * Container workspaces
+   */
+  200: Array<ContainerWorkspace>
+}
+
+export type GlobalContainerWorkspacesListResponse =
+  GlobalContainerWorkspacesListResponses[keyof GlobalContainerWorkspacesListResponses]
+
+export type GlobalContainerWorkspacesUpsertData = {
+  body?: ContainerWorkspaceUpsertPayload
+  path: {
+    containerId: string
+  }
+  query?: never
+  url: "/global/container-workspaces/{containerId}"
+}
+
+export type GlobalContainerWorkspacesUpsertErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainerWorkspacesUpsertError =
+  GlobalContainerWorkspacesUpsertErrors[keyof GlobalContainerWorkspacesUpsertErrors]
+
+export type GlobalContainerWorkspacesUpsertResponses = {
+  /**
+   * Container workspace
+   */
+  200: ContainerWorkspace
+}
+
+export type GlobalContainerWorkspacesUpsertResponse =
+  GlobalContainerWorkspacesUpsertResponses[keyof GlobalContainerWorkspacesUpsertResponses]
 
 export type EventSubscribeData = {
   body?: never

@@ -5,6 +5,8 @@ import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unst
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
+import { Container } from "../../src/container"
+import { Service as ContainerWorkspace } from "../../src/container/workspace"
 import { Installation } from "../../src/installation"
 import { ServerAuth } from "../../src/server/auth"
 import { RootHttpApi } from "../../src/server/routes/instance/httpapi/api"
@@ -36,6 +38,26 @@ const apiLayer = HttpRouter.serve(
     }),
   ),
   Layer.provide(ServerAuth.Config.layer({ password: Option.none(), username: "openlegion" })),
+  Layer.provide(
+    Layer.mock(Container.Service)({
+      list: () => Effect.succeed([]),
+      create: () => Effect.fail(new Container.CreateFailedError({ message: "unimplemented" })),
+      stop: () => Effect.void,
+      remove: () => Effect.void,
+    }),
+  ),
+  Layer.provide(
+    Layer.mock(ContainerWorkspace)({
+      list: () => Effect.succeed([]),
+      get: () => Effect.succeed(undefined),
+      upsert: (input) =>
+        Effect.succeed({
+          ...input,
+          createdAt: Date.now(),
+        }),
+      remove: () => Effect.void,
+    }),
+  ),
 )
 const it = testEffect(apiLayer)
 

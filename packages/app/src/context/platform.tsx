@@ -12,6 +12,18 @@ type UpdateInfo = { updateAvailable: boolean; version?: string }
 type PlatformName = "web" | "desktop"
 type DesktopOS = "macos" | "windows" | "linux"
 
+export type ContainerRuntimeStatus = {
+  docker: boolean
+  microvm: boolean
+  microvmUrl: string
+}
+
+export type EnsureMicrovmDaemonResult = {
+  ok: boolean
+  url: string
+  error?: string
+}
+
 export type FatalRendererErrorLog = {
   error: string
   url: string
@@ -113,6 +125,12 @@ export type Platform = {
 
   /** Record a fatal renderer error in platform logs (desktop only) */
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
+
+  /** Check docker and sandbox daemon availability (desktop only) */
+  containerRuntimeStatus?(): Promise<ContainerRuntimeStatus>
+
+  /** Start the local sandbox daemon when possible (desktop only) */
+  ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
 }
 
 export type DisplayBackend = "auto" | "wayland"

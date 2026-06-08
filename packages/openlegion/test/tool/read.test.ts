@@ -4,6 +4,8 @@ import { Cause, Effect, Exit, Layer, Stream } from "effect"
 import path from "path"
 import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
+import { ProjectV2 } from "@openlegion-ai/core/project"
+import { Session } from "@/session/session"
 import { FSUtil } from "@openlegion-ai/core/fs-util"
 import { Global } from "@openlegion-ai/core/global"
 import { Config } from "@/config/config"
@@ -26,6 +28,7 @@ import {
 import { testEffect } from "../lib/effect"
 import { Reference } from "@/reference/reference"
 import { RepositoryCache } from "@/reference/repository-cache"
+import { ContainerFiles } from "@/container/files"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
 
@@ -51,15 +54,28 @@ const referenceLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
     Layer.provide(RuntimeFlags.layer(flags)),
   )
 
+const shellSession = {
+  slug: "test",
+  projectID: ProjectV2.ID.make("project_read_test"),
+  directory: process.cwd(),
+  title: "test",
+  version: "1",
+  time: { created: Date.now(), updated: Date.now() },
+}
+
 const readLayer = (flags: Partial<RuntimeFlags.Info> = {}) =>
   Layer.mergeAll(
     Agent.defaultLayer,
     FSUtil.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
+    ContainerFiles.defaultLayer,
     Instruction.defaultLayer,
     LSP.defaultLayer,
     referenceLayer(flags),
     Truncate.defaultLayer,
+    Layer.mock(Session.Service)({
+      get: (sessionID) => Effect.succeed({ id: sessionID, ...shellSession }),
+    }),
   )
 
 const it = testEffect(Layer.mergeAll(readLayer(), testInstanceStoreLayer))

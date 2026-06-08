@@ -63,6 +63,7 @@ import { useTheme, type ColorScheme } from "@openlegion-ai/ui/theme/context"
 import { useCommand, type CommandOption } from "@/context/command"
 import { ConstrainDragXAxis, getDraggableId } from "@/utils/solid-dnd"
 import { DebugBar } from "@/components/debug-bar"
+import { DesktopShell } from "@/components/desktop-shell"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { useServer } from "@/context/server"
 import { useLanguage, type Locale } from "@/context/language"
@@ -2375,7 +2376,7 @@ export default function Layout(props: ParentProps) {
           <Titlebar update={titlebarUpdate} />
           <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
             <Show when={!autoselecting.loading} fallback={<div class="size-full" />}>
-              {props.children}
+              <DesktopShell>{props.children}</DesktopShell>
             </Show>
           </main>
           {import.meta.env.DEV && <DebugBar />}

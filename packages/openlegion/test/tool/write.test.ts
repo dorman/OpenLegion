@@ -11,7 +11,10 @@ import { Truncate } from "@/tool/truncate"
 import { Tool } from "@/tool/tool"
 import { Agent } from "../../src/agent/agent"
 import { SessionID, MessageID } from "../../src/session/schema"
+import { ProjectV2 } from "@openlegion-ai/core/project"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
+import { Session } from "@/session/session"
+import { ContainerFiles } from "@/container/files"
 import { disposeAllInstances, TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -30,6 +33,15 @@ afterEach(async () => {
   await disposeAllInstances()
 })
 
+const shellSession = {
+  slug: "test",
+  projectID: ProjectV2.ID.make("project_write_test"),
+  directory: process.cwd(),
+  title: "test",
+  version: "1",
+  time: { created: Date.now(), updated: Date.now() },
+}
+
 const it = testEffect(
   Layer.mergeAll(
     LSP.defaultLayer,
@@ -37,8 +49,12 @@ const it = testEffect(
     EventV2Bridge.defaultLayer,
     Format.defaultLayer,
     CrossSpawnSpawner.defaultLayer,
+    ContainerFiles.defaultLayer,
     Truncate.defaultLayer,
     Agent.defaultLayer,
+    Layer.mock(Session.Service)({
+      get: (sessionID) => Effect.succeed({ id: sessionID, ...shellSession }),
+    }),
   ),
 )
 

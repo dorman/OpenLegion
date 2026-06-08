@@ -63,6 +63,7 @@ const TOP_LEVEL = [
   "session",
   "plugin",
   "db",
+  "container",
 ] as const
 
 // Subcommands worth pinning. Not exhaustive — the goal is one snapshot per
@@ -83,6 +84,10 @@ const SUBCOMMANDS = [
   ["github", "install"],
   ["github", "run"],
   ["db", "path"],
+  ["container", "list"],
+  ["container", "create"],
+  ["container", "stop"],
+  ["container", "rm"],
 ] as const
 
 // Fixed wrap width so a developer's terminal doesn't affect snapshots.
