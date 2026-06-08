@@ -1922,6 +1922,7 @@ export type ContainerInfo = {
   runtime: "docker" | "podman" | "microvm"
   image: string
   name?: string
+  status?: "running" | "stopped"
 }
 
 export type ContainerListOutput = Array<ContainerInfo>
@@ -1942,6 +1943,15 @@ export type ContainerCreateInput = {
     readOnly?: boolean
   }>
   command?: Array<string>
+}
+
+export type ContainerLogsOutput = {
+  logs: string
+}
+
+export type ContainerShellOutput = {
+  command: string
+  runtime: "docker" | "podman" | "microvm"
 }
 
 export type ContainerWorkspace = {
@@ -4938,6 +4948,62 @@ export type GlobalContainersStopResponses = {
 
 export type GlobalContainersStopResponse = GlobalContainersStopResponses[keyof GlobalContainersStopResponses]
 
+export type GlobalContainersLogsData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    tail?: string
+  }
+  url: "/global/containers/{id}/logs"
+}
+
+export type GlobalContainersLogsErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersLogsError = GlobalContainersLogsErrors[keyof GlobalContainersLogsErrors]
+
+export type GlobalContainersLogsResponses = {
+  /**
+   * Container logs
+   */
+  200: ContainerLogsOutput
+}
+
+export type GlobalContainersLogsResponse = GlobalContainersLogsResponses[keyof GlobalContainersLogsResponses]
+
+export type GlobalContainersShellData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/global/containers/{id}/shell"
+}
+
+export type GlobalContainersShellErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type GlobalContainersShellError = GlobalContainersShellErrors[keyof GlobalContainersShellErrors]
+
+export type GlobalContainersShellResponses = {
+  /**
+   * Container shell command
+   */
+  200: ContainerShellOutput
+}
+
+export type GlobalContainersShellResponse = GlobalContainersShellResponses[keyof GlobalContainersShellResponses]
+
 export type GlobalContainersRemoveData = {
   body?: never
   path: {
@@ -5575,6 +5641,7 @@ export type FileListData = {
     directory?: string
     workspace?: string
     path: string
+    sessionID?: string
   }
   url: "/file"
 }
@@ -5604,6 +5671,7 @@ export type FileReadData = {
     directory?: string
     workspace?: string
     path: string
+    sessionID?: string
   }
   url: "/file/content"
 }

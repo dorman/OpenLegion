@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process"
 import { spawn } from "node:child_process"
 import { access } from "node:fs/promises"
 import { dirname, join } from "node:path"
@@ -10,18 +11,24 @@ export type ContainerRuntimeStatus = {
   microvmUrl: string
 }
 
+const requiredMicrovmFeatures = ["logs", "shell"]
+
 let daemon: ReturnType<typeof spawn> | undefined
 
 function microvmUrl() {
   return process.env.OPENLEGION_MICROVM_URL ?? "http://127.0.0.1:7420"
 }
 
-async function microvmHealthy(url: string) {
+async function microvmHealth(url: string) {
   try {
     const response = await fetch(`${url.replace(/\/$/, "")}/health`, { signal: AbortSignal.timeout(1500) })
-    return response.ok
+    if (!response.ok) return { ok: false as const }
+    const json = (await response.json()) as { ok?: boolean; features?: string[] }
+    const features = json.features ?? []
+    const supported = requiredMicrovmFeatures.every((feature) => features.includes(feature))
+    return { ok: json.ok === true, supported }
   } catch {
-    return false
+    return { ok: false as const }
   }
 }
 
@@ -35,8 +42,8 @@ async function dockerAvailable() {
 
 export async function containerRuntimeStatus(): Promise<ContainerRuntimeStatus> {
   const url = microvmUrl()
-  const [docker, microvm] = await Promise.all([dockerAvailable(), microvmHealthy(url)])
-  return { docker, microvm, microvmUrl: url }
+  const [docker, health] = await Promise.all([dockerAvailable(), microvmHealth(url)])
+  return { docker, microvm: health.ok === true, microvmUrl: url }
 }
 
 async function repoRoot() {
@@ -59,12 +66,48 @@ async function daemonCommand() {
   return undefined
 }
 
+async function killPort(port: string) {
+  await new Promise<void>((resolve) => {
+    execFile("lsof", ["-ti", `tcp:${port}`], (error, stdout) => {
+      if (error || !stdout.trim()) {
+        resolve()
+        return
+      }
+      for (const pid of stdout.trim().split("\n")) {
+        const value = Number(pid)
+        if (!Number.isFinite(value)) continue
+        try {
+          process.kill(value, "SIGTERM")
+        } catch {}
+      }
+      resolve()
+    })
+  })
+}
+
+async function stopTrackedDaemon() {
+  if (!daemon || daemon.killed) return
+  daemon.kill()
+  daemon = undefined
+}
+
+async function restartStaleDaemon(url: string) {
+  const port = new URL(url).port || "7420"
+  await stopTrackedDaemon()
+  await killPort(port)
+  await new Promise((resolve) => setTimeout(resolve, 300))
+}
+
 export async function ensureMicrovmDaemon() {
   const url = microvmUrl()
-  if (await microvmHealthy(url)) return { ok: true as const, url }
+  const health = await microvmHealth(url)
+  if (health.ok && health.supported) return { ok: true as const, url }
+  if (health.ok && !health.supported) await restartStaleDaemon(url)
 
   if (daemon && !daemon.killed) {
-    if (await microvmHealthy(url)) return { ok: true as const, url }
+    const current = await microvmHealth(url)
+    if (current.ok && current.supported) return { ok: true as const, url }
+    await restartStaleDaemon(url)
   }
 
   const command = await daemonCommand()
@@ -80,7 +123,8 @@ export async function ensureMicrovmDaemon() {
 
   for (let attempt = 0; attempt < 40; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 250))
-    if (await microvmHealthy(url)) return { ok: true as const, url }
+    const next = await microvmHealth(url)
+    if (next.ok && next.supported) return { ok: true as const, url }
     if (daemon.exitCode !== null) break
   }
 
@@ -88,7 +132,6 @@ export async function ensureMicrovmDaemon() {
 }
 
 export async function stopMicrovmDaemon() {
-  if (!daemon || daemon.killed) return
-  daemon.kill()
-  daemon = undefined
+  await stopTrackedDaemon()
+  await killPort(new URL(microvmUrl()).port || "7420")
 }

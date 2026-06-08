@@ -40,7 +40,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
+	writeJSON(w, http.StatusOK, types.HealthResponse{
+		OK:       true,
+		Features: []string{"logs", "shell"},
+	})
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {

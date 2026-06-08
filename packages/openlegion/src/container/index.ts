@@ -2,6 +2,7 @@ import { AppProcess } from "@openlegion-ai/core/process"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import * as MicroVMClient from "./microvm-client"
+import { resolveDockerContainerId } from "./resolve"
 import type * as ContainerSchema from "./schema"
 
 export * from "./schema"
@@ -172,6 +173,40 @@ export const layer = Layer.effect(
       })
     })
 
+    const dockerRuntime = (): CliRuntime => {
+      const preferred = process.env.OPENLEGION_DOCKER_RUNTIME?.trim()
+      if (preferred === "podman") return "podman"
+      return "docker"
+    }
+
+    const dockerContainerId = Effect.fnUntraced(function* (id: string) {
+      return yield* resolveDockerContainerId(appProcess, id).pipe(
+        Effect.mapError((error) => new LogsFailedError({ message: error.message })),
+      )
+    })
+
+    const dockerLogs = Effect.fnUntraced(function* (id: string, tail: number) {
+      const runtime = dockerRuntime()
+      const containerId = yield* dockerContainerId(id)
+      const args = tail > 0 ? ["logs", "--tail", String(tail), containerId] : ["logs", containerId]
+      const result = yield* run(runtime, args)
+      if (result.code !== 0) {
+        return yield* new LogsFailedError({
+          message: normalizeMessage(result, "Failed to fetch container logs"),
+        })
+      }
+      return { logs: result.stdout }
+    })
+
+    const dockerShell = Effect.fnUntraced(function* (id: string) {
+      const runtime = dockerRuntime()
+      const containerId = yield* dockerContainerId(id)
+      return {
+        command: `${runtime} exec -i ${containerId} sh`,
+        runtime,
+      }
+    })
+
     const ensureRuntimeAvailable = Effect.fnUntraced(function* (runtime: Runtime) {
       if (runtime === "microvm") {
         if (yield* microvmClient.health()) return
@@ -273,7 +308,7 @@ export const layer = Layer.effect(
       const runtime = yield* detectRuntime()
       const tail = input?.tail ?? 200
       if (runtime === "microvm") {
-        return yield* microvmClient.logs(id, tail).pipe(Effect.mapError((message) => new LogsFailedError({ message })))
+        return yield* microvmClient.logs(id, tail).pipe(Effect.catch(() => dockerLogs(id, tail)))
       }
       yield* ensureRuntimeAvailable(runtime)
       const args = tail > 0 ? ["logs", "--tail", String(tail), id] : ["logs", id]
@@ -289,7 +324,7 @@ export const layer = Layer.effect(
     const shell = Effect.fn("Container.shell")(function* (id: string) {
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
-        return yield* microvmClient.shell(id).pipe(Effect.mapError((message) => new ShellFailedError({ message })))
+        return yield* microvmClient.shell(id).pipe(Effect.catch(() => dockerShell(id)))
       }
       yield* ensureRuntimeAvailable(runtime)
       return {

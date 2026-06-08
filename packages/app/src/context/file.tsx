@@ -70,10 +70,15 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       file: {},
     })
 
+    const sessionID = createMemo(() => params.id)
+
     const tree = createFileTreeStore({
       scope,
       normalizeDir: path.normalizeDir,
-      list: (dir) => sdk.client.file.list({ path: dir }).then((x) => x.data ?? []),
+      list: (dir) =>
+        sdk.client.file
+          .list({ path: dir, ...(sessionID() ? { sessionID: sessionID() } : {}) })
+          .then((x) => x.data ?? []),
       onError: (message) => {
         showToast({
           variant: "error",
@@ -172,7 +177,7 @@ export const { use: useFile, provider: FileProvider } = createSimpleContext({
       setLoading(file)
 
       const promise = sdk.client.file
-        .read({ path: file })
+        .read({ path: file, ...(params.id ? { sessionID: params.id } : {}) })
         .then((x) => {
           if (scope() !== directory) return
           const content = x.data

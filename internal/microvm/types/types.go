@@ -31,7 +31,8 @@ type ErrorResponse struct {
 }
 
 type HealthResponse struct {
-	OK bool `json:"ok"`
+	OK       bool     `json:"ok"`
+	Features []string `json:"features,omitempty"`
 }
 
 type LogsResponse struct {

@@ -2,6 +2,7 @@ import path from "path"
 import { AppProcess, type AppProcessError } from "@openlegion-ai/core/process"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
+import { resolveDockerContainerId } from "./resolve"
 import { containerCli, type SessionContainer } from "./session"
 
 export class ContainerFileError extends Schema.TaggedErrorClass<ContainerFileError>()("ContainerFileError", {
@@ -45,10 +46,13 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const appProcess = yield* AppProcess.Service
 
-    const exec = (container: SessionContainer, args: string[], stdin?: string) => {
+    const exec = Effect.fnUntraced(function* (container: SessionContainer, args: string[], stdin?: string) {
       const bin = containerCli(container.runtime)
-      return appProcess
-        .run(ChildProcess.make(bin, ["exec", "-i", container.id, ...args], { stdin: stdin === undefined ? "ignore" : "pipe" }), {
+      const containerId = yield* resolveDockerContainerId(appProcess, container.id).pipe(
+        Effect.mapError((error) => new ContainerFileError({ message: error.message })),
+      )
+      return yield* appProcess
+        .run(ChildProcess.make(bin, ["exec", "-i", containerId, ...args], { stdin: stdin === undefined ? "ignore" : "pipe" }), {
           stdin,
           maxOutputBytes: 64 * 1024 * 1024,
         })
@@ -60,7 +64,7 @@ export const layer = Layer.effect(
               }),
           ),
         )
-    }
+    })
 
     const requireSuccess = (result: AppProcess.RunResult) => {
       if (result.exitCode === 0) return Effect.succeed(result)

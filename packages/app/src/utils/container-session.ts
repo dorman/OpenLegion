@@ -7,6 +7,7 @@ import { ensureContainerAvailable, type ContainerInfo } from "@/utils/containers
 import {
   containerSessionMetadata,
   DEFAULT_CONTAINER_MOUNT,
+  sessionContainerFromMetadata,
   type ContainerWorkspace,
   upsertContainerWorkspace,
 } from "@/utils/container-workspaces"
@@ -26,8 +27,9 @@ type OpenContainerSessionInput = {
 export async function openContainerSession(input: OpenContainerSessionInput) {
   const container = await ensureContainerAvailable(input.http, input.container.id)
 
-  const hostMount = input.workspace?.hostMount ?? input.projectDirectory
+  const hostMount = input.projectDirectory
   const containerMount = input.workspace?.containerMount ?? DEFAULT_CONTAINER_MOUNT
+  const metadata = containerSessionMetadata(container, { hostMount, containerMount })
 
   const workspace = await upsertContainerWorkspace(input.http, container.id, {
     image: container.image,
@@ -54,6 +56,19 @@ export async function openContainerSession(input: OpenContainerSessionInput) {
       .then((result) => result.data)
       .catch(() => undefined)
     if (existing?.id) {
+      const current = sessionContainerFromMetadata(existing.metadata)
+      if (
+        current?.hostMount !== hostMount ||
+        current.containerMount !== containerMount ||
+        current.id !== container.id ||
+        current.runtime !== container.runtime
+      ) {
+        await client.session.update({
+          sessionID: existing.id,
+          directory: input.projectDirectory,
+          metadata,
+        })
+      }
       input.navigate(`/${base64Encode(input.projectDirectory)}/session/${existing.id}`)
       return existing
     }
@@ -61,7 +76,7 @@ export async function openContainerSession(input: OpenContainerSessionInput) {
 
   const created = await client.session.create({
     directory: input.projectDirectory,
-    metadata: containerSessionMetadata(container, { hostMount, containerMount }),
+    metadata,
   })
 
   const session = created.data

@@ -15,6 +15,11 @@ import {
 
 type InspectTab = "logs" | "shell"
 
+function defaultShellCommand(container: ContainerInfo) {
+  const target = container.name ?? container.id
+  return `docker exec -i ${target} sh`
+}
+
 export function DialogContainerInspect(props: { container: ContainerInfo }) {
   const language = useLanguage()
   const platform = usePlatform()
@@ -23,50 +28,67 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
   const [tab, setTab] = createSignal<InspectTab>("logs")
   const [logs, setLogs] = createSignal("")
   const [shellCommand, setShellCommand] = createSignal<string | undefined>()
-  const [error, setError] = createSignal<string | undefined>()
-  const [loading, setLoading] = createSignal(true)
+  const [logsError, setLogsError] = createSignal<string | undefined>()
+  const [shellError, setShellError] = createSignal<string | undefined>()
+  const [logsLoading, setLogsLoading] = createSignal(true)
   const [autoRefresh, setAutoRefresh] = createSignal(true)
 
   const running = () => (props.container.status ?? "running") === "running"
-  const shellAvailable = () => !!platform.containerPty && running() && !!shellCommand()
+  const shellCommandValue = () => shellCommand() ?? defaultShellCommand(props.container)
+  const shellReady = () => running() && !!platform.containerPty
 
-  async function refresh() {
+  async function refreshLogs() {
     const http = server.current?.http
     if (!http) {
-      setError(language.t("containers.error.noServer"))
-      setLoading(false)
+      setLogsError(language.t("containers.error.noServer"))
+      setLogsLoading(false)
       return
     }
 
-    setError(undefined)
+    setLogsError(undefined)
     try {
-      const [nextLogs, shell] = await Promise.all([
-        fetchContainerLogs(http, props.container.id),
-        fetchContainerShell(http, props.container.id),
-      ])
-      setLogs(nextLogs)
+      setLogs(await fetchContainerLogs(http, props.container.id))
+    } catch (err) {
+      setLogsError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  async function refreshShell() {
+    const http = server.current?.http
+    if (!http) {
+      setShellError(language.t("containers.error.noServer"))
+      return
+    }
+
+    setShellError(undefined)
+    try {
+      const shell = await fetchContainerShell(http, props.container.id)
       setShellCommand(shell.command)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
+      setShellCommand(defaultShellCommand(props.container))
+      setShellError(err instanceof Error ? err.message : String(err))
     }
   }
 
   createEffect(() => {
-    void refresh()
+    void refreshLogs()
     if (!autoRefresh() || !running() || tab() !== "logs") return
 
     const timer = setInterval(() => {
-      void refresh()
+      void refreshLogs()
     }, 3_000)
     onCleanup(() => clearInterval(timer))
   })
 
+  createEffect(() => {
+    if (tab() !== "shell" || !shellReady()) return
+    void refreshShell()
+  })
+
   async function copyShellCommand() {
-    const command = shellCommand()
-    if (!command) return
-    await navigator.clipboard.writeText(command)
+    await navigator.clipboard.writeText(shellCommandValue())
   }
 
   return (
@@ -89,7 +111,7 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
             variant={tab() === "shell" ? "neutral" : "ghost"}
             size="normal"
             onClick={() => setTab("shell")}
-            disabled={!shellAvailable()}
+            disabled={!shellReady()}
           >
             {language.t("containers.inspect.tab.shell")}
           </ButtonV2>
@@ -106,48 +128,51 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
               />
               {language.t("containers.inspect.autoRefresh")}
             </label>
-            <ButtonV2 variant="ghost" size="normal" onClick={() => void refresh()} disabled={loading()}>
+            <ButtonV2 variant="ghost" size="normal" onClick={() => void refreshLogs()} disabled={logsLoading()}>
               {language.t("containers.inspect.refresh")}
             </ButtonV2>
           </div>
 
-          <Show when={loading()} fallback={null}>
+          <Show when={logsLoading()} fallback={null}>
             <div class="flex justify-center py-8">
               <Spinner />
             </div>
           </Show>
 
-          <Show when={!loading()}>
+          <Show when={!logsLoading()}>
             <pre class="max-h-[min(50vh,420px)] min-h-[240px] overflow-auto rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-3 font-mono text-xs leading-relaxed text-v2-text-text-base whitespace-pre-wrap">
               {logs().trim() || language.t("containers.inspect.logsEmpty")}
             </pre>
           </Show>
+
+          <Show when={logsError()}>
+            <div class="text-sm text-v2-text-text-danger">{logsError()}</div>
+          </Show>
         </Show>
 
-        <Show
-          when={shellAvailable()}
-          fallback={
-            <Show when={tab() === "shell"}>
+        <Show when={tab() === "shell"}>
+          <Show
+            when={shellReady()}
+            fallback={
               <div class="rounded-md border border-v2-border-border-base p-4 text-sm text-v2-text-text-muted">
                 {running()
                   ? language.t("containers.inspect.shellUnavailable")
                   : language.t("containers.inspect.shellStopped")}
               </div>
-            </Show>
-          }
-        >
-          <div classList={{ "flex min-h-0 flex-1 flex-col gap-3": true, hidden: tab() !== "shell" }}>
-            <ContainerTerminal command={shellCommand()!} active={tab() === "shell"} />
-            <div class="flex flex-wrap gap-2">
-              <ButtonV2 variant="neutral" size="normal" onClick={() => void copyShellCommand()}>
-                {language.t("containers.inspect.copyShell")}
-              </ButtonV2>
+            }
+          >
+            <div class="flex min-h-0 flex-1 flex-col gap-3">
+              <ContainerTerminal command={shellCommandValue()} active={tab() === "shell"} />
+              <div class="flex flex-wrap gap-2">
+                <ButtonV2 variant="neutral" size="normal" onClick={() => void copyShellCommand()}>
+                  {language.t("containers.inspect.copyShell")}
+                </ButtonV2>
+              </div>
+              <Show when={shellError()}>
+                <div class="text-sm text-v2-text-text-muted">{shellError()}</div>
+              </Show>
             </div>
-          </div>
-        </Show>
-
-        <Show when={error()}>
-          <div class="text-sm text-v2-text-text-danger">{error()}</div>
+          </Show>
         </Show>
       </div>
 

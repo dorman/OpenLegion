@@ -47,8 +47,16 @@ async function containerFetch(server: ServerConnection.HttpBase, path: string, i
     const text = await response.text()
     let message = text
     try {
-      const json = JSON.parse(text) as { message?: string; error?: string }
-      message = json.message ?? json.error ?? text
+      const json = JSON.parse(text) as {
+        message?: string
+        error?: string
+        _tag?: string
+        data?: { message?: string }
+      }
+      message = json.message ?? json.data?.message ?? json.error ?? text
+      if (message === text && json._tag === "BadRequest") {
+        message = "Request failed (400)"
+      }
     } catch {}
     throw new Error(message || `Request failed (${response.status})`)
   }

@@ -84,8 +84,12 @@ import type {
   GlobalContainersCreateResponses,
   GlobalContainersListErrors,
   GlobalContainersListResponses,
+  GlobalContainersLogsErrors,
+  GlobalContainersLogsResponses,
   GlobalContainersRemoveErrors,
   GlobalContainersRemoveResponses,
+  GlobalContainersShellErrors,
+  GlobalContainersShellResponses,
   GlobalContainersStopErrors,
   GlobalContainersStopResponses,
   GlobalContainerWorkspacesListErrors,
@@ -628,6 +632,63 @@ export class Containers extends HeyApiClient {
       ThrowOnError
     >({
       url: "/global/containers/{id}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Container logs
+   *
+   * Fetch recent stdout/stderr logs for a sandbox container.
+   */
+  public logs<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      tail?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "tail" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      GlobalContainersLogsResponses,
+      GlobalContainersLogsErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}/logs",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Container shell command
+   *
+   * Resolve the local command used to open an interactive shell in a sandbox container.
+   */
+  public shell<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).get<
+      GlobalContainersShellResponses,
+      GlobalContainersShellErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}/shell",
       ...options,
       ...params,
     })
@@ -1878,6 +1939,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1889,6 +1951,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "sessionID" },
           ],
         },
       ],
@@ -1910,6 +1973,7 @@ export class File extends HeyApiClient {
       directory?: string
       workspace?: string
       path: string
+      sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1921,6 +1985,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "sessionID" },
           ],
         },
       ],

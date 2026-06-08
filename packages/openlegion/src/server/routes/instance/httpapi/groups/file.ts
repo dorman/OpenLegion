@@ -2,6 +2,7 @@ import { FileSystem } from "@openlegion-ai/core/filesystem"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { NonNegativeInt } from "@openlegion-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
+import { SessionID } from "@/session/schema"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
@@ -16,6 +17,7 @@ import { described } from "./metadata"
 export const FileQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   path: Schema.String,
+  sessionID: Schema.optional(SessionID),
 })
 
 export const FindTextQuery = Schema.Struct({
