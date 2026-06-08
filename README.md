@@ -1,4 +1,8 @@
 # OpenLegion
+[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/main)
+![MIT License](https://img.shields.io/badge/LICENSE-MIT-%234183C4.svg?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TYPESCRIPT-%233178C6.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Electron](https://img.shields.io/badge/ELECTRON-%2347848F.svg?style=for-the-badge&logo=electron&logoColor=white)
 
 **Local desktop platform for running Docker workloads with sandboxed, security-aware agents.**
 
@@ -11,8 +15,6 @@ MIT — see [LICENSE](./LICENSE). Upstream OpenCode remains MIT; attribution app
 ---
 
 Everything runs **on your machine**. There is no hosted control plane; data, credentials, and workloads stay local.
-
-[![Build status](https://img.shields.io/github/actions/workflow/status/dorman/OpenLegion/publish.yml?style=flat-square&branch=dev)](https://github.com/dorman/OpenLegion/actions/workflows/publish.yml)
 
 ---
 
