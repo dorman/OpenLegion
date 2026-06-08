@@ -16,9 +16,11 @@ export function DialogContainerCreate(props: {
   const [error, setError] = createSignal<string | undefined>()
   const [pending, setPending] = createSignal(false)
   const [store, setStore] = createStore({
+    kind: "container" as "container" | "desktop",
     image: "alpine:latest",
     name: "",
     command: "sleep 3600",
+    memoryMb: "2048",
     volumeHost: "",
     volumeContainer: "/workspace",
     publish: "",
@@ -49,13 +51,16 @@ export function DialogContainerCreate(props: {
           return [{ host, container }]
         })
 
+      const memoryMb = Number(store.memoryMb)
       await props.onCreate({
+        kind: store.kind,
         image: store.image.trim(),
         name: store.name.trim() || undefined,
-        command: command.length > 0 ? command : undefined,
+        memoryMb: store.kind === "desktop" && Number.isFinite(memoryMb) && memoryMb > 0 ? memoryMb : undefined,
+        command: store.kind === "container" && command.length > 0 ? command : undefined,
         ports: ports.length > 0 ? ports : undefined,
         volumes:
-          store.volumeHost.trim() && store.volumeContainer.trim()
+          store.kind === "container" && store.volumeHost.trim() && store.volumeContainer.trim()
             ? [{ host: store.volumeHost.trim(), container: store.volumeContainer.trim() }]
             : undefined,
       })
@@ -71,10 +76,34 @@ export function DialogContainerCreate(props: {
     <Dialog
       title={language.t("containers.create.title")}
       description={language.t("containers.create.description")}
-      size="x-large"
+      size="large"
+      fit
       class="container-create-dialog"
     >
-      <div class="flex flex-col gap-4 px-4 pb-2">
+      <div class="container-create-dialog-body flex flex-col gap-4 px-4 pb-2">
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="text-v2-text-text-muted">{language.t("containers.create.kind")}</span>
+          <select
+            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+            value={store.kind}
+            onChange={(event) => setStore("kind", event.currentTarget.value as "container" | "desktop")}
+          >
+            <option value="container">{language.t("containers.create.kind.container")}</option>
+            <option value="desktop">{language.t("containers.create.kind.desktop")}</option>
+          </select>
+        </label>
+
+        <Show when={store.kind === "desktop"}>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-v2-text-text-muted">{language.t("containers.create.memory")}</span>
+            <input
+              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+              value={store.memoryMb}
+              onInput={(event) => setStore("memoryMb", event.currentTarget.value)}
+            />
+          </label>
+        </Show>
+
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-v2-text-text-muted">{language.t("containers.create.image")}</span>
           <input
@@ -93,14 +122,16 @@ export function DialogContainerCreate(props: {
           />
         </label>
 
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-v2-text-text-muted">{language.t("containers.create.command")}</span>
-          <input
-            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-            value={store.command}
-            onInput={(event) => setStore("command", event.currentTarget.value)}
-          />
-        </label>
+        <Show when={store.kind === "container"}>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-v2-text-text-muted">{language.t("containers.create.command")}</span>
+            <input
+              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+              value={store.command}
+              onInput={(event) => setStore("command", event.currentTarget.value)}
+            />
+          </label>
+        </Show>
 
         <label class="flex flex-col gap-1 text-sm">
           <span class="text-v2-text-text-muted">{language.t("containers.create.publish")}</span>
@@ -112,6 +143,7 @@ export function DialogContainerCreate(props: {
           />
         </label>
 
+        <Show when={store.kind === "container"}>
         <div class="flex flex-col gap-2 text-sm">
           <span class="text-v2-text-text-muted">{language.t("containers.create.volume")}</span>
           <div class="flex gap-2">
@@ -132,6 +164,7 @@ export function DialogContainerCreate(props: {
             onInput={(event) => setStore("volumeContainer", event.currentTarget.value)}
           />
         </div>
+        </Show>
 
         <Show when={error()}>
           <p class="text-sm text-v2-text-text-danger">{error()}</p>
@@ -142,7 +175,10 @@ export function DialogContainerCreate(props: {
         <ButtonV2 variant="ghost" onClick={() => dialog.close()} disabled={pending()}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2 onClick={() => void submit()} disabled={pending() || !store.image.trim()}>
+        <ButtonV2
+          onClick={() => void submit()}
+          disabled={pending() || (store.kind === "container" && !store.image.trim())}
+        >
           {language.t("containers.create.submit")}
         </ButtonV2>
       </DialogFooter>

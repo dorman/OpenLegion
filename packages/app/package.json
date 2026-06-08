@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@kobalte/core": "catalog:",
+    "@novnc/novnc": "1.5.0",
     "@openlegion-ai/core": "workspace:*",
     "@openlegion-ai/sdk": "workspace:*",
     "@openlegion-ai/ui": "workspace:*",

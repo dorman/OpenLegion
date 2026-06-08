@@ -29,6 +29,10 @@ func NewDockerSandbox() *DockerSandbox {
 	}
 }
 
+func (e *DockerSandbox) Kind() string {
+	return "container"
+}
+
 func (e *DockerSandbox) Available(ctx context.Context) error {
 	return e.docker.Available(ctx)
 }
@@ -77,10 +81,17 @@ func (e *DockerSandbox) List(ctx context.Context) ([]types.VMInfo, error) {
 		if id == "" {
 			id = record.ID
 		}
+		status := "stopped"
+		if strings.EqualFold(record.State, "running") {
+			status = "running"
+		}
 		out = append(out, types.VMInfo{
-			ID:    id,
-			Image: record.Image,
-			Name:  record.Name,
+			ID:      id,
+			Image:   record.Image,
+			Name:    record.Name,
+			Status:  status,
+			Kind:    "container",
+			Display: e.hasDisplay(ctx, record.ID),
 		})
 	}
 	return out, nil
@@ -102,10 +113,44 @@ func (e *DockerSandbox) Logs(ctx context.Context, id string, tail int) (string, 
 	return e.docker.ContainerLogs(ctx, record.ID, tail)
 }
 
+func (e *DockerSandbox) Display(ctx context.Context, id string) (DisplayInfo, error) {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return DisplayInfo{}, err
+	}
+	running, err := e.docker.ContainerRunning(ctx, record.ID)
+	if err != nil {
+		return DisplayInfo{}, err
+	}
+	if !running {
+		return DisplayInfo{}, fmt.Errorf("container is not running")
+	}
+	host, port, err := e.docker.PublishedPort(ctx, record.ID, "5900/tcp")
+	if err != nil {
+		return DisplayInfo{}, fmt.Errorf("display is not configured for this workload")
+	}
+	return DisplayInfo{
+		TargetHost: host,
+		TargetPort: port,
+	}, nil
+}
+
+func (e *DockerSandbox) hasDisplay(ctx context.Context, containerID string) bool {
+	_, _, err := e.docker.PublishedPort(ctx, containerID, "5900/tcp")
+	return err == nil
+}
+
 func (e *DockerSandbox) ShellCommand(ctx context.Context, id string) (string, error) {
 	record, err := e.findRecord(ctx, id)
 	if err != nil {
 		return "", err
+	}
+	running, err := e.docker.ContainerRunning(ctx, record.ID)
+	if err != nil {
+		return "", err
+	}
+	if !running {
+		return "", fmt.Errorf("container is not running")
 	}
 	return e.docker.ExecShellCommand(record.ID), nil
 }

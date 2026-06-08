@@ -14,7 +14,7 @@ import * as Sse from "effect/unstable/encoding/Sse"
 import { Container } from "@/container"
 import { Service as ContainerWorkspace, UpsertPayload } from "@/container/workspace"
 import { RootHttpApi } from "../api"
-import { GlobalUpgradeInput } from "../groups/global"
+import { ContainerApiError, GlobalUpgradeInput } from "../groups/global"
 import { HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 
 const log = Log.create({ service: "server" })
@@ -78,7 +78,9 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
     const bridge = yield* EffectBridge.make()
 
     const mapContainerError = <A, R>(effect: Effect.Effect<A, Container.Error, R>) =>
-      effect.pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      effect.pipe(
+        Effect.mapError((error) => new ContainerApiError({ name: error._tag, data: { message: error.message } })),
+      )
 
     const health = Effect.fn("GlobalHttpApi.health")(function* () {
       return { healthy: true as const, version: InstallationVersion }
@@ -145,6 +147,11 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return yield* mapContainerError(container.create(ctx.payload))
     })
 
+    const containerStart = Effect.fn("GlobalHttpApi.containerStart")(function* (ctx: { params: { id: string } }) {
+      yield* mapContainerError(container.start(ctx.params.id))
+      return HttpApiSchema.NoContent.make()
+    })
+
     const containerStop = Effect.fn("GlobalHttpApi.containerStop")(function* (ctx: { params: { id: string } }) {
       yield* mapContainerError(container.stop(ctx.params.id))
       return HttpApiSchema.NoContent.make()
@@ -152,7 +159,13 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
 
     const containerRemove = Effect.fn("GlobalHttpApi.containerRemove")(function* (ctx: { params: { id: string } }) {
       yield* mapContainerError(container.remove(ctx.params.id))
-      yield* workspaces.remove(ctx.params.id).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      yield* workspaces
+        .remove(ctx.params.id)
+        .pipe(
+          Effect.mapError(
+            () => new ContainerApiError({ name: "WorkspaceRemoveFailed", data: { message: "Failed to remove workspace metadata" } }),
+          ),
+        )
       return HttpApiSchema.NoContent.make()
     })
 
@@ -165,6 +178,10 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
 
     const containerShell = Effect.fn("GlobalHttpApi.containerShell")(function* (ctx: { params: { id: string } }) {
       return yield* mapContainerError(container.shell(ctx.params.id))
+    })
+
+    const containerDisplay = Effect.fn("GlobalHttpApi.containerDisplay")(function* (ctx: { params: { id: string } }) {
+      return yield* mapContainerError(container.display(ctx.params.id))
     })
 
     const containerWorkspaces = Effect.fn("GlobalHttpApi.containerWorkspaces")(function* () {
@@ -207,9 +224,11 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("dispose", dispose)
       .handle("containers", containers)
       .handle("containerCreate", containerCreate)
+      .handle("containerStart", containerStart)
       .handle("containerStop", containerStop)
       .handle("containerLogs", containerLogs)
       .handle("containerShell", containerShell)
+      .handle("containerDisplay", containerDisplay)
       .handle("containerRemove", containerRemove)
       .handle("containerWorkspaces", containerWorkspaces)
       .handle("containerWorkspaceUpsert", containerWorkspaceUpsert)

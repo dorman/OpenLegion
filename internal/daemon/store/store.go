@@ -14,12 +14,14 @@ type VM struct {
 	ContainerID string
 	SandboxID   string
 	NetworkName string
+	Kind        string
 	Image       string
 	Name        string
 	Env         map[string]string
 	Ports       []types.PortMapping
 	Volumes     []types.VolumeMapping
 	Command     []string
+	MemoryMB    int
 }
 
 type Store struct {

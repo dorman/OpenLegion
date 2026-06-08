@@ -2,7 +2,7 @@ import { AppProcess } from "@openlegion-ai/core/process"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import * as MicroVMClient from "./microvm-client"
-import { resolveDockerContainerId } from "./resolve"
+import { ContainerResolveError, resolveDockerContainerId, resolveRunningDockerContainerId } from "./resolve"
 import type * as ContainerSchema from "./schema"
 
 export * from "./schema"
@@ -48,25 +48,37 @@ export class ShellFailedError extends Schema.TaggedErrorClass<ShellFailedError>(
   message: Schema.String,
 }) {}
 
+export class DisplayFailedError extends Schema.TaggedErrorClass<DisplayFailedError>()("ContainerDisplayFailedError", {
+  message: Schema.String,
+}) {}
+
+export class StartFailedError extends Schema.TaggedErrorClass<StartFailedError>()("ContainerStartFailedError", {
+  message: Schema.String,
+}) {}
+
 export type Error =
   | RuntimeNotFoundError
   | RuntimeUnavailableError
   | CreateFailedError
   | ListFailedError
   | StopFailedError
+  | StartFailedError
   | RemoveFailedError
   | LogsFailedError
   | ShellFailedError
+  | DisplayFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
   readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
+  readonly start: (id: string) => Effect.Effect<void, Error>
   readonly stop: (id: string) => Effect.Effect<void, Error>
   readonly remove: (id: string) => Effect.Effect<void, Error>
   readonly logs: (id: string, input?: { tail?: number }) => Effect.Effect<ContainerSchema.LogsOutput, Error>
   readonly shell: (id: string) => Effect.Effect<ContainerSchema.ShellOutput, Error>
+  readonly display: (id: string) => Effect.Effect<ContainerSchema.DisplayOutput, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -89,6 +101,33 @@ function buildCreateArgs(input: CreateInput) {
   })
   const command = input.command ?? []
   return ["container", "create", ...name, ...env, ...ports, ...volumes, input.image, ...command]
+}
+
+const SANDBOX_LABEL_PREFIX = "openlegion.sandbox.id="
+
+function parseSandboxLabel(labels: string) {
+  for (const part of labels.split(",")) {
+    const trimmed = part.trim()
+    if (trimmed.startsWith(SANDBOX_LABEL_PREFIX)) return trimmed.slice(SANDBOX_LABEL_PREFIX.length)
+  }
+  return undefined
+}
+
+function parseSandboxDockerStatus(stdout: string) {
+  const map = new Map<string, "running" | "stopped">()
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    try {
+      const data = JSON.parse(trimmed) as { Labels?: unknown; State?: unknown }
+      if (typeof data.Labels !== "string") continue
+      const sandboxId = parseSandboxLabel(data.Labels)
+      if (!sandboxId) continue
+      const state = typeof data.State === "string" ? data.State.toLowerCase() : ""
+      map.set(sandboxId, state === "running" ? "running" : "stopped")
+    } catch {}
+  }
+  return map
 }
 
 function parseListOutput(stdout: string, runtime: CliRuntime) {
@@ -181,7 +220,21 @@ export const layer = Layer.effect(
 
     const dockerContainerId = Effect.fnUntraced(function* (id: string) {
       return yield* resolveDockerContainerId(appProcess, id).pipe(
-        Effect.mapError((error) => new LogsFailedError({ message: error.message })),
+        Effect.mapError((error) =>
+          new LogsFailedError({
+            message: error instanceof ContainerResolveError ? error.message : "Failed to resolve container id",
+          }),
+        ),
+      )
+    })
+
+    const dockerRunningContainerId = Effect.fnUntraced(function* (id: string) {
+      return yield* resolveRunningDockerContainerId(appProcess, id).pipe(
+        Effect.mapError((error) =>
+          new ShellFailedError({
+            message: error instanceof ContainerResolveError ? error.message : "Failed to resolve container id",
+          }),
+        ),
       )
     })
 
@@ -200,7 +253,7 @@ export const layer = Layer.effect(
 
     const dockerShell = Effect.fnUntraced(function* (id: string) {
       const runtime = dockerRuntime()
-      const containerId = yield* dockerContainerId(id)
+      const containerId = yield* dockerRunningContainerId(id)
       return {
         command: `${runtime} exec -i ${containerId} sh`,
         runtime,
@@ -221,10 +274,30 @@ export const layer = Layer.effect(
       })
     })
 
+    const sandboxDockerStatus = Effect.fnUntraced(function* () {
+      const result = yield* run(dockerRuntime(), [
+        "ps",
+        "-a",
+        "--filter",
+        "label=openlegion.sandbox.id",
+        "--format",
+        "{{json .}}",
+      ])
+      if (result.code !== 0) return new Map<string, "running" | "stopped">()
+      return parseSandboxDockerStatus(result.stdout)
+    })
+
     const list = Effect.fn("Container.list")(function* () {
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
+        const statusBySandbox = yield* sandboxDockerStatus()
         return yield* microvmClient.list().pipe(
+          Effect.map((items) =>
+            items.map((item) => ({
+              ...item,
+              status: statusBySandbox.get(item.id) ?? item.status ?? ("stopped" as const),
+            })),
+          ),
           Effect.mapError((message) => new ListFailedError({ message })),
         )
       }
@@ -274,6 +347,46 @@ export const layer = Layer.effect(
         image: input.image,
         name: input.name,
       }
+    })
+
+    const ensureRunningAfterStart = Effect.fnUntraced(function* (runtime: CliRuntime, containerId: string) {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const inspect = yield* run(runtime, ["inspect", "-f", "{{.State.Running}}", containerId])
+        if (inspect.code === 0 && inspect.stdout.trim() === "true") return
+        yield* Effect.sleep("100 millis")
+      }
+      return yield* new StartFailedError({
+        message:
+          "Container exited immediately after start. Recreate it with a long-running command such as sleep 3600.",
+      })
+    })
+
+    const dockerStart = Effect.fnUntraced(function* (id: string) {
+      const runtime = dockerRuntime()
+      const containerId = yield* dockerContainerId(id)
+      const result = yield* run(runtime, ["start", containerId])
+      if (result.code !== 0) {
+        return yield* new StartFailedError({
+          message: normalizeMessage(result, "Failed to start container"),
+        })
+      }
+      yield* ensureRunningAfterStart(runtime, containerId)
+    })
+
+    const start = Effect.fn("Container.start")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* dockerStart(id)
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const containerId = id
+      const result = yield* run(runtime, ["start", containerId])
+      if (result.code !== 0) {
+        return yield* new StartFailedError({
+          message: normalizeMessage(result, "Failed to start container"),
+        })
+      }
+      yield* ensureRunningAfterStart(runtime, containerId)
     })
 
     const stop = Effect.fn("Container.stop")(function* (id: string) {
@@ -327,13 +440,24 @@ export const layer = Layer.effect(
         return yield* microvmClient.shell(id).pipe(Effect.catch(() => dockerShell(id)))
       }
       yield* ensureRuntimeAvailable(runtime)
+      const containerId = yield* dockerRunningContainerId(id)
       return {
-        command: `${runtime} exec -it ${id} sh`,
+        command: `${runtime} exec -i ${containerId} sh`,
         runtime,
       }
     })
 
-    return Service.of({ list, create, stop, remove, logs, shell })
+    const display = Effect.fn("Container.display")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* microvmClient.display(id).pipe(Effect.mapError((message) => new DisplayFailedError({ message })))
+      }
+      return yield* new DisplayFailedError({
+        message: "Display is only available for sandbox daemon workloads",
+      })
+    })
+
+    return Service.of({ list, create, start, stop, remove, logs, shell, display })
   }),
 )
 

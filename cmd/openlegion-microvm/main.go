@@ -14,11 +14,11 @@ func main() {
 	addr := env("OPENLEGION_MICROVM_LISTEN", "127.0.0.1:7420")
 
 	st := store.New()
-	eng := engine.NewDockerSandbox()
+	eng := engine.NewRouter()
 	srv := daemon.NewServer(st, eng)
 
 	log.Printf("microvm daemon listening on http://%s", addr)
-	log.Printf("mode: docker containers wrapped in per-workload sandbox networks")
+	log.Printf("mode: docker sandboxes + optional qemu desktop vms")
 	if err := http.ListenAndServe(addr, srv.Routes()); err != nil {
 		log.Fatal(err)
 	}

@@ -171,19 +171,24 @@
     }
   }
 
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"] {
-    height: min(90vh, 680px);
-  }
-
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"] {
-    overflow-y: auto;
-  }
-
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"],
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
-    height: min(90vh, 720px);
+    height: auto;
+    max-height: min(92vh, 720px);
   }
 
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"],
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-body"] {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) .container-create-dialog-body,
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) .container-inspect-dialog-body {
+    min-height: 0;
+    flex: 1;
     overflow-y: auto;
   }
 }

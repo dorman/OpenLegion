@@ -9,6 +9,9 @@ const VmInfo = Schema.Struct({
   id: Schema.String,
   image: Schema.String,
   name: Schema.optional(Schema.String),
+  status: Schema.optional(Schema.Literals(["running", "stopped"])),
+  kind: Schema.optional(Schema.Literals(["container", "desktop"])),
+  display: Schema.optional(Schema.Boolean),
 })
 
 const VmList = Schema.Array(VmInfo)
@@ -22,6 +25,16 @@ const ShellResponse = Schema.Struct({
   runtime: Schema.String,
 })
 
+const DisplayResponse = Schema.Struct({
+  url: Schema.String,
+  kind: Schema.Literals(["vnc-websocket"]),
+  password: Schema.optional(Schema.String),
+})
+
+const ErrorResponse = Schema.Struct({
+  error: Schema.String,
+})
+
 export interface Interface {
   readonly health: () => Effect.Effect<boolean>
   readonly create: (input: typeof CreateInput.Type) => Effect.Effect<Info, string>
@@ -30,6 +43,7 @@ export interface Interface {
   readonly remove: (id: string) => Effect.Effect<void, string>
   readonly logs: (id: string, tail: number) => Effect.Effect<{ logs: string }, string>
   readonly shell: (id: string) => Effect.Effect<{ command: string; runtime: "docker" | "podman" | "microvm" }, string>
+  readonly display: (id: string) => Effect.Effect<{ url: string; kind: "vnc-websocket"; password?: string }, string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container/MicroVMClient") {}
@@ -40,6 +54,9 @@ function toInfo(item: typeof VmInfo.Type): Info {
     runtime: "microvm",
     image: item.image,
     name: item.name,
+    status: item.status,
+    kind: item.kind,
+    display: item.display,
   }
 }
 
@@ -51,7 +68,8 @@ function errorMessage(error: unknown, fallback: string) {
 export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const http = HttpClient.filterStatusOk(withTransientReadRetry(yield* HttpClient.HttpClient))
+    const client = withTransientReadRetry(yield* HttpClient.HttpClient)
+    const http = HttpClient.filterStatusOk(client)
     const baseUrl = defaultBaseUrl().replace(/\/$/, "")
 
     const health = Effect.fnUntraced(function* () {
@@ -124,7 +142,21 @@ export const layer = Layer.effect(
       )
     })
 
-    return Service.of({ health, create, list, stop, remove, logs, shell })
+    const display = Effect.fnUntraced(function* (id: string) {
+      const response = yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/display`).pipe(
+        HttpClientRequest.acceptJson,
+        client.execute,
+      )
+      if (response.status < 200 || response.status >= 300) {
+        const body = yield* HttpClientResponse.schemaBodyJson(ErrorResponse)(response).pipe(
+          Effect.catch(() => Effect.succeed({ error: "display is not available for this workload" })),
+        )
+        return yield* Effect.fail(body.error)
+      }
+      return yield* HttpClientResponse.schemaBodyJson(DisplayResponse)(response)
+    })
+
+    return Service.of({ health, create, list, stop, remove, logs, shell, display })
   }),
 )
 

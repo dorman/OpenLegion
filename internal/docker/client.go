@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -75,7 +76,7 @@ func (c *Client) ContainerLogs(ctx context.Context, id string, tail int) (string
 }
 
 func (c *Client) ExecShellCommand(containerID string) string {
-	return c.Runtime + " exec -it " + containerID + " sh"
+	return c.Runtime + " exec -i " + containerID + " sh"
 }
 
 func (c *Client) ListSandboxContainers(ctx context.Context) ([]ContainerRecord, error) {
@@ -124,6 +125,7 @@ type ContainerRecord struct {
 	Image     string
 	Name      string
 	SandboxID string
+	State     string
 }
 
 func parseContainerRecord(line string) (ContainerRecord, error) {
@@ -132,6 +134,7 @@ func parseContainerRecord(line string) (ContainerRecord, error) {
 		Image  string `json:"Image"`
 		Names  string `json:"Names"`
 		Labels string `json:"Labels"`
+		State  string `json:"State"`
 	}
 	var data payload
 	if err := jsonUnmarshal(line, &data); err != nil {
@@ -143,7 +146,36 @@ func parseContainerRecord(line string) (ContainerRecord, error) {
 		Image:     data.Image,
 		Name:      strings.TrimPrefix(strings.TrimSpace(data.Names), "/"),
 		SandboxID: parseSandboxLabel(data.Labels),
+		State:     strings.TrimSpace(data.State),
 	}, nil
+}
+
+func (c *Client) PublishedPort(ctx context.Context, id string, containerPort string) (string, string, error) {
+	out, err := c.run(ctx, "port", id, containerPort)
+	if err != nil {
+		return "", "", err
+	}
+	line := strings.TrimSpace(strings.Split(out, "\n")[0])
+	if line == "" {
+		return "", "", fmt.Errorf("port %s is not published", containerPort)
+	}
+
+	host, port, err := net.SplitHostPort(line)
+	if err != nil {
+		return "", "", fmt.Errorf("parse published port %q: %w", line, err)
+	}
+	if host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return host, port, nil
+}
+
+func (c *Client) ContainerRunning(ctx context.Context, id string) (bool, error) {
+	out, err := c.run(ctx, "inspect", "-f", "{{.State.Running}}", id)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(out), "true"), nil
 }
 
 func parseSandboxLabel(raw string) string {

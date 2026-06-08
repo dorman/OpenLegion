@@ -6,11 +6,19 @@ import "@openlegion-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { CreateInput, Info, ListOutput, LogsOutput, ShellOutput } from "@/container/schema"
+import { CreateInput, DisplayOutput, Info, ListOutput, LogsOutput, ShellOutput } from "@/container/schema"
 import { UpsertPayload, Workspace } from "@/container/workspace"
 import { described } from "./metadata"
 
 const ContainerID = Schema.String
+
+export class ContainerApiError extends Schema.ErrorClass<ContainerApiError>("ContainerError")(
+  {
+    name: Schema.String,
+    data: Schema.Struct({ message: Schema.String }),
+  },
+  { httpApiStatus: 400 },
+) {}
 
 const ContainerLogsQuery = Schema.Struct({
   tail: Schema.optional(Schema.NumberFromString),
@@ -76,9 +84,11 @@ export const GlobalPaths = {
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
   containers: "/global/containers",
+  containerStart: "/global/containers/:id/start",
   containerStop: "/global/containers/:id/stop",
   containerLogs: "/global/containers/:id/logs",
   containerShell: "/global/containers/:id/shell",
+  containerDisplay: "/global/containers/:id/display",
   containerRemove: "/global/containers/:id",
   containerWorkspaces: "/global/container-workspaces",
   containerWorkspace: "/global/container-workspaces/:containerId",
@@ -147,7 +157,7 @@ export const GlobalApi = HttpApi.make("global").add(
       ),
       HttpApiEndpoint.get("containers", GlobalPaths.containers, {
         success: described(ListOutput, "Sandbox containers"),
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.list",
@@ -158,7 +168,7 @@ export const GlobalApi = HttpApi.make("global").add(
       HttpApiEndpoint.post("containerCreate", GlobalPaths.containers, {
         payload: CreateInput,
         success: described(Info, "Created container"),
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.create",
@@ -166,10 +176,21 @@ export const GlobalApi = HttpApi.make("global").add(
           description: "Create and start a sandbox container.",
         }),
       ),
+      HttpApiEndpoint.post("containerStart", GlobalPaths.containerStart, {
+        params: { id: ContainerID },
+        success: HttpApiSchema.NoContent,
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.start",
+          summary: "Start container",
+          description: "Start a stopped sandbox container by id.",
+        }),
+      ),
       HttpApiEndpoint.post("containerStop", GlobalPaths.containerStop, {
         params: { id: ContainerID },
         success: HttpApiSchema.NoContent,
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.stop",
@@ -181,7 +202,7 @@ export const GlobalApi = HttpApi.make("global").add(
         params: { id: ContainerID },
         query: ContainerLogsQuery,
         success: described(LogsOutput, "Container logs"),
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.logs",
@@ -192,7 +213,7 @@ export const GlobalApi = HttpApi.make("global").add(
       HttpApiEndpoint.get("containerShell", GlobalPaths.containerShell, {
         params: { id: ContainerID },
         success: described(ShellOutput, "Container shell command"),
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.shell",
@@ -200,10 +221,21 @@ export const GlobalApi = HttpApi.make("global").add(
           description: "Resolve the local command used to open an interactive shell in a sandbox container.",
         }),
       ),
+      HttpApiEndpoint.get("containerDisplay", GlobalPaths.containerDisplay, {
+        params: { id: ContainerID },
+        success: described(DisplayOutput, "Container display session"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.display",
+          summary: "Container display session",
+          description: "Resolve a websocket URL for the remote desktop display of a sandbox workload.",
+        }),
+      ),
       HttpApiEndpoint.delete("containerRemove", GlobalPaths.containerRemove, {
         params: { id: ContainerID },
         success: HttpApiSchema.NoContent,
-        error: HttpApiError.BadRequest,
+        error: ContainerApiError,
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.containers.remove",

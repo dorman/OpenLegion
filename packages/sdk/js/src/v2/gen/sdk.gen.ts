@@ -82,6 +82,8 @@ import type {
   GlobalConfigUpdateResponses,
   GlobalContainersCreateErrors,
   GlobalContainersCreateResponses,
+  GlobalContainersDisplayErrors,
+  GlobalContainersDisplayResponses,
   GlobalContainersListErrors,
   GlobalContainersListResponses,
   GlobalContainersLogsErrors,
@@ -90,6 +92,8 @@ import type {
   GlobalContainersRemoveResponses,
   GlobalContainersShellErrors,
   GlobalContainersShellResponses,
+  GlobalContainersStartErrors,
+  GlobalContainersStartResponses,
   GlobalContainersStopErrors,
   GlobalContainersStopResponses,
   GlobalContainerWorkspacesListErrors,
@@ -615,6 +619,29 @@ export class Containers extends HeyApiClient {
   }
 
   /**
+   * Start container
+   *
+   * Start a stopped sandbox container by id.
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).post<
+      GlobalContainersStartResponses,
+      GlobalContainersStartErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}/start",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Stop container
    *
    * Stop a sandbox container by id.
@@ -689,6 +716,29 @@ export class Containers extends HeyApiClient {
       ThrowOnError
     >({
       url: "/global/containers/{id}/shell",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Container display session
+   *
+   * Resolve a websocket URL for the remote desktop display of a sandbox workload.
+   */
+  public display<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).get<
+      GlobalContainersDisplayResponses,
+      GlobalContainersDisplayErrors,
+      ThrowOnError
+    >({
+      url: "/global/containers/{id}/display",
       ...options,
       ...params,
     })

@@ -3,7 +3,7 @@ import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { useQuery, useQueryClient } from "@tanstack/solid-query"
 import { Navigate, useNavigate } from "@solidjs/router"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { DialogContainerCreate } from "@/components/dialog-container-create"
 import { DialogContainerInspect } from "@/components/dialog-container-inspect"
 import { DialogContainerOpenSession } from "@/components/dialog-container-open-session"
@@ -24,10 +24,12 @@ import {
   createContainer,
   listContainers,
   removeContainer,
+  startContainer,
   stopContainer,
   type ContainerCreateInput,
   type ContainerInfo,
 } from "@/utils/containers"
+import { showToast } from "@/utils/toast"
 
 function containerLabel(item: ContainerInfo) {
   if (item.name) return item.name
@@ -53,6 +55,7 @@ export default function ContainersPage() {
   const navigate = useNavigate()
   const dialog = useDialog()
   const queryClient = useQueryClient()
+  const [ensuringDaemon, setEnsuringDaemon] = createSignal(false)
 
   const enabled = createMemo(() => platform.platform === "desktop" && server.isLocal() && !!server.current?.http)
 
@@ -83,8 +86,10 @@ export default function ContainersPage() {
     queryFn: async () => platform.containerRuntimeStatus?.(),
   }))
 
+  const daemonReady = createMemo(() => runtime.data?.microvm === true)
+
   const activeCount = createMemo(
-    () => (containers.data ?? []).filter((item) => (item.status ?? "running") === "running").length,
+    () => (containers.data ?? []).filter((item) => (item.status ?? "stopped") === "running").length,
   )
 
   const agentWorkspace = createMemo(() => activeAgentWorkspace(workspaces.data ?? []))
@@ -147,7 +152,26 @@ export default function ContainersPage() {
   }
 
   function showInspect(container: ContainerInfo) {
-    dialog.show(() => <DialogContainerInspect container={container} />)
+    dialog.show(() => <DialogContainerInspect container={container} onStart={refresh} />)
+  }
+
+  async function handleStart(id: string) {
+    const http = server.current?.http
+    if (!http) return
+    try {
+      await startContainer(http, id)
+      await refresh()
+      showToast({
+        variant: "success",
+        title: language.t("containers.started"),
+      })
+    } catch (err) {
+      showToast({
+        variant: "error",
+        title: language.t("containers.start.failed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    }
   }
 
   async function handleStop(id: string) {
@@ -165,9 +189,42 @@ export default function ContainersPage() {
   }
 
   async function ensureDaemon() {
-    await platform.ensureMicrovmDaemon?.()
-    await runtime.refetch()
-    await refresh()
+    if (ensuringDaemon()) return
+    setEnsuringDaemon(true)
+    try {
+      const result = await platform.ensureMicrovmDaemon?.()
+      if (!result) {
+        showToast({
+          variant: "error",
+          title: language.t("containers.ensureDaemon.failed"),
+          description: "Desktop sandbox controls are unavailable.",
+        })
+        return
+      }
+      if (!result.ok) {
+        showToast({
+          variant: "error",
+          title: language.t("containers.ensureDaemon.failed"),
+          description: result.error,
+        })
+        return
+      }
+      showToast({
+        variant: "success",
+        title: language.t("containers.ensureDaemon.ready"),
+        description: result.url,
+      })
+      await runtime.refetch()
+      await refresh()
+    } catch (err) {
+      showToast({
+        variant: "error",
+        title: language.t("containers.ensureDaemon.failed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setEnsuringDaemon(false)
+    }
   }
 
   return (
@@ -184,8 +241,10 @@ export default function ContainersPage() {
           </div>
           <div class="flex flex-wrap gap-2">
             <Show when={platform.ensureMicrovmDaemon !== undefined}>
-              <ButtonV2 variant="neutral" onClick={() => void ensureDaemon()}>
-                {language.t("containers.ensureDaemon")}
+              <ButtonV2 variant="neutral" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
+                {ensuringDaemon()
+                  ? language.t("containers.ensureDaemon.starting")
+                  : language.t("containers.ensureDaemon")}
               </ButtonV2>
             </Show>
             <ButtonV2
@@ -196,6 +255,31 @@ export default function ContainersPage() {
             </ButtonV2>
           </div>
         </header>
+
+        <Show when={runtime.data}>
+          {(status) => (
+            <div class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-4">
+              <div class="text-sm text-v2-text-text-muted">{language.t("containers.runtime.title")}</div>
+              <div class="flex flex-wrap gap-2">
+                <RuntimePill
+                  label={language.t("containers.runtime.docker")}
+                  ready={status().docker}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
+                <RuntimePill
+                  label={language.t("containers.runtime.microvm")}
+                  ready={status().microvm}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
+              </div>
+              <Show when={!daemonReady()}>
+                <p class="text-sm text-v2-text-text-muted">{language.t("containers.description")}</p>
+              </Show>
+            </div>
+          )}
+        </Show>
 
         <section class="flex min-h-0 flex-1 flex-col gap-3">
           <Show when={!containers.isLoading} fallback={<div class="flex justify-center p-10"><Spinner /></div>}>
@@ -211,6 +295,7 @@ export default function ContainersPage() {
                     language={language}
                     onOpenSession={() => showOpenSession(item)}
                     onInspect={() => showInspect(item)}
+                    onStart={() => void handleStart(item.id)}
                     onStop={() => void handleStop(item.id)}
                     onRemove={() => void handleRemove(item.id)}
                   />
@@ -249,16 +334,36 @@ export default function ContainersPage() {
   )
 }
 
+function RuntimePill(props: {
+  label: string
+  ready: boolean
+  readyLabel: string
+  unavailableLabel: string
+}) {
+  return (
+    <span
+      classList={{
+        "desktop-pill": true,
+        "desktop-pill-success": props.ready,
+        "desktop-pill-stopped": !props.ready,
+      }}
+    >
+      {props.label}: {props.ready ? props.readyLabel : props.unavailableLabel}
+    </span>
+  )
+}
+
 function ContainerCard(props: {
   item: ContainerInfo
   workspace?: ContainerWorkspace
   language: ReturnType<typeof useLanguage>
   onOpenSession: () => void
   onInspect: () => void
+  onStart: () => void
   onStop: () => void
   onRemove: () => void
 }) {
-  const running = () => (props.item.status ?? "running") === "running"
+  const running = () => (props.item.status ?? "stopped") === "running"
 
   return (
     <article class="desktop-container-card">
@@ -281,6 +386,9 @@ function ContainerCard(props: {
         </ButtonV2>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
           {props.language.t("containers.inspect")}
+        </ButtonV2>
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onStart} disabled={running()}>
+          {props.language.t("containers.start")}
         </ButtonV2>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running()}>
           {props.language.t("containers.stop")}

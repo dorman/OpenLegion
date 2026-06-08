@@ -3,23 +3,29 @@ package daemon
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/dorman/openlegion/internal/daemon/store"
+	"github.com/dorman/openlegion/internal/display"
 	"github.com/dorman/openlegion/internal/engine"
 	"github.com/dorman/openlegion/internal/microvm/types"
 )
 
 type Server struct {
-	store  *store.Store
-	engine engine.Engine
+	store   *store.Store
+	engine  engine.Engine
+	display *display.Bridge
+	listen  string
 }
 
 func NewServer(st *store.Store, eng engine.Engine) *Server {
 	return &Server{
-		store:  st,
-		engine: eng,
+		store:   st,
+		engine:  eng,
+		display: display.NewBridge(),
+		listen:  env("OPENLEGION_MICROVM_LISTEN", "127.0.0.1:7420"),
 	}
 }
 
@@ -32,6 +38,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /vms/{id}", s.handleDelete)
 	mux.HandleFunc("GET /vms/{id}/logs", s.handleLogs)
 	mux.HandleFunc("GET /vms/{id}/shell", s.handleShell)
+	mux.HandleFunc("GET /vms/{id}/display", s.handleDisplay)
+	mux.HandleFunc("GET /vms/{id}/display/ws", s.handleDisplayWS)
 	return mux
 }
 
@@ -42,7 +50,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, types.HealthResponse{
 		OK:       true,
-		Features: []string{"logs", "shell"},
+		Features: []string{"logs", "shell", "display"},
 	})
 }
 
@@ -66,7 +74,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Image = strings.TrimSpace(req.Image)
-	if req.Image == "" {
+	if req.Image == "" && !isDesktopKind(req.Kind) {
 		writeError(w, http.StatusBadRequest, "image is required")
 		return
 	}
@@ -77,17 +85,24 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	kind := strings.TrimSpace(req.Kind)
+	if kind == "" {
+		kind = "container"
+	}
+
 	vm := s.store.Create(store.VM{
 		ID:          created.ID,
 		ContainerID: created.ContainerID,
 		SandboxID:   created.SandboxID,
 		NetworkName: created.NetworkName,
+		Kind:        kind,
 		Image:       req.Image,
 		Name:        req.Name,
 		Env:         req.Env,
 		Ports:       req.Ports,
 		Volumes:     req.Volumes,
 		Command:     req.Command,
+		MemoryMB:    req.MemoryMB,
 	})
 
 	writeJSON(w, http.StatusCreated, toVMInfo(vm))
@@ -105,6 +120,7 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.display.Revoke(id)
 	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
 }
 
@@ -120,6 +136,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.display.Revoke(id)
 	s.store.Delete(id)
 	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
 }
@@ -163,17 +180,83 @@ func (s *Server) handleShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	runtime := "docker"
+	if strings.HasPrefix(id, "desktop-") {
+		runtime = "qemu"
+	}
+
 	writeJSON(w, http.StatusOK, types.ShellResponse{
 		Command: command,
-		Runtime: "docker",
+		Runtime: runtime,
 	})
 }
 
+func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	info, err := s.engine.Display(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	token := s.display.Register(id, display.Session{
+		TargetHost: info.TargetHost,
+		TargetPort: info.TargetPort,
+		Password:   info.Password,
+	})
+
+	writeJSON(w, http.StatusOK, types.DisplayResponse{
+		URL:      display.WebSocketURL(r, id, token),
+		Kind:     "vnc-websocket",
+		Password: info.Password,
+	})
+}
+
+func (s *Server) handleDisplayWS(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	if id == "" || token == "" {
+		writeError(w, http.StatusBadRequest, "id and token are required")
+		return
+	}
+	s.display.ServeWS(w, r, id, token)
+}
+
 func toVMInfo(vm store.VM) types.VMInfo {
+	kind := strings.TrimSpace(vm.Kind)
+	if kind == "" {
+		kind = "container"
+	}
 	return types.VMInfo{
-		ID:    vm.ID,
-		Image: vm.Image,
-		Name:  vm.Name,
+		ID:      vm.ID,
+		Image:   vm.Image,
+		Name:    vm.Name,
+		Kind:    kind,
+		Display: kind == "desktop" || hasPublishedVncPort(vm.Ports),
+	}
+}
+
+func hasPublishedVncPort(ports []types.PortMapping) bool {
+	for _, port := range ports {
+		container := strings.TrimSpace(port.Container)
+		if container == "5900" || container == "5900/tcp" {
+			return true
+		}
+	}
+	return false
+}
+
+func isDesktopKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "desktop", "qemu", "vm":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -185,4 +268,11 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, types.ErrorResponse{Error: message})
+}
+
+func env(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }

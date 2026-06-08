@@ -1923,13 +1923,24 @@ export type ContainerInfo = {
   image: string
   name?: string
   status?: "running" | "stopped"
+  kind?: "container" | "desktop"
+  display?: boolean
 }
 
 export type ContainerListOutput = Array<ContainerInfo>
 
+export type ContainerError = {
+  name: string
+  data: {
+    message: string
+  }
+}
+
 export type ContainerCreateInput = {
+  kind?: "container" | "desktop"
   image: string
   name?: string
+  memoryMb?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
   env?: {
     [key: string]: string
   }
@@ -1952,6 +1963,12 @@ export type ContainerLogsOutput = {
 export type ContainerShellOutput = {
   command: string
   runtime: "docker" | "podman" | "microvm"
+}
+
+export type ContainerDisplayOutput = {
+  url: string
+  kind: "vnc-websocket"
+  password?: string
 }
 
 export type ContainerWorkspace = {
@@ -4880,9 +4897,9 @@ export type GlobalContainersListData = {
 
 export type GlobalContainersListErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersListError = GlobalContainersListErrors[keyof GlobalContainersListErrors]
@@ -4905,9 +4922,9 @@ export type GlobalContainersCreateData = {
 
 export type GlobalContainersCreateErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersCreateError = GlobalContainersCreateErrors[keyof GlobalContainersCreateErrors]
@@ -4921,6 +4938,33 @@ export type GlobalContainersCreateResponses = {
 
 export type GlobalContainersCreateResponse = GlobalContainersCreateResponses[keyof GlobalContainersCreateResponses]
 
+export type GlobalContainersStartData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/global/containers/{id}/start"
+}
+
+export type GlobalContainersStartErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type GlobalContainersStartError = GlobalContainersStartErrors[keyof GlobalContainersStartErrors]
+
+export type GlobalContainersStartResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type GlobalContainersStartResponse = GlobalContainersStartResponses[keyof GlobalContainersStartResponses]
+
 export type GlobalContainersStopData = {
   body?: never
   path: {
@@ -4932,9 +4976,9 @@ export type GlobalContainersStopData = {
 
 export type GlobalContainersStopErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersStopError = GlobalContainersStopErrors[keyof GlobalContainersStopErrors]
@@ -4961,9 +5005,9 @@ export type GlobalContainersLogsData = {
 
 export type GlobalContainersLogsErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersLogsError = GlobalContainersLogsErrors[keyof GlobalContainersLogsErrors]
@@ -4988,9 +5032,9 @@ export type GlobalContainersShellData = {
 
 export type GlobalContainersShellErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersShellError = GlobalContainersShellErrors[keyof GlobalContainersShellErrors]
@@ -5004,6 +5048,33 @@ export type GlobalContainersShellResponses = {
 
 export type GlobalContainersShellResponse = GlobalContainersShellResponses[keyof GlobalContainersShellResponses]
 
+export type GlobalContainersDisplayData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/global/containers/{id}/display"
+}
+
+export type GlobalContainersDisplayErrors = {
+  /**
+   * ContainerError | InvalidRequestError
+   */
+  400: ContainerError | InvalidRequestError
+}
+
+export type GlobalContainersDisplayError = GlobalContainersDisplayErrors[keyof GlobalContainersDisplayErrors]
+
+export type GlobalContainersDisplayResponses = {
+  /**
+   * Container display session
+   */
+  200: ContainerDisplayOutput
+}
+
+export type GlobalContainersDisplayResponse = GlobalContainersDisplayResponses[keyof GlobalContainersDisplayResponses]
+
 export type GlobalContainersRemoveData = {
   body?: never
   path: {
@@ -5015,9 +5086,9 @@ export type GlobalContainersRemoveData = {
 
 export type GlobalContainersRemoveErrors = {
   /**
-   * BadRequest | InvalidRequestError
+   * ContainerError | InvalidRequestError
    */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  400: ContainerError | InvalidRequestError
 }
 
 export type GlobalContainersRemoveError = GlobalContainersRemoveErrors[keyof GlobalContainersRemoveErrors]

@@ -1,0 +1,34 @@
+# Lima VM for OpenLegion sandbox backends on macOS.
+# Usage: limactl start --name=openlegion scripts/lima/openlegion.yaml
+
+minimumLimaVersion: 1.0.0
+
+vmType: vz
+os: Linux
+arch: aarch64
+
+cpus: 4
+memory: 4GiB
+disk: 40GiB
+
+mounts:
+  - location: "~"
+    writable: false
+  - location: "{{.Home}}/Downloads/openlegion"
+    writable: true
+
+portForwards:
+  - guestPort: 7420
+    hostPort: 7420
+    bindAddress: 127.0.0.1
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -eux
+      apt-get update
+      apt-get install -y qemu-system-aarch64 qemu-utils curl ca-certificates
+      if ! command -v go >/dev/null 2>&1; then
+        apt-get install -y golang-go
+      fi

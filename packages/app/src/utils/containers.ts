@@ -5,17 +5,23 @@ export type ContainerRuntime = "docker" | "podman" | "microvm"
 
 export type ContainerStatus = "running" | "stopped"
 
+export type ContainerWorkloadKind = "container" | "desktop"
+
 export type ContainerInfo = {
   id: string
   runtime: ContainerRuntime
   image: string
   name?: string
   status?: ContainerStatus
+  kind?: ContainerWorkloadKind
+  display?: boolean
 }
 
 export type ContainerCreateInput = {
+  kind?: ContainerWorkloadKind
   image: string
   name?: string
+  memoryMb?: number
   env?: Record<string, string>
   ports?: { host: string; container: string }[]
   volumes?: { host: string; container: string; readOnly?: boolean }[]
@@ -77,6 +83,10 @@ export async function createContainer(server: ServerConnection.HttpBase, input: 
   return (await response.json()) as ContainerInfo
 }
 
+export async function startContainer(server: ServerConnection.HttpBase, id: string) {
+  await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/start`, { method: "POST" })
+}
+
 export async function stopContainer(server: ServerConnection.HttpBase, id: string) {
   await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/stop`, { method: "POST" })
 }
@@ -102,6 +112,17 @@ export type ContainerShellInfo = {
 export async function fetchContainerShell(server: ServerConnection.HttpBase, id: string) {
   const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/shell`)
   return (await response.json()) as ContainerShellInfo
+}
+
+export type ContainerDisplayInfo = {
+  url: string
+  kind: "vnc-websocket"
+  password?: string
+}
+
+export async function fetchContainerDisplay(server: ServerConnection.HttpBase, id: string) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/display`)
+  return (await response.json()) as ContainerDisplayInfo
 }
 
 export function containerIdsMatch(left: string, right: string) {

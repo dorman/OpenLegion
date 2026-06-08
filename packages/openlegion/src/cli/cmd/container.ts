@@ -11,10 +11,12 @@ function runContainer<A, R>(effect: Effect.Effect<A, Container.Error, R>) {
     Effect.catchTag("ContainerRuntimeUnavailableError", (error) => fail(error.message)),
     Effect.catchTag("ContainerCreateFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerListFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerStartFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerStopFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerRemoveFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerLogsFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerShellFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerDisplayFailedError", (error) => fail(error.message)),
   )
 }
 

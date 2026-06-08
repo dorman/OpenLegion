@@ -2,25 +2,32 @@ import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
 import { Dialog, DialogFooter } from "@openlegion-ai/ui/v2/dialog-v2"
 import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
-import { createEffect, createSignal, onCleanup, Show } from "solid-js"
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { ContainerDisplay } from "@/components/container-display"
 import { ContainerTerminal } from "@/components/container-terminal"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import {
+  containerIdsMatch,
+  fetchContainerDisplay,
   fetchContainerLogs,
   fetchContainerShell,
+  listContainers,
+  type ContainerDisplayInfo,
+  startContainer,
   type ContainerInfo,
 } from "@/utils/containers"
+import { showToast } from "@/utils/toast"
 
-type InspectTab = "logs" | "shell"
+type InspectTab = "logs" | "shell" | "display"
 
 function defaultShellCommand(container: ContainerInfo) {
   const target = container.name ?? container.id
   return `docker exec -i ${target} sh`
 }
 
-export function DialogContainerInspect(props: { container: ContainerInfo }) {
+export function DialogContainerInspect(props: { container: ContainerInfo; onStart?: () => Promise<void> }) {
   const language = useLanguage()
   const platform = usePlatform()
   const server = useServer()
@@ -30,13 +37,23 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
   const [shellCommand, setShellCommand] = createSignal<string | undefined>()
   const [logsError, setLogsError] = createSignal<string | undefined>()
   const [shellError, setShellError] = createSignal<string | undefined>()
+  const [display, setDisplay] = createSignal<ContainerDisplayInfo | undefined>()
+  const [displayError, setDisplayError] = createSignal<string | undefined>()
+  const [displayLoading, setDisplayLoading] = createSignal(false)
   const [logsLoading, setLogsLoading] = createSignal(true)
   const [autoRefresh, setAutoRefresh] = createSignal(true)
+  const [starting, setStarting] = createSignal(false)
+  const [status, setStatus] = createSignal<ContainerInfo["status"]>(props.container.status ?? "stopped")
 
-  const running = () => (props.container.status ?? "running") === "running"
-  const shellCommandValue = () => shellCommand() ?? defaultShellCommand(props.container)
+  const running = () => (status() ?? "stopped") === "running"
+  const displayCapable = () => props.container.display === true || props.container.kind === "desktop"
+  const shellCommandValue = () => {
+    const command = shellCommand()
+    if (command) return command
+    if (!running()) return ""
+    return defaultShellCommand(props.container)
+  }
   const shellReady = () => running() && !!platform.containerPty
-
   async function refreshLogs() {
     const http = server.current?.http
     if (!http) {
@@ -55,10 +72,58 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
     }
   }
 
+  async function refreshContainerStatus() {
+    const http = server.current?.http
+    if (!http) return
+
+    const containers = await listContainers(http).catch(() => [] as ContainerInfo[])
+    const latest = containers.find((item) => containerIdsMatch(item.id, props.container.id))
+    if (latest) setStatus(latest.status ?? "stopped")
+  }
+
+  async function handleStart() {
+    const http = server.current?.http
+    if (!http) return
+
+    setStarting(true)
+    setShellError(undefined)
+    try {
+      await startContainer(http, props.container.id)
+      await props.onStart?.()
+      await refreshContainerStatus()
+      if (running()) {
+        await refreshShell()
+        showToast({
+          variant: "success",
+          title: language.t("containers.started"),
+        })
+        return
+      }
+      setShellError(language.t("containers.inspect.shellStopped"))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setShellError(message)
+      showToast({
+        variant: "error",
+        title: language.t("containers.start.failed"),
+        description: message,
+      })
+    } finally {
+      setStarting(false)
+    }
+  }
+
   async function refreshShell() {
     const http = server.current?.http
     if (!http) {
       setShellError(language.t("containers.error.noServer"))
+      return
+    }
+
+    await refreshContainerStatus()
+    if (!running()) {
+      setShellCommand(undefined)
+      setShellError(language.t("containers.inspect.shellStopped"))
       return
     }
 
@@ -67,10 +132,14 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
       const shell = await fetchContainerShell(http, props.container.id)
       setShellCommand(shell.command)
     } catch (err) {
-      setShellCommand(defaultShellCommand(props.container))
+      setShellCommand(undefined)
       setShellError(err instanceof Error ? err.message : String(err))
     }
   }
+
+  onMount(() => {
+    void refreshContainerStatus()
+  })
 
   createEffect(() => {
     void refreshLogs()
@@ -83,8 +152,44 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
   })
 
   createEffect(() => {
-    if (tab() !== "shell" || !shellReady()) return
+    if (tab() !== "shell") return
     void refreshShell()
+  })
+
+  async function refreshDisplay() {
+    const http = server.current?.http
+    if (!http) {
+      setDisplayError(language.t("containers.error.noServer"))
+      return
+    }
+
+    await refreshContainerStatus()
+    if (!running()) {
+      setDisplay(undefined)
+      setDisplayError(language.t("containers.inspect.displayStopped"))
+      return
+    }
+    if (!displayCapable()) {
+      setDisplay(undefined)
+      setDisplayError(language.t("containers.inspect.displayHowTo"))
+      return
+    }
+
+    setDisplayLoading(true)
+    setDisplayError(undefined)
+    try {
+      setDisplay(await fetchContainerDisplay(http, props.container.id))
+    } catch (err) {
+      setDisplay(undefined)
+      setDisplayError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setDisplayLoading(false)
+    }
+  }
+
+  createEffect(() => {
+    if (tab() !== "display") return
+    void refreshDisplay()
   })
 
   async function copyShellCommand() {
@@ -95,26 +200,41 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
     <Dialog
       title={language.t("containers.inspect.title", { name: props.container.name ?? props.container.id.slice(0, 12) })}
       description={language.t("containers.inspect.description")}
-      size="x-large"
+      size="large"
+      fit
       class="container-inspect-dialog"
     >
-      <div class="flex min-h-0 flex-1 flex-col gap-4">
-        <div class="flex flex-wrap gap-2">
-          <ButtonV2
-            variant={tab() === "logs" ? "neutral" : "ghost"}
-            size="normal"
-            onClick={() => setTab("logs")}
-          >
-            {language.t("containers.inspect.tab.logs")}
-          </ButtonV2>
-          <ButtonV2
-            variant={tab() === "shell" ? "neutral" : "ghost"}
-            size="normal"
-            onClick={() => setTab("shell")}
-            disabled={!shellReady()}
-          >
-            {language.t("containers.inspect.tab.shell")}
-          </ButtonV2>
+      <div class="container-inspect-dialog-body flex min-h-0 flex-1 flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap gap-2">
+            <ButtonV2
+              variant={tab() === "logs" ? "neutral" : "ghost"}
+              size="normal"
+              onClick={() => setTab("logs")}
+            >
+              {language.t("containers.inspect.tab.logs")}
+            </ButtonV2>
+            <ButtonV2
+              variant={tab() === "shell" ? "neutral" : "ghost"}
+              size="normal"
+              onClick={() => setTab("shell")}
+              disabled={!platform.containerPty}
+            >
+              {language.t("containers.inspect.tab.shell")}
+            </ButtonV2>
+            <ButtonV2
+              variant={tab() === "display" ? "neutral" : "ghost"}
+              size="normal"
+              onClick={() => setTab("display")}
+            >
+              {language.t("containers.inspect.tab.display")}
+            </ButtonV2>
+          </div>
+          <Show when={!running()}>
+            <ButtonV2 size="normal" onClick={() => void handleStart()} disabled={starting()}>
+              {language.t("containers.start")}
+            </ButtonV2>
+          </Show>
         </div>
 
         <Show when={tab() === "logs"}>
@@ -152,26 +272,60 @@ export function DialogContainerInspect(props: { container: ContainerInfo }) {
 
         <Show when={tab() === "shell"}>
           <Show
-            when={shellReady()}
+            when={platform.containerPty}
             fallback={
               <div class="rounded-md border border-v2-border-border-base p-4 text-sm text-v2-text-text-muted">
-                {running()
-                  ? language.t("containers.inspect.shellUnavailable")
-                  : language.t("containers.inspect.shellStopped")}
+                {language.t("containers.inspect.shellUnavailable")}
               </div>
             }
           >
-            <div class="flex min-h-0 flex-1 flex-col gap-3">
-              <ContainerTerminal command={shellCommandValue()} active={tab() === "shell"} />
-              <div class="flex flex-wrap gap-2">
-                <ButtonV2 variant="neutral" size="normal" onClick={() => void copyShellCommand()}>
-                  {language.t("containers.inspect.copyShell")}
-                </ButtonV2>
+            <Show
+              when={shellReady()}
+              fallback={
+                <div class="rounded-md border border-v2-border-border-base p-4 text-sm text-v2-text-text-muted">
+                  {shellError() ?? language.t("containers.inspect.shellStopped")}
+                </div>
+              }
+            >
+              <div class="flex min-h-0 flex-1 flex-col gap-3">
+                <Show when={shellCommandValue()} fallback={null}>
+                  {(command) => <ContainerTerminal command={command()} active={tab() === "shell"} />}
+                </Show>
+                <div class="flex flex-wrap gap-2">
+                  <ButtonV2 variant="neutral" size="normal" onClick={() => void copyShellCommand()}>
+                    {language.t("containers.inspect.copyShell")}
+                  </ButtonV2>
+                </div>
               </div>
-              <Show when={shellError()}>
-                <div class="text-sm text-v2-text-text-muted">{shellError()}</div>
-              </Show>
+            </Show>
+            <Show when={shellError() && running()}>
+              <div class="text-sm text-v2-text-text-muted">{shellError()}</div>
+            </Show>
+          </Show>
+        </Show>
+
+        <Show when={tab() === "display"}>
+          <Show when={displayLoading()}>
+            <div class="flex justify-center py-8">
+              <Spinner />
             </div>
+          </Show>
+          <Show when={!displayLoading() && display()}>
+            {(session) => (
+              <ContainerDisplay
+                url={session().url}
+                password={session().password}
+                active={tab() === "display"}
+              />
+            )}
+          </Show>
+          <Show when={!displayLoading() && !display()}>
+            <div class="rounded-md border border-v2-border-border-base p-4 text-sm text-v2-text-text-muted">
+              {displayError() ?? language.t("containers.inspect.displayUnavailable")}
+            </div>
+            <Show when={!displayCapable()}>
+              <p class="text-sm text-v2-text-text-muted">{language.t("containers.inspect.displayHowTo")}</p>
+            </Show>
           </Show>
         </Show>
       </div>

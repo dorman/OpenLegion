@@ -1,6 +1,7 @@
+import { appendFile, access, mkdir } from "node:fs/promises"
 import { execFile } from "node:child_process"
 import { spawn } from "node:child_process"
-import { access } from "node:fs/promises"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app } from "electron"
@@ -11,7 +12,7 @@ export type ContainerRuntimeStatus = {
   microvmUrl: string
 }
 
-const requiredMicrovmFeatures = ["logs", "shell"]
+const requiredMicrovmFeatures = ["logs", "shell", "display"]
 
 let daemon: ReturnType<typeof spawn> | undefined
 
@@ -43,7 +44,7 @@ async function dockerAvailable() {
 export async function containerRuntimeStatus(): Promise<ContainerRuntimeStatus> {
   const url = microvmUrl()
   const [docker, health] = await Promise.all([dockerAvailable(), microvmHealth(url)])
-  return { docker, microvm: health.ok === true, microvmUrl: url }
+  return { docker, microvm: health.ok === true && health.supported, microvmUrl: url }
 }
 
 async function repoRoot() {
@@ -68,7 +69,7 @@ async function daemonCommand() {
 
 async function killPort(port: string) {
   await new Promise<void>((resolve) => {
-    execFile("lsof", ["-ti", `tcp:${port}`], (error, stdout) => {
+    execFile("lsof", ["-ti", `tcp:${port}`, "-sTCP:LISTEN"], (error, stdout) => {
       if (error || !stdout.trim()) {
         resolve()
         return
@@ -114,21 +115,33 @@ export async function ensureMicrovmDaemon() {
   if (!command) return { ok: false as const, url, error: "microvm daemon binary is not configured" }
 
   const root = await repoRoot()
+  const logPath = join(homedir(), ".openlegion", "logs", "microvm-daemon.log")
+  await mkdir(dirname(logPath), { recursive: true })
   daemon = spawn(command.cmd, command.args, {
     cwd: root,
     env: process.env,
-    stdio: "ignore",
+    stdio: ["ignore", "ignore", "pipe"],
     detached: false,
   })
+  let spawnError = ""
+  daemon.stderr?.on("data", (chunk: Buffer) => {
+    void appendFile(logPath, chunk)
+  })
+  daemon.on("error", (error) => {
+    spawnError = error.message
+  })
 
-  for (let attempt = 0; attempt < 40; attempt++) {
+  for (let attempt = 0; attempt < 80; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 250))
     const next = await microvmHealth(url)
     if (next.ok && next.supported) return { ok: true as const, url }
     if (daemon.exitCode !== null) break
   }
 
-  return { ok: false as const, url, error: "microvm daemon did not become healthy" }
+  if (spawnError) {
+    return { ok: false as const, url, error: spawnError }
+  }
+  return { ok: false as const, url, error: `microvm daemon did not become healthy (see ${logPath})` }
 }
 
 export async function stopMicrovmDaemon() {

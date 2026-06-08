@@ -1,6 +1,6 @@
 # openlegion-microvm
 
-Local sandbox daemon for OpenLegion. It wraps Docker containers in per-workload isolated networks (not the default Docker bridge).
+Local sandbox daemon for OpenLegion. It wraps Docker containers in per-workload isolated networks and can launch QEMU desktop VMs.
 
 ## Run
 
@@ -16,18 +16,25 @@ Defaults to `http://127.0.0.1:7420`. Configure with:
 | `OPENLEGION_MICROVM_URL` | used by the TypeScript client |
 | `OPENLEGION_SANDBOX_ROOT` | `~/.openlegion/sandboxes` |
 | `OPENLEGION_DOCKER_RUNTIME` | `docker` |
+| `OPENLEGION_QEMU_IMAGE` | required for `kind: desktop` |
+| `OPENLEGION_QEMU_MEMORY_MB` | `2048` |
+| `OPENLEGION_QEMU_ROOT` | `~/.openlegion/qemu-vms` |
 
 ## API
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Daemon and Docker availability |
+| `GET` | `/health` | Daemon and runtime availability |
 | `GET` | `/vms` | List sandbox workloads |
-| `POST` | `/vms` | Create and start a sandboxed container |
+| `POST` | `/vms` | Create and start a sandbox workload |
 | `POST` | `/vms/{id}/stop` | Stop a workload |
-| `DELETE` | `/vms/{id}` | Remove workload, network, and sandbox metadata |
+| `DELETE` | `/vms/{id}` | Remove workload and metadata |
+| `GET` | `/vms/{id}/logs` | Recent logs |
+| `GET` | `/vms/{id}/shell` | Shell command metadata |
+| `GET` | `/vms/{id}/display` | Remote desktop websocket session |
+| `GET` | `/vms/{id}/display/ws` | VNC websocket proxy |
 
-Example:
+Example container:
 
 ```bash
 curl -X POST http://127.0.0.1:7420/vms \
@@ -35,13 +42,14 @@ curl -X POST http://127.0.0.1:7420/vms \
   -d '{"image":"alpine:latest","name":"workload","command":["sleep","3600"]}'
 ```
 
-## CLI
-
-With the daemon running (or with Docker/Podman on `PATH`):
+Example desktop VM:
 
 ```bash
-openlegion container list
-openlegion container create --image alpine:latest --command sleep 3600
-openlegion container stop <id>
-openlegion container rm <id>
+curl -X POST http://127.0.0.1:7420/vms \
+  -H 'Content-Type: application/json' \
+  -d '{"kind":"desktop","name":"re-lab","memoryMb":2048}'
 ```
+
+## macOS
+
+Use the Lima template in `scripts/lima/` to run this daemon inside Linux when QEMU desktop VMs are needed.

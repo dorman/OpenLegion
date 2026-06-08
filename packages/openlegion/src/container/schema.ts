@@ -3,9 +3,14 @@ import { Schema } from "effect"
 export const Runtime = Schema.Literals(["docker", "podman", "microvm"])
 export type Runtime = typeof Runtime.Type
 
+export const WorkloadKind = Schema.Literals(["container", "desktop"])
+export type WorkloadKind = typeof WorkloadKind.Type
+
 export const CreateInput = Schema.Struct({
+  kind: Schema.optional(WorkloadKind),
   image: Schema.String,
   name: Schema.optional(Schema.String),
+  memoryMb: Schema.optional(Schema.Number),
   env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   ports: Schema.optional(
     Schema.Array(
@@ -37,6 +42,8 @@ export const Info = Schema.Struct({
   image: Schema.String,
   name: Schema.optional(Schema.String),
   status: Schema.optional(Status),
+  kind: Schema.optional(WorkloadKind),
+  display: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "ContainerInfo" })
 export type Info = typeof Info.Type
 
@@ -53,3 +60,10 @@ export const ShellOutput = Schema.Struct({
   runtime: Runtime,
 }).annotate({ identifier: "ContainerShellOutput" })
 export type ShellOutput = typeof ShellOutput.Type
+
+export const DisplayOutput = Schema.Struct({
+  url: Schema.String,
+  kind: Schema.Literals(["vnc-websocket"]),
+  password: Schema.optional(Schema.String),
+}).annotate({ identifier: "ContainerDisplayOutput" })
+export type DisplayOutput = typeof DisplayOutput.Type

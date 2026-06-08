@@ -46,6 +46,19 @@ function run(appProcess: AppProcess.Interface, runtime: CliRuntime, args: string
     )
 }
 
+function firstLine(stdout: string) {
+  return stdout
+    .split("\n")
+    .map((item) => item.trim())
+    .find((item) => item.length > 0)
+}
+
+function matchContainerId(id: string, containerId: string, name: string) {
+  if (containerId === id || containerId.startsWith(id) || id.startsWith(containerId)) return true
+  if (name === id || name.includes(id) || id.includes(name)) return true
+  return false
+}
+
 export const resolveDockerContainerId = Effect.fn("Container.resolveDockerContainerId")(function* (
   appProcess: AppProcess.Interface,
   id: string,
@@ -59,10 +72,7 @@ export const resolveDockerContainerId = Effect.fn("Container.resolveDockerContai
     "--format",
     "{{.ID}}",
   ])
-  const labelId = byLabel.stdout
-    .split("\n")
-    .map((item) => item.trim())
-    .find((item) => item.length > 0)
+  const labelId = firstLine(byLabel.stdout)
   if (labelId) return labelId
 
   const listed = yield* run(appProcess, runtime, ["ps", "-a", "--format", "{{.ID}}\t{{.Names}}"])
@@ -76,8 +86,47 @@ export const resolveDockerContainerId = Effect.fn("Container.resolveDockerContai
     const [containerId, ...nameParts] = line.split("\t")
     const name = nameParts.join("\t").trim().replace(/^\//, "")
     if (!containerId) continue
-    if (containerId === id || containerId.startsWith(id) || id.startsWith(containerId)) return containerId
-    if (name === id || name.includes(id) || id.includes(name)) return containerId
+    if (matchContainerId(id, containerId, name)) return containerId
+  }
+
+  return yield* new ContainerResolveError({ message: `Container ${id} not found` })
+})
+
+export const resolveRunningDockerContainerId = Effect.fn("Container.resolveRunningDockerContainerId")(function* (
+  appProcess: AppProcess.Interface,
+  id: string,
+) {
+  const runtime = dockerRuntime()
+  const byLabel = yield* run(appProcess, runtime, [
+    "ps",
+    "--filter",
+    `label=openlegion.sandbox.id=${id}`,
+    "--format",
+    "{{.ID}}",
+  ])
+  const labelId = firstLine(byLabel.stdout)
+  if (labelId) return labelId
+
+  const listed = yield* run(appProcess, runtime, ["ps", "--format", "{{.ID}}\t{{.Names}}"])
+  if (listed.code !== 0) {
+    return yield* new ContainerResolveError({
+      message: normalizeMessage(listed, "Failed to resolve container id"),
+    })
+  }
+
+  for (const line of listed.stdout.split("\n")) {
+    const [containerId, ...nameParts] = line.split("\t")
+    const name = nameParts.join("\t").trim().replace(/^\//, "")
+    if (!containerId) continue
+    if (matchContainerId(id, containerId, name)) return containerId
+  }
+
+  const existsStopped = yield* resolveDockerContainerId(appProcess, id).pipe(
+    Effect.map(() => true),
+    Effect.catch(() => Effect.succeed(false)),
+  )
+  if (existsStopped) {
+    return yield* new ContainerResolveError({ message: "Container is not running" })
   }
 
   return yield* new ContainerResolveError({ message: `Container ${id} not found` })

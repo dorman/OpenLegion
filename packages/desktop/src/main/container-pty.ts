@@ -36,7 +36,7 @@ export function createContainerPty(input: {
   if (!parsed) throw new Error("Unsupported container shell command")
 
   const id = randomUUID()
-  const proc = pty.spawn(parsed.runtime, ["exec", "-i", parsed.containerId, ...parsed.shell], {
+  const proc = pty.spawn(parsed.runtime, ["exec", "-i", "-t", parsed.containerId, ...parsed.shell], {
     name: "xterm-256color",
     cols: input.cols,
     rows: input.rows,
