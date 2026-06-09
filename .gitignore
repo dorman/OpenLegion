@@ -28,6 +28,7 @@ target
 
 # Local dev files
 openlegion-dev
+openlegion-microvm
 UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
