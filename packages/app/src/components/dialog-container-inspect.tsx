@@ -312,11 +312,18 @@ export function DialogContainerInspect(props: { container: ContainerInfo; onStar
           </Show>
           <Show when={!displayLoading() && display()}>
             {(session) => (
-              <ContainerDisplay
-                url={session().url}
-                password={session().password}
-                active={tab() === "display"}
-              />
+              <div class="flex min-h-0 flex-1 flex-col gap-2">
+                <p class="text-xs text-v2-text-text-muted">{language.t("containers.inspect.displayFocus")}</p>
+                <p class="text-xs text-v2-text-text-muted">{language.t("containers.inspect.displayMonitor")}</p>
+                <ButtonV2 variant="ghost" size="normal" onClick={() => void refreshDisplay()}>
+                  {language.t("containers.inspect.displayRefresh")}
+                </ButtonV2>
+                <ContainerDisplay
+                  url={session().url}
+                  password={session().password}
+                  active={tab() === "display"}
+                />
+              </div>
             )}
           </Show>
           <Show when={!displayLoading() && !display()}>

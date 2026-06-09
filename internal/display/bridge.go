@@ -49,7 +49,7 @@ func (b *Bridge) Register(vmID string, session Session) string {
 }
 
 func (b *Bridge) ServeWS(w http.ResponseWriter, r *http.Request, vmID, token string) {
-	session, ok := b.consume(vmID, token)
+	session, ok := b.lookup(vmID, token)
 	if !ok {
 		http.Error(w, "display session expired or invalid", http.StatusUnauthorized)
 		return
@@ -79,7 +79,7 @@ func (b *Bridge) ServeWS(w http.ResponseWriter, r *http.Request, vmID, token str
 	<-errCh
 }
 
-func (b *Bridge) consume(vmID, token string) (Session, bool) {
+func (b *Bridge) lookup(vmID, token string) (Session, bool) {
 	key := sessionKey(vmID, token)
 
 	b.mu.Lock()
@@ -89,8 +89,8 @@ func (b *Bridge) consume(vmID, token string) (Session, bool) {
 	if !ok {
 		return Session{}, false
 	}
-	delete(b.sessions, key)
 	if time.Now().After(session.ExpiresAt) {
+		delete(b.sessions, key)
 		return Session{}, false
 	}
 	return session, true

@@ -273,6 +273,12 @@ export default function ContainersPage() {
                   readyLabel={language.t("containers.runtime.ready")}
                   unavailableLabel={language.t("containers.runtime.unavailable")}
                 />
+                <RuntimePill
+                  label={language.t("containers.runtime.qemu")}
+                  ready={status().qemu}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
               </div>
               <Show when={!daemonReady()}>
                 <p class="text-sm text-v2-text-text-muted">{language.t("containers.description")}</p>

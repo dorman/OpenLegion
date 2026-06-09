@@ -31,6 +31,7 @@ export type ContainerCreateInput = {
 export type ContainerRuntimeStatus = {
   docker: boolean
   microvm: boolean
+  qemu: boolean
   microvmUrl: string
 }
 

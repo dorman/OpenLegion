@@ -15,6 +15,7 @@ type DesktopOS = "macos" | "windows" | "linux"
 export type ContainerRuntimeStatus = {
   docker: boolean
   microvm: boolean
+  qemu: boolean
   microvmUrl: string
 }
 

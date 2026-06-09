@@ -361,22 +361,12 @@ export const layer = Layer.effect(
       })
     })
 
-    const dockerStart = Effect.fnUntraced(function* (id: string) {
-      const runtime = dockerRuntime()
-      const containerId = yield* dockerContainerId(id)
-      const result = yield* run(runtime, ["start", containerId])
-      if (result.code !== 0) {
-        return yield* new StartFailedError({
-          message: normalizeMessage(result, "Failed to start container"),
-        })
-      }
-      yield* ensureRunningAfterStart(runtime, containerId)
-    })
-
     const start = Effect.fn("Container.start")(function* (id: string) {
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
-        return yield* dockerStart(id)
+        return yield* microvmClient.start(id).pipe(
+          Effect.mapError((message) => new StartFailedError({ message })),
+        )
       }
       yield* ensureRuntimeAvailable(runtime)
       const containerId = id

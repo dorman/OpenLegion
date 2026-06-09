@@ -11,6 +11,7 @@ export type WslConfig = { enabled: boolean }
 export type ContainerRuntimeStatus = {
   docker: boolean
   microvm: boolean
+  qemu: boolean
   microvmUrl: string
 }
 

@@ -27,6 +27,7 @@ Defaults to `http://127.0.0.1:7420`. Configure with:
 | `GET` | `/health` | Daemon and runtime availability |
 | `GET` | `/vms` | List sandbox workloads |
 | `POST` | `/vms` | Create and start a sandbox workload |
+| `POST` | `/vms/{id}/start` | Start a stopped workload (Docker container or QEMU desktop VM) |
 | `POST` | `/vms/{id}/stop` | Stop a workload |
 | `DELETE` | `/vms/{id}` | Remove workload and metadata |
 | `GET` | `/vms/{id}/logs` | Recent logs |

@@ -16,6 +16,7 @@ type Engine interface {
 	Available(ctx context.Context) error
 	Create(ctx context.Context, req types.CreateVMRequest) (Result, error)
 	List(ctx context.Context) ([]types.VMInfo, error)
+	Start(ctx context.Context, id string) error
 	Stop(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 	Logs(ctx context.Context, id string, tail int) (string, error)

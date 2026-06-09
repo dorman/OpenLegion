@@ -26,6 +26,15 @@ export function DialogContainerCreate(props: {
     publish: "",
   })
 
+  async function pickDiskImage() {
+    const file = await platform.openFilePickerDialog?.({
+      title: language.t("containers.create.pickDiskImage"),
+      accept: ["iso", "qcow2"],
+    })
+    if (!file || Array.isArray(file)) return
+    setStore("image", file)
+  }
+
   async function pickVolume() {
     const host = await platform.openDirectoryPickerDialog?.({
       title: language.t("containers.create.pickVolume"),
@@ -54,7 +63,7 @@ export function DialogContainerCreate(props: {
       const memoryMb = Number(store.memoryMb)
       await props.onCreate({
         kind: store.kind,
-        image: store.image.trim(),
+        image: store.kind === "desktop" ? store.image.trim() : store.image.trim(),
         name: store.name.trim() || undefined,
         memoryMb: store.kind === "desktop" && Number.isFinite(memoryMb) && memoryMb > 0 ? memoryMb : undefined,
         command: store.kind === "container" && command.length > 0 ? command : undefined,
@@ -86,7 +95,12 @@ export function DialogContainerCreate(props: {
           <select
             class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
             value={store.kind}
-            onChange={(event) => setStore("kind", event.currentTarget.value as "container" | "desktop")}
+            onChange={(event) => {
+              const kind = event.currentTarget.value as "container" | "desktop"
+              setStore("kind", kind)
+              if (kind === "desktop") setStore("image", "")
+              if (kind === "container" && !store.image.trim()) setStore("image", "alpine:latest")
+            }}
           >
             <option value="container">{language.t("containers.create.kind.container")}</option>
             <option value="desktop">{language.t("containers.create.kind.desktop")}</option>
@@ -105,12 +119,27 @@ export function DialogContainerCreate(props: {
         </Show>
 
         <label class="flex flex-col gap-1 text-sm">
-          <span class="text-v2-text-text-muted">{language.t("containers.create.image")}</span>
-          <input
-            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-            value={store.image}
-            onInput={(event) => setStore("image", event.currentTarget.value)}
-          />
+          <span class="text-v2-text-text-muted">
+            {store.kind === "desktop"
+              ? language.t("containers.create.diskImage")
+              : language.t("containers.create.image")}
+          </span>
+          <div class="flex gap-2">
+            <input
+              class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+              placeholder={store.kind === "desktop" ? "/Users/you/Downloads/ubuntu.iso" : undefined}
+              value={store.image}
+              onInput={(event) => setStore("image", event.currentTarget.value)}
+            />
+            <Show when={store.kind === "desktop"}>
+              <ButtonV2 variant="neutral" onClick={() => void pickDiskImage()}>
+                {language.t("containers.create.pickDiskImage")}
+              </ButtonV2>
+            </Show>
+          </div>
+          <Show when={store.kind === "desktop"}>
+            <span class="text-xs text-v2-text-text-muted">{language.t("containers.create.diskImageHint")}</span>
+          </Show>
         </label>
 
         <label class="flex flex-col gap-1 text-sm">
@@ -133,15 +162,17 @@ export function DialogContainerCreate(props: {
           </label>
         </Show>
 
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-v2-text-text-muted">{language.t("containers.create.publish")}</span>
-          <input
-            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-            placeholder="8080:80"
-            value={store.publish}
-            onInput={(event) => setStore("publish", event.currentTarget.value)}
-          />
-        </label>
+        <Show when={store.kind === "container"}>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-v2-text-text-muted">{language.t("containers.create.publish")}</span>
+            <input
+              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+              placeholder="8080:80"
+              value={store.publish}
+              onInput={(event) => setStore("publish", event.currentTarget.value)}
+            />
+          </label>
+        </Show>
 
         <Show when={store.kind === "container"}>
         <div class="flex flex-col gap-2 text-sm">
@@ -177,7 +208,7 @@ export function DialogContainerCreate(props: {
         </ButtonV2>
         <ButtonV2
           onClick={() => void submit()}
-          disabled={pending() || (store.kind === "container" && !store.image.trim())}
+          disabled={pending() || !store.image.trim()}
         >
           {language.t("containers.create.submit")}
         </ButtonV2>

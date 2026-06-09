@@ -1,18 +1,20 @@
-import { appendFile, access, mkdir } from "node:fs/promises"
+import { access, appendFile, mkdir } from "node:fs/promises"
 import { execFile } from "node:child_process"
 import { spawn } from "node:child_process"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app } from "electron"
+import { getUserShell, loadShellEnv } from "./shell-env"
 
 export type ContainerRuntimeStatus = {
   docker: boolean
   microvm: boolean
+  qemu: boolean
   microvmUrl: string
 }
 
-const requiredMicrovmFeatures = ["logs", "shell", "display"]
+const requiredMicrovmFeatures = ["logs", "shell", "display", "desktop-v2"]
 
 let daemon: ReturnType<typeof spawn> | undefined
 
@@ -35,16 +37,44 @@ async function microvmHealth(url: string) {
 
 async function dockerAvailable() {
   return new Promise<boolean>((resolve) => {
-    const child = spawn("docker", ["--version"], { stdio: "ignore" })
+    const child = spawn("docker", ["--version"], { stdio: "ignore", env: daemonEnv() })
     child.once("error", () => resolve(false))
     child.once("exit", (code) => resolve(code === 0))
   })
 }
 
+const qemuCandidates = [
+  "/opt/homebrew/bin/qemu-system-aarch64",
+  "/usr/local/bin/qemu-system-aarch64",
+  "qemu-system-aarch64",
+  "qemu-system-x86_64",
+]
+
+async function qemuAvailable() {
+  const env = daemonEnv()
+  for (const candidate of qemuCandidates) {
+    const ok = await new Promise<boolean>((resolve) => {
+      const child = spawn(candidate, ["--version"], { stdio: "ignore", env })
+      child.once("error", () => resolve(false))
+      child.once("exit", (code) => resolve(code === 0))
+    })
+    if (ok) return true
+  }
+  return false
+}
+
+function daemonEnv() {
+  const shell = getUserShell()
+  const shellEnv = loadShellEnv(shell)
+  if (!shellEnv) return process.env
+  const path = [process.env.PATH, shellEnv.PATH].filter(Boolean).join(":")
+  return { ...shellEnv, ...process.env, PATH: path }
+}
+
 export async function containerRuntimeStatus(): Promise<ContainerRuntimeStatus> {
   const url = microvmUrl()
-  const [docker, health] = await Promise.all([dockerAvailable(), microvmHealth(url)])
-  return { docker, microvm: health.ok === true && health.supported, microvmUrl: url }
+  const [docker, qemu, health] = await Promise.all([dockerAvailable(), qemuAvailable(), microvmHealth(url)])
+  return { docker, qemu, microvm: health.ok === true && health.supported, microvmUrl: url }
 }
 
 async function repoRoot() {
@@ -119,7 +149,7 @@ export async function ensureMicrovmDaemon() {
   await mkdir(dirname(logPath), { recursive: true })
   daemon = spawn(command.cmd, command.args, {
     cwd: root,
-    env: process.env,
+    env: daemonEnv(),
     stdio: ["ignore", "ignore", "pipe"],
     detached: false,
   })

@@ -35,6 +35,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /vms", s.handleList)
 	mux.HandleFunc("POST /vms", s.handleCreate)
 	mux.HandleFunc("POST /vms/{id}/stop", s.handleStop)
+	mux.HandleFunc("POST /vms/{id}/start", s.handleStart)
 	mux.HandleFunc("DELETE /vms/{id}", s.handleDelete)
 	mux.HandleFunc("GET /vms/{id}/logs", s.handleLogs)
 	mux.HandleFunc("GET /vms/{id}/shell", s.handleShell)
@@ -50,7 +51,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, types.HealthResponse{
 		OK:       true,
-		Features: []string{"logs", "shell", "display"},
+		Features: []string{"logs", "shell", "display", "desktop-v2"},
 	})
 }
 
@@ -106,6 +107,21 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusCreated, toVMInfo(vm))
+}
+
+func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	if err := s.engine.Start(r.Context(), id); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, types.HealthResponse{OK: true})
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {

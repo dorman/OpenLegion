@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,13 +45,8 @@ func (e *QemuSandbox) Kind() string {
 }
 
 func (e *QemuSandbox) Available(ctx context.Context) error {
-	if _, err := qemuBinary(); err != nil {
-		return err
-	}
-	if imagePath("") == "" {
-		return fmt.Errorf("qemu desktop image is not configured (set OPENLEGION_QEMU_IMAGE)")
-	}
-	return nil
+	_, err := qemuBinary()
+	return err
 }
 
 func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Result, error) {
@@ -75,6 +71,9 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	if image == "" {
 		return Result{}, fmt.Errorf("desktop image is required")
 	}
+	if err := validateDesktopImage(image); err != nil {
+		return Result{}, err
+	}
 
 	vmDir := filepath.Join(e.rootDir, id)
 	if err := os.MkdirAll(vmDir, 0o755); err != nil {
@@ -82,7 +81,8 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	}
 
 	disk := filepath.Join(vmDir, "disk.qcow2")
-	if err := ensureDiskImage(image, disk); err != nil {
+	isoPath, err := prepareDesktopDisk(image, disk)
+	if err != nil {
 		_ = os.RemoveAll(vmDir)
 		return Result{}, err
 	}
@@ -94,7 +94,9 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	}
 
 	pid, err := startQemu(ctx, qemuStartConfig{
+		vmDir:    vmDir,
 		disk:     disk,
+		iso:      isoPath,
 		memoryMB: memoryMB,
 		vncPort:  vncPort,
 		pidFile:  filepath.Join(vmDir, "qemu.pid"),
@@ -161,6 +163,54 @@ func (e *QemuSandbox) List(ctx context.Context) ([]types.VMInfo, error) {
 		})
 	}
 	return out, nil
+}
+
+func (e *QemuSandbox) Start(ctx context.Context, id string) error {
+	record, err := e.findRecord(id)
+	if err != nil {
+		return err
+	}
+	record = refreshQemuStatus(record)
+	if record.Status == "running" {
+		return nil
+	}
+
+	vmDir := filepath.Join(e.rootDir, record.ID)
+	disk := filepath.Join(vmDir, "disk.qcow2")
+	if _, err := os.Stat(disk); err != nil {
+		return fmt.Errorf("desktop disk is missing")
+	}
+
+	memoryMB := record.MemoryMB
+	if memoryMB <= 0 {
+		memoryMB = defaultQemuMemoryMB()
+	}
+
+	vncPort := record.VNCPort
+	if vncPort <= 0 || !vncPortAvailable(vncPort) {
+		vncPort, err = freeVNCPort()
+		if err != nil {
+			return err
+		}
+	}
+
+	pid, err := startQemu(ctx, qemuStartConfig{
+		vmDir:    vmDir,
+		disk:     disk,
+		memoryMB: memoryMB,
+		vncPort:  vncPort,
+		pidFile:  filepath.Join(vmDir, "qemu.pid"),
+		logFile:  filepath.Join(vmDir, "qemu.log"),
+	})
+	if err != nil {
+		return err
+	}
+
+	record.Status = "running"
+	record.PID = pid
+	record.VNCPort = vncPort
+	record.MemoryMB = memoryMB
+	return writeQemuRecord(vmDir, record)
 }
 
 func (e *QemuSandbox) Stop(ctx context.Context, id string) error {
@@ -257,7 +307,9 @@ func (e *QemuSandbox) findRecord(id string) (qemuRecord, error) {
 }
 
 type qemuStartConfig struct {
+	vmDir    string
 	disk     string
+	iso      string
 	memoryMB int
 	vncPort  int
 	pidFile  string
@@ -273,13 +325,31 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 	args := []string{
 		"-machine", "virt",
 		"-m", strconv.Itoa(cfg.memoryMB),
-		"-drive", "file=" + cfg.disk + ",if=virtio,format=qcow2",
+		"-vga", "none",
+		"-drive", "if=none,file=" + cfg.disk + ",format=qcow2,id=hd",
+		"-device", "virtio-blk-pci,drive=hd",
 		"-netdev", "user,id=net0",
 		"-device", "virtio-net-pci,netdev=net0",
+		"-device", "virtio-gpu-pci",
+		"-device", "qemu-xhci,id=xhci",
+		"-device", "usb-kbd,bus=xhci.0",
+		"-device", "usb-tablet,bus=xhci.0",
+		"-serial", "null",
+		"-parallel", "null",
+		"-monitor", "none",
 		"-display", "none",
 		"-vnc", fmt.Sprintf("127.0.0.1:%d", cfg.vncPort-5900),
 		"-daemonize",
 		"-pidfile", cfg.pidFile,
+	}
+	args = append(qemuFirmwareArgs(cfg.vmDir), args...)
+	if cfg.iso != "" {
+		args = append(args,
+			"-drive", "if=none,file="+cfg.iso+",format=raw,readonly=on,id=cd",
+			"-device", "virtio-scsi-pci,id=scsi0",
+			"-device", "scsi-cd,bus=scsi0.0,drive=cd",
+			"-boot", "order=dc",
+		)
 	}
 
 	args = append(qemuAccelArgs(binary), args...)
@@ -308,6 +378,48 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 	return pid, nil
 }
 
+func qemuFirmwareArgs(vmDir string) []string {
+	dirs := []string{"/opt/homebrew/share/qemu", "/usr/local/share/qemu"}
+	for _, dir := range dirs {
+		code := filepath.Join(dir, "edk2-aarch64-code.fd")
+		varsTemplate := filepath.Join(dir, "edk2-arm-vars.fd")
+		if _, err := os.Stat(code); err != nil {
+			continue
+		}
+		vars := filepath.Join(vmDir, "uefi-vars.fd")
+		if _, err := os.Stat(vars); err != nil {
+			if _, err := os.Stat(varsTemplate); err == nil {
+				if err := copyFile(varsTemplate, vars); err != nil {
+					return nil
+				}
+			}
+		}
+		args := []string{
+			"-drive", "if=pflash,format=raw,readonly=on,file=" + code,
+		}
+		if _, err := os.Stat(vars); err == nil {
+			args = append(args, "-drive", "if=pflash,format=raw,file="+vars)
+		}
+		return args
+	}
+	return nil
+}
+
+func copyFile(source, dest string) error {
+	in, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
+
 func qemuAccelArgs(binary string) []string {
 	if strings.Contains(binary, "aarch64") {
 		if _, err := exec.LookPath(binary); err == nil {
@@ -318,16 +430,35 @@ func qemuAccelArgs(binary string) []string {
 }
 
 func qemuBinary() (string, error) {
-	candidates := []string{
-		"qemu-system-aarch64",
-		"qemu-system-x86_64",
+	return findTool([]string{"qemu-system-aarch64", "qemu-system-x86_64"})
+}
+
+func qemuImgBinary() (string, error) {
+	return findTool([]string{"qemu-img"})
+}
+
+func findTool(names []string) (string, error) {
+	dirs := []string{"/opt/homebrew/bin", "/usr/local/bin"}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, ".nix-profile", "bin"))
 	}
-	for _, name := range candidates {
+	for _, dir := range dirs {
+		for _, name := range names {
+			full := filepath.Join(dir, name)
+			if info, err := os.Stat(full); err == nil && !info.IsDir() {
+				return full, nil
+			}
+		}
+	}
+	for _, name := range names {
 		if path, err := exec.LookPath(name); err == nil {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("qemu-system binary is not available on PATH")
+	if len(names) == 1 && names[0] == "qemu-img" {
+		return "", fmt.Errorf("qemu-img is not installed (install with: brew install qemu)")
+	}
+	return "", fmt.Errorf("qemu is not installed (install with: brew install qemu)")
 }
 
 func qemuRootDir() string {
@@ -361,12 +492,62 @@ func defaultQemuMemoryMB() int {
 	return value
 }
 
+func prepareDesktopDisk(source, dest string) (string, error) {
+	if _, err := os.Stat(source); err != nil {
+		return "", fmt.Errorf("desktop image %q is missing", source)
+	}
+	if isISOPath(source) {
+		if err := createEmptyDisk(dest, 24); err != nil {
+			return "", err
+		}
+		return source, nil
+	}
+	if err := ensureDiskImage(source, dest); err != nil {
+		return "", err
+	}
+	return "", nil
+}
+
+func isISOPath(path string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(path)), ".iso")
+}
+
+func validateDesktopImage(image string) error {
+	binary, err := qemuBinary()
+	if err != nil {
+		return err
+	}
+	lower := strings.ToLower(filepath.Base(image))
+	onAarch64 := strings.Contains(binary, "aarch64") || strings.Contains(strings.ToLower(runtime.GOARCH), "arm")
+	if !onAarch64 {
+		return nil
+	}
+	for _, token := range []string{"amd64", "x86_64", "x64"} {
+		if strings.Contains(lower, token) {
+			return fmt.Errorf("amd64 ISO cannot boot in an arm64 VM on Apple Silicon; download an arm64 or aarch64 Ubuntu image instead")
+		}
+	}
+	return nil
+}
+
+func createEmptyDisk(path string, sizeGB int) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	qemuImg, err := qemuImgBinary()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(qemuImg, "create", "-f", "qcow2", path, fmt.Sprintf("%dG", sizeGB))
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("create disk image: %s", strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
 func ensureDiskImage(source, dest string) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
-	}
-	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("desktop image %q is missing", source)
 	}
 	in, err := os.Open(source)
 	if err != nil {
@@ -386,14 +567,21 @@ func ensureDiskImage(source, dest string) error {
 
 func freeVNCPort() (int, error) {
 	for port := 5900; port < 6000; port++ {
-		listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-		if err != nil {
+		if !vncPortAvailable(port) {
 			continue
 		}
-		listener.Close()
 		return port, nil
 	}
 	return 0, fmt.Errorf("no free vnc port in range 5900-5999")
+}
+
+func vncPortAvailable(port int) bool {
+	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
 }
 
 func newDesktopID() string {

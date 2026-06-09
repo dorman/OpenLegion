@@ -39,6 +39,7 @@ export interface Interface {
   readonly health: () => Effect.Effect<boolean>
   readonly create: (input: typeof CreateInput.Type) => Effect.Effect<Info, string>
   readonly list: () => Effect.Effect<Array<Info>, string>
+  readonly start: (id: string) => Effect.Effect<void, string>
   readonly stop: (id: string) => Effect.Effect<void, string>
   readonly remove: (id: string) => Effect.Effect<void, string>
   readonly logs: (id: string, tail: number) => Effect.Effect<{ logs: string }, string>
@@ -86,10 +87,14 @@ export const layer = Layer.effect(
           HttpClientRequest.acceptJson,
           HttpClientRequest.schemaBodyJson(CreateInput)(input),
         )
-        return yield* http.execute(request).pipe(
-          Effect.flatMap(HttpClientResponse.schemaBodyJson(VmInfo)),
-          Effect.map(toInfo),
-        )
+        const response = yield* client.execute(request)
+        if (response.status < 200 || response.status >= 300) {
+          const body = yield* HttpClientResponse.schemaBodyJson(ErrorResponse)(response).pipe(
+            Effect.catch(() => Effect.succeed({ error: `Failed to create microvm (${response.status})` })),
+          )
+          return yield* Effect.fail(body.error)
+        }
+        return yield* HttpClientResponse.schemaBodyJson(VmInfo)(response).pipe(Effect.map(toInfo))
       }).pipe(Effect.mapError((error) => errorMessage(error, "Failed to create microvm")))
     })
 
@@ -100,6 +105,14 @@ export const layer = Layer.effect(
         Effect.flatMap(HttpClientResponse.schemaBodyJson(VmList)),
         Effect.map((items) => items.map(toInfo)),
         Effect.mapError((error) => errorMessage(error, "Failed to list microvms")),
+      )
+    })
+
+    const start = Effect.fnUntraced(function* (id: string) {
+      return yield* HttpClientRequest.post(`${baseUrl}/vms/${encodeURIComponent(id)}/start`).pipe(
+        http.execute,
+        Effect.asVoid,
+        Effect.mapError((error) => errorMessage(error, "Failed to start microvm")),
       )
     })
 
@@ -143,20 +156,22 @@ export const layer = Layer.effect(
     })
 
     const display = Effect.fnUntraced(function* (id: string) {
-      const response = yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/display`).pipe(
-        HttpClientRequest.acceptJson,
-        client.execute,
-      )
-      if (response.status < 200 || response.status >= 300) {
-        const body = yield* HttpClientResponse.schemaBodyJson(ErrorResponse)(response).pipe(
-          Effect.catch(() => Effect.succeed({ error: "display is not available for this workload" })),
+      return yield* Effect.gen(function* () {
+        const response = yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/display`).pipe(
+          HttpClientRequest.acceptJson,
+          client.execute,
         )
-        return yield* Effect.fail(body.error)
-      }
-      return yield* HttpClientResponse.schemaBodyJson(DisplayResponse)(response)
+        if (response.status < 200 || response.status >= 300) {
+          const body = yield* HttpClientResponse.schemaBodyJson(ErrorResponse)(response).pipe(
+            Effect.catch(() => Effect.succeed({ error: "display is not available for this workload" })),
+          )
+          return yield* Effect.fail(body.error)
+        }
+        return yield* HttpClientResponse.schemaBodyJson(DisplayResponse)(response)
+      }).pipe(Effect.mapError((error) => errorMessage(error, "Failed to resolve microvm display")))
     })
 
-    return Service.of({ health, create, list, stop, remove, logs, shell, display })
+    return Service.of({ health, create, list, start, stop, remove, logs, shell, display })
   }),
 )
 

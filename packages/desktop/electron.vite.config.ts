@@ -60,6 +60,7 @@ export default defineConfig({
       {
         name: "openlegion:copy-server-assets",
         async writeBundle() {
+          await fs.mkdir("./out/main/chunks", { recursive: true })
           for (const l of await fs.readdir(OPENLEGION_SERVER_DIST)) {
             if (!l.endsWith(".wasm")) continue
             await fs.writeFile(`./out/main/chunks/${l}`, await fs.readFile(`${OPENLEGION_SERVER_DIST}/${l}`))

@@ -54,6 +54,14 @@ func (r *Router) List(ctx context.Context) ([]types.VMInfo, error) {
 	return append(dockerItems, qemuItems...), nil
 }
 
+func (r *Router) Start(ctx context.Context, id string) error {
+	engine, err := r.resolve(id)
+	if err != nil {
+		return err
+	}
+	return engine.Start(ctx, id)
+}
+
 func (r *Router) Stop(ctx context.Context, id string) error {
 	engine, err := r.resolve(id)
 	if err != nil {

@@ -16,6 +16,16 @@ MIT — see [LICENSE](./LICENSE). Upstream OpenCode remains MIT; attribution app
 
 Everything runs **on your machine**. There is no hosted control plane; data, credentials, and workloads stay local.
 
+### Screenshots
+
+**Containers page** — manage Docker and QEMU desktop workloads, check runtime status, and start the sandbox daemon from one place.
+
+![OpenLegion containers page](./docs/screenshots/containers-page.png)
+
+**Desktop VM display** — inspect a sandbox, then open a live Linux desktop over VNC in the app (no separate viewer required).
+
+![OpenLegion desktop VM display](./docs/screenshots/desktop-vm-display.png)
+
 ---
 
 ## Who this is for
@@ -44,9 +54,10 @@ flowchart LR
 ```
 
 1. **Desktop-first** — Primary experience is the Electron app (`bun run dev:desktop`): manage containers, open agent sessions, and review recent work in one place.
-2. **Many containers** — List, create, stop, and remove Docker workloads from the desktop UI or CLI, with optional per-workload network isolation via the sandbox daemon.
-3. **Agents that help** — Sandboxed agents assist with writing Dockerfiles, hardening images, explaining `docker`/`compose` output, and proposing fixes—always subject to permission rules and your approval.
-4. **Security by design** — Linked sessions run file and shell tools inside the container; risky operations require confirmation. The goal is secure **design** and **bring-up**, not unconstrained host access.
+2. **Many containers** — List, create, start, stop, and remove Docker workloads from the desktop UI or CLI, with optional per-workload network isolation via the sandbox daemon.
+3. **Linux desktop VMs** — Launch QEMU desktop sandboxes (Ubuntu ISO or qcow2), view them in-app over VNC, and restart stopped VMs without recreating disks.
+4. **Agents that help** — Sandboxed agents assist with writing Dockerfiles, hardening images, explaining `docker`/`compose` output, and proposing fixes—always subject to permission rules and your approval.
+5. **Security by design** — Linked sessions run file and shell tools inside the container; risky operations require confirmation. The goal is secure **design** and **bring-up**, not unconstrained host access.
 
 Branding uses a Robin Hood motif: defend operators and workloads against opaque, insecure defaults—give teams control on their own hardware.
 
@@ -61,10 +72,11 @@ This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. Th
 | Component | Command / location | Notes |
 | --- | --- | --- |
 | **Desktop app** | `bun run dev:desktop` | Electron UI with Containers, Agents, and Settings navigation |
-| **Containers UI** | Desktop → **Containers** | List running/stopped workloads, create containers, open agent sessions |
-| **Sandbox daemon** | `go run ./cmd/openlegion-microvm` | Per-workload isolated Docker networks ([daemon README](./cmd/openlegion-microvm/README.md)) |
+| **Containers UI** | Desktop → **Containers** | List running/stopped workloads, create containers, inspect logs/shell/desktop, open agent sessions |
+| **Sandbox daemon** | `go run ./cmd/openlegion-microvm` | Isolated Docker networks + QEMU desktop VMs ([daemon README](./cmd/openlegion-microvm/README.md)) |
+| **Desktop auto-start** | Desktop app launch | Starts the sandbox daemon when possible; **Start sandbox daemon** button if it is offline |
 | **Container runtime** | `packages/openlegion/src/container/` | Auto-detects microvm daemon, Docker, or Podman (`OPENLEGION_CONTAINER_RUNTIME`) |
-| **Container HTTP API** | `GET/POST /global/containers` | List, create, stop, and remove containers via the local sidecar |
+| **Container HTTP API** | `GET/POST /global/containers` | List, create, start, stop, and remove containers via the local sidecar |
 | **Container workspaces** | `GET/PUT /global/container-workspaces` | Persist bind mounts and session links per container |
 | **Container CLI** | `openlegion container list\|create\|stop\|remove` | Manage workloads from the terminal |
 | **CLI / TUI** | `bun run dev` | Terminal agent (upstream OpenCode behavior) |
@@ -80,7 +92,11 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 | Feature | Description |
 | --- | --- |
 | **Create containers** | Desktop dialog or CLI—image, name, command, ports, bind mounts |
-| **Isolated sandboxes** | `openlegion-microvm` places each workload on its own Docker network |
+| **Create desktop VMs** | `kind: desktop` with Ubuntu arm64 ISO (Apple Silicon) or qcow2 disk; persisted under `~/.openlegion/qemu-vms` |
+| **Isolated sandboxes** | `openlegion-microvm` places each Docker workload on its own network (`network: isolated (hardened)` in the UI) |
+| **Start stopped workloads** | Restart stopped containers and desktop VMs from the UI or `POST /global/containers/:id/start` |
+| **Logs, shell & desktop** | Inspect dialog with log tail, embedded shell (containers), and noVNC desktop view (QEMU workloads) |
+| **Runtime status** | Desktop shows Docker, sandbox daemon, and QEMU availability before you create workloads |
 | **Open agent session** | Bind a host project directory into a container and start/resume an agent session with `openlegion.container` metadata |
 | **In-container file tools** | When a session has container metadata, `read`, `write`, and `edit` run inside the container via `docker exec` (not on the host) |
 | **In-container shell** | Shell tool wraps commands in `docker exec` for sandboxed sessions |
@@ -90,7 +106,8 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 
 ### Desktop UI
 
-- **Containers page** — card layout with running/stopped status, network label, and actions (open session, stop, remove)
+- **Containers page** — card layout with running/stopped status, isolated-network label, runtime pills, and actions (open session, inspect, start, stop, remove)
+- **Inspect sandbox** — modal with **Logs**, **Shell**, and **Desktop** tabs; live VNC for QEMU desktop VMs
 - **Agents page** — recent agent sessions (`/agents`)
 - **Settings** — in-app settings dialog from the sidebar
 - **Dev channel badge** — neon green `DEV` indicator in the titlebar (dev builds)
@@ -122,7 +139,8 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 ## Requirements
 
 - [Bun](https://bun.sh) **1.3.14+**
-- [Docker](https://docs.docker.com/get-docker/) (or Podman) for container features
+- [Docker](https://docs.docker.com/get-docker/) (or Podman) for container features — on macOS, [Colima](https://github.com/abiosoft/colima) is a common local Docker backend
+- [QEMU](https://www.qemu.org/) (`brew install qemu`) for desktop VM sandboxes on macOS
 - [Go](https://go.dev) **1.22+** (to build/run the sandbox daemon locally)
 - macOS, Linux, or Windows (desktop development is most tested on **macOS** today)
 
@@ -141,8 +159,13 @@ bun run dev:desktop
 # Terminal agent (also useful for debugging)
 bun run dev
 
-# Optional: sandbox daemon (isolated networks per container)
+# Optional: sandbox daemon (isolated Docker networks + QEMU desktops)
+# The desktop app can also start this for you from Containers → Start sandbox daemon
 go run ./cmd/openlegion-microvm
+
+# macOS: ensure Docker and QEMU are available
+colima start          # if you use Colima for Docker
+brew install qemu     # for desktop VM sandboxes
 
 # Container CLI (with local server or daemon running)
 bun run dev -- container list
@@ -172,8 +195,8 @@ When a session is linked to a container (`openlegion.container` metadata), file 
 
 ```
 cmd/
-  openlegion-microvm/   # Go sandbox daemon (isolated Docker networks)
-internal/               # Daemon engine, Docker client, sandbox networking
+  openlegion-microvm/   # Go sandbox daemon (isolated Docker networks + QEMU desktops)
+internal/               # Daemon engine, Docker client, QEMU sandbox, VNC display bridge
 packages/
   openlegion/           # CLI, TUI, local HTTP server, agent + tool runtime
   core/                 # Shared logic (permissions, DB, providers, …)
@@ -204,6 +227,9 @@ Environment variables: `OPENLEGION_*` prefix. Container-related examples:
 | `OPENLEGION_MICROVM_URL` | Sandbox daemon URL (default `http://127.0.0.1:7420`) |
 | `OPENLEGION_MICROVM_LISTEN` | Daemon listen address |
 | `OPENLEGION_SANDBOX_ROOT` | Sandbox metadata directory (default `~/.openlegion/sandboxes`) |
+| `OPENLEGION_QEMU_IMAGE` | Path to Ubuntu arm64 ISO or qcow2 for `kind: desktop` |
+| `OPENLEGION_QEMU_ROOT` | Desktop VM disks (default `~/.openlegion/qemu-vms`) |
+| `OPENLEGION_QEMU_MEMORY_MB` | RAM for desktop VMs (default `2048`) |
 
 ---
 

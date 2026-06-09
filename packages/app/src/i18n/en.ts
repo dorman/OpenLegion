@@ -751,6 +751,7 @@ export const dict = {
   "containers.error.unavailable": "This container is not available. It may have been removed.",
   "containers.runtime.docker": "Docker",
   "containers.runtime.microvm": "Sandbox daemon",
+  "containers.runtime.qemu": "QEMU",
   "containers.table.id": "ID",
   "containers.table.runtime": "Runtime",
   "containers.table.image": "Image",
@@ -759,6 +760,10 @@ export const dict = {
   "containers.create.title": "New container",
   "containers.create.description": "Create a sandboxed container on the local runtime.",
   "containers.create.image": "Image",
+  "containers.create.diskImage": "Disk image or installer ISO",
+  "containers.create.diskImageHint":
+    "Choose a .qcow2 desktop disk, or an Ubuntu .iso installer (creates a new 24 GB disk). On Apple Silicon you must use an arm64/aarch64 ISO — not amd64.",
+  "containers.create.pickDiskImage": "Browse…",
   "containers.create.name": "Name",
   "containers.create.command": "Command",
   "containers.create.publish": "Ports (host:container, comma-separated)",
@@ -799,6 +804,11 @@ export const dict = {
   "containers.inspect.displayUnavailable": "No remote desktop is configured for this workload.",
   "containers.inspect.displayHowTo":
     "To use Desktop: create a container with a VNC image and publish port 5900:5900, or create a Linux desktop (QEMU) workload.",
+  "containers.inspect.displayFocus":
+    "Click inside the black display area to send keyboard and mouse input to the VM.",
+  "containers.inspect.displayMonitor":
+    "If you see (qemu) or monitor help text, you are in the QEMU monitor — not the Linux desktop. Remove this VM, restart the sandbox daemon, create a new desktop, and use Refresh display.",
+  "containers.inspect.displayRefresh": "Refresh display",
   "containers.inspect.displayDisconnected": "The remote desktop connection closed.",
   "containers.create.kind": "Workload type",
   "containers.create.kind.container": "Container",

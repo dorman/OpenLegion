@@ -97,6 +97,21 @@ func (e *DockerSandbox) List(ctx context.Context) ([]types.VMInfo, error) {
 	return out, nil
 }
 
+func (e *DockerSandbox) Start(ctx context.Context, id string) error {
+	record, err := e.findRecord(ctx, id)
+	if err != nil {
+		return err
+	}
+	running, err := e.docker.ContainerRunning(ctx, record.ID)
+	if err != nil {
+		return err
+	}
+	if running {
+		return nil
+	}
+	return e.docker.StartContainer(ctx, record.ID)
+}
+
 func (e *DockerSandbox) Stop(ctx context.Context, id string) error {
 	record, err := e.findRecord(ctx, id)
 	if err != nil {
