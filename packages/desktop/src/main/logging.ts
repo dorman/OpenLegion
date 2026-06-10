@@ -72,6 +72,18 @@ export async function exportDebugLogs() {
   }
 }
 
+export { classifyProcessExit, type ProcessExitKind } from "./process-exit"
+
+export function processMeta(sessionStartedAt?: number) {
+  return {
+    pid: process.pid,
+    ppid: process.ppid,
+    packaged: app.isPackaged,
+    uptimeMs: Math.round(process.uptime() * 1000),
+    sessionMs: sessionStartedAt ? Date.now() - sessionStartedAt : undefined,
+  }
+}
+
 export function write(
   name: string,
   message: string,

@@ -7,6 +7,7 @@ import { usePlatform } from "@/context/platform"
 import type { ContainerInfo } from "@/utils/containers"
 import type { ContainerWorkspace } from "@/utils/container-workspaces"
 import { DEFAULT_CONTAINER_MOUNT } from "@/utils/container-workspaces"
+import { isAgentCapable } from "@/utils/container-workload"
 
 export function DialogContainerOpenSession(props: {
   container: ContainerInfo
@@ -29,6 +30,11 @@ export function DialogContainerOpenSession(props: {
   }
 
   async function submit() {
+    if (!isAgentCapable(props.container)) {
+      setError(language.t("containers.openSession.desktopUnsupported"))
+      return
+    }
+
     const directory = projectDirectory().trim()
     if (!directory) {
       setError(language.t("containers.openSession.projectRequired"))
@@ -55,6 +61,11 @@ export function DialogContainerOpenSession(props: {
       fit
     >
       <div class="flex flex-col gap-4 px-4 pb-2">
+        <Show when={!isAgentCapable(props.container)}>
+          <p class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 text-sm text-v2-text-text-muted">
+            {language.t("containers.openSession.desktopUnsupported")}
+          </p>
+        </Show>
         <div class="rounded-lg border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 text-sm">
           <div class="font-mono text-xs text-v2-text-text-muted">{props.container.id}</div>
           <div class="mt-1 text-v2-text-text-base">{props.container.image}</div>
@@ -91,7 +102,7 @@ export function DialogContainerOpenSession(props: {
         <ButtonV2 variant="ghost" onClick={() => dialog.close()} disabled={pending()}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2 onClick={() => void submit()} disabled={pending()}>
+        <ButtonV2 onClick={() => void submit()} disabled={pending() || !isAgentCapable(props.container)}>
           {language.t("containers.openSession.submit")}
         </ButtonV2>
       </DialogFooter>

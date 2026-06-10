@@ -6,6 +6,7 @@ import type { DesktopMenuAction } from "@openlegion-ai/app/desktop-menu"
 import type {
   ContainerRuntimeStatus,
   EnsureMicrovmDaemonResult,
+  EnsureDesktopImageResult,
   FatalRendererError,
   ServerReadyData,
   TitlebarTheme,
@@ -50,6 +51,7 @@ type Deps = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>
   containerPtyCreate: (
     event: IpcMainInvokeEvent,
     input: { command: string; cols: number; rows: number },
@@ -90,6 +92,9 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
   ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
+  ipcMain.handle("ensure-desktop-image", (_event: IpcMainInvokeEvent, presetId: string) =>
+    deps.ensureDesktopImage(presetId),
+  )
   ipcMain.handle(
     "container-pty-create",
     (event: IpcMainInvokeEvent, input: { command: string; cols: number; rows: number }) =>

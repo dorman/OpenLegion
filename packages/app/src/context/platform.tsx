@@ -17,6 +17,13 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  arch: "arm64" | "x64"
+}
+
+export type EnsureDesktopImageResult = {
+  ok: boolean
+  path?: string
+  error?: string
 }
 
 export type EnsureMicrovmDaemonResult = {
@@ -143,6 +150,9 @@ export type Platform = {
 
   /** Start the local sandbox daemon when possible (desktop only) */
   ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
+
+  /** Download or resolve a preset desktop VM image (desktop only) */
+  ensureDesktopImage?(presetId: string): Promise<EnsureDesktopImageResult>
 
   /** Interactive container shell bridged through the desktop main process (desktop only) */
   containerPty?: ContainerPty

@@ -22,13 +22,14 @@ import (
 )
 
 type qemuRecord struct {
-	ID       string `json:"id"`
-	Image    string `json:"image"`
-	Name     string `json:"name,omitempty"`
-	Status   string `json:"status"`
-	MemoryMB int    `json:"memoryMb"`
-	VNCPort  int    `json:"vncPort"`
-	PID      int    `json:"pid,omitempty"`
+	ID           string `json:"id"`
+	Image        string `json:"image"`
+	Name         string `json:"name,omitempty"`
+	Status       string `json:"status"`
+	MemoryMB     int    `json:"memoryMb"`
+	VNCPort      int    `json:"vncPort"`
+	SerialSocket string `json:"serialSocket,omitempty"`
+	PID          int    `json:"pid,omitempty"`
 }
 
 type QemuSandbox struct {
@@ -93,14 +94,16 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		return Result{}, err
 	}
 
+	serialSocket := serialSocketPath(vmDir)
 	pid, err := startQemu(ctx, qemuStartConfig{
-		vmDir:    vmDir,
-		disk:     disk,
-		iso:      isoPath,
-		memoryMB: memoryMB,
-		vncPort:  vncPort,
-		pidFile:  filepath.Join(vmDir, "qemu.pid"),
-		logFile:  filepath.Join(vmDir, "qemu.log"),
+		vmDir:        vmDir,
+		disk:         disk,
+		iso:          isoPath,
+		memoryMB:     memoryMB,
+		vncPort:      vncPort,
+		serialSocket: serialSocket,
+		pidFile:      filepath.Join(vmDir, "qemu.pid"),
+		logFile:      filepath.Join(vmDir, "qemu.log"),
 	})
 	if err != nil {
 		_ = os.RemoveAll(vmDir)
@@ -108,13 +111,14 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	}
 
 	record := qemuRecord{
-		ID:       id,
-		Image:    filepath.Base(image),
-		Name:     name,
-		Status:   "running",
-		MemoryMB: memoryMB,
-		VNCPort:  vncPort,
-		PID:      pid,
+		ID:           id,
+		Image:        filepath.Base(image),
+		Name:         name,
+		Status:       "running",
+		MemoryMB:     memoryMB,
+		VNCPort:      vncPort,
+		SerialSocket: serialSocket,
+		PID:          pid,
 	}
 	if err := writeQemuRecord(vmDir, record); err != nil {
 		_ = stopPID(pid)
@@ -194,13 +198,15 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 		}
 	}
 
+	serialSocket := serialSocketPath(vmDir)
 	pid, err := startQemu(ctx, qemuStartConfig{
-		vmDir:    vmDir,
-		disk:     disk,
-		memoryMB: memoryMB,
-		vncPort:  vncPort,
-		pidFile:  filepath.Join(vmDir, "qemu.pid"),
-		logFile:  filepath.Join(vmDir, "qemu.log"),
+		vmDir:        vmDir,
+		disk:         disk,
+		memoryMB:     memoryMB,
+		vncPort:      vncPort,
+		serialSocket: serialSocket,
+		pidFile:      filepath.Join(vmDir, "qemu.pid"),
+		logFile:      filepath.Join(vmDir, "qemu.log"),
 	})
 	if err != nil {
 		return err
@@ -210,6 +216,7 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 	record.PID = pid
 	record.VNCPort = vncPort
 	record.MemoryMB = memoryMB
+	record.SerialSocket = serialSocket
 	return writeQemuRecord(vmDir, record)
 }
 
@@ -265,10 +272,18 @@ func (e *QemuSandbox) ShellCommand(ctx context.Context, id string) (string, erro
 	if err != nil {
 		return "", err
 	}
+	record = refreshQemuStatus(record)
 	if record.Status != "running" {
 		return "", fmt.Errorf("desktop vm is not running")
 	}
-	return "", fmt.Errorf("interactive shell is not available for desktop vms yet")
+	socket := record.SerialSocket
+	if socket == "" {
+		socket = serialSocketPath(filepath.Join(e.rootDir, record.ID))
+	}
+	if _, err := os.Stat(socket); err != nil {
+		return "", fmt.Errorf("serial console is unavailable — restart this desktop vm to enable shell access")
+	}
+	return serialConsoleCommand(socket)
 }
 
 func (e *QemuSandbox) Display(ctx context.Context, id string) (DisplayInfo, error) {
@@ -307,13 +322,14 @@ func (e *QemuSandbox) findRecord(id string) (qemuRecord, error) {
 }
 
 type qemuStartConfig struct {
-	vmDir    string
-	disk     string
-	iso      string
-	memoryMB int
-	vncPort  int
-	pidFile  string
-	logFile  string
+	vmDir        string
+	disk         string
+	iso          string
+	memoryMB     int
+	vncPort      int
+	serialSocket string
+	pidFile      string
+	logFile      string
 }
 
 func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
@@ -334,14 +350,16 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 		"-device", "qemu-xhci,id=xhci",
 		"-device", "usb-kbd,bus=xhci.0",
 		"-device", "usb-tablet,bus=xhci.0",
-		"-serial", "null",
+	}
+	args = appendSerialConsoleArgs(args, cfg.serialSocket)
+	args = append(args,
 		"-parallel", "null",
 		"-monitor", "none",
 		"-display", "none",
 		"-vnc", fmt.Sprintf("127.0.0.1:%d", cfg.vncPort-5900),
 		"-daemonize",
 		"-pidfile", cfg.pidFile,
-	}
+	)
 	args = append(qemuFirmwareArgs(cfg.vmDir), args...)
 	if cfg.iso != "" {
 		args = append(args,
@@ -647,4 +665,27 @@ func stopPID(pid int) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return process.Kill()
+}
+
+func serialSocketPath(vmDir string) string {
+	return filepath.Join(vmDir, "serial.sock")
+}
+
+func appendSerialConsoleArgs(args []string, socket string) []string {
+	_ = os.Remove(socket)
+	return append(args,
+		"-chardev", "socket,id=serial0,path="+socket+",server=on,wait=off,format=raw",
+		"-serial", "chardev:serial0",
+	)
+}
+
+func serialConsoleCommand(socket string) (string, error) {
+	quoted := strconv.Quote(socket)
+	if _, err := exec.LookPath("socat"); err == nil {
+		return "socat STDIO,raw,echo=0 UNIX-CONNECT:" + quoted, nil
+	}
+	if _, err := exec.LookPath("nc"); err == nil {
+		return "nc -U " + quoted, nil
+	}
+	return "", fmt.Errorf("install socat to use the desktop serial console (brew install socat)")
 }

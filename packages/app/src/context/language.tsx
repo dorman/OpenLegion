@@ -97,8 +97,20 @@ const LABEL_KEY: Record<Locale, keyof Dictionary> = {
   tr: "language.tr",
 }
 
-const base = i18n.flatten({ ...en, ...uiEn })
+function englishDictionary() {
+  return i18n.flatten({ ...en, ...uiEn })
+}
+
+const base = englishDictionary()
 const dicts = new Map<Locale, Dictionary>([["en", base]])
+
+if (import.meta.hot) {
+  import.meta.hot.accept(["@/i18n/en", "@openlegion-ai/ui/i18n/en"], () => {
+    const next = englishDictionary()
+    dicts.set("en", next)
+    window.location.reload()
+  })
+}
 
 const merge = (app: Promise<Source>, ui: Promise<Source>) =>
   Promise.all([app, ui]).then(([a, b]) => ({ ...base, ...i18n.flatten({ ...a.dict, ...b.dict }) }) as Dictionary)

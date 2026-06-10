@@ -12,6 +12,7 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  arch: "arm64" | "x64"
 }
 
 const requiredMicrovmFeatures = ["logs", "shell", "display", "desktop-v2"]
@@ -74,7 +75,13 @@ function daemonEnv() {
 export async function containerRuntimeStatus(): Promise<ContainerRuntimeStatus> {
   const url = microvmUrl()
   const [docker, qemu, health] = await Promise.all([dockerAvailable(), qemuAvailable(), microvmHealth(url)])
-  return { docker, qemu, microvm: health.ok === true && health.supported, microvmUrl: url }
+  return {
+    docker,
+    qemu,
+    microvm: health.ok === true && health.supported,
+    microvmUrl: url,
+    arch: process.arch === "arm64" ? "arm64" : "x64",
+  }
 }
 
 async function repoRoot() {

@@ -2,6 +2,11 @@ import { Spinner } from "@openlegion-ai/ui/spinner"
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 
+function logDesktopDisplay(event: string, extra?: Record<string, unknown>) {
+  const payload = extra ? ` ${JSON.stringify(extra)}` : ""
+  console.info(`[openlegion:desktop-display] ${event}${payload}`)
+}
+
 export function ContainerDisplay(props: {
   url: string
   password?: string
@@ -30,6 +35,7 @@ export function ContainerDisplay(props: {
 
   createEffect(() => {
     if (!props.active) {
+      logDesktopDisplay("inactive")
       client?.disconnect()
       client = undefined
       setConnecting(true)
@@ -43,6 +49,7 @@ export function ContainerDisplay(props: {
     setConnecting(true)
     setConnected(false)
     setError(undefined)
+    logDesktopDisplay("connecting", { url: props.url })
 
     void import("@novnc/novnc/lib/rfb.js")
       .then(({ default: RFBClient }) => {
@@ -56,27 +63,32 @@ export function ContainerDisplay(props: {
         client.focusOnClick = true
         client.clipViewport = false
         client.addEventListener("connect", () => {
+          logDesktopDisplay("connected")
           setConnecting(false)
           setConnected(true)
           focusDisplay()
         })
         client.addEventListener("disconnect", (event: Event) => {
+          const detail = (event as CustomEvent<{ clean?: boolean }>).detail
+          logDesktopDisplay("disconnected", { clean: detail?.clean ?? false })
           setConnecting(false)
           setConnected(false)
-          const detail = (event as CustomEvent<{ clean?: boolean }>).detail
           if (!detail?.clean) {
             setError(language.t("containers.inspect.displayDisconnected"))
           }
         })
       })
       .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err)
+        logDesktopDisplay("connect failed", { error: message })
         setConnecting(false)
         setConnected(false)
-        setError(err instanceof Error ? err.message : String(err))
+        setError(message)
       })
 
     return () => {
       cancelled = true
+      logDesktopDisplay("cleanup")
       client?.disconnect()
       client = undefined
     }
@@ -102,7 +114,10 @@ export function ContainerDisplay(props: {
           ref={viewport}
           tabindex={0}
           class="h-full w-full outline-none"
-          onMouseDown={() => focusDisplay()}
+          onMouseDown={() => {
+            logDesktopDisplay("viewport focus")
+            focusDisplay()
+          }}
           onKeyDown={blockMonitorHotkey}
         />
       </div>
