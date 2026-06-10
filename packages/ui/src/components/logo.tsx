@@ -1,17 +1,18 @@
-import { type ComponentProps } from "solid-js"
-
-import iconUrl from "../assets/brand/openlegion-icon.png"
-import wordmarkUrl from "../assets/brand/openlegion-wordmark.png"
+import markUrl from "../assets/brand/openlegion-mark.base64"
+import logoUrl from "../assets/brand/openlegion-logo.base64"
 
 const imgClass = (className: string | undefined) => ({ [className ?? ""]: !!className })
 
-/** Hooded archer mark with cyber shield — compact icon */
+/** Hooded legion mark — circular icon without eyes */
 export const Mark = (props: { class?: string; alt?: string }) => {
+  const label = props.alt ?? "OpenLegion"
+  const decorative = props.alt === ""
   return (
     <img
       data-component="logo-mark"
-      src={iconUrl}
-      alt={props.alt ?? "OpenLegion"}
+      src={markUrl}
+      alt={decorative ? "" : label}
+      aria-hidden={decorative ? true : undefined}
       classList={imgClass(props.class)}
       draggable={false}
     />
@@ -19,12 +20,12 @@ export const Mark = (props: { class?: string; alt?: string }) => {
 }
 
 /** Loading splash emblem */
-export const Splash = (props: Pick<ComponentProps<"img">, "ref" | "class" | "alt">) => {
+export const Splash = (props: { ref?: (el: HTMLImageElement) => void; class?: string; alt?: string }) => {
   return (
     <img
       ref={props.ref}
       data-component="logo-splash"
-      src={iconUrl}
+      src={markUrl}
       alt={props.alt ?? "OpenLegion"}
       classList={imgClass(props.class)}
       draggable={false}
@@ -32,12 +33,12 @@ export const Splash = (props: Pick<ComponentProps<"img">, "ref" | "class" | "alt
   )
 }
 
-/** Full wordmark for headers and home */
+/** Stacked mark + wordmark for headers and home */
 export const Logo = (props: { class?: string; alt?: string }) => {
   return (
     <img
       data-component="logo-wordmark"
-      src={wordmarkUrl}
+      src={logoUrl}
       alt={props.alt ?? "OpenLegion"}
       classList={imgClass(props.class)}
       draggable={false}
