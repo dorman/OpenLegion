@@ -1,6 +1,7 @@
 import * as pty from "@lydell/node-pty"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
+import { write as writeLog } from "./logging"
 
 type Session = {
   proc: pty.IPty
@@ -25,6 +26,47 @@ export function parseContainerExec(command: string) {
   return { runtime, containerId, shell }
 }
 
+function unquoteShellArg(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return
+  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+    try {
+      return JSON.parse(trimmed) as string
+    } catch {
+      return trimmed.slice(1, -1)
+    }
+  }
+  return trimmed
+}
+
+export function parseSerialConsoleCommand(command: string) {
+  const trimmed = command.trim()
+
+  const socatMatch = trimmed.match(/^socat\s+STDIO,raw,echo=0\s+UNIX-CONNECT:(.+)$/)
+  if (socatMatch) {
+    const socket = unquoteShellArg(socatMatch[1]!)
+    if (!socket) return
+    return { runtime: "socat", args: ["STDIO,raw,echo=0", `UNIX-CONNECT:${socket}`] }
+  }
+
+  const ncMatch = trimmed.match(/^nc\s+-U\s+(.+)$/)
+  if (ncMatch) {
+    const socket = unquoteShellArg(ncMatch[1]!)
+    if (!socket) return
+    return { runtime: "nc", args: ["-U", socket] }
+  }
+}
+
+function ptyOptions(input: { cols: number; rows: number }) {
+  return {
+    name: "xterm-256color",
+    cols: input.cols,
+    rows: input.rows,
+    cwd: homedir(),
+    env: process.env,
+  }
+}
+
 export function createContainerPty(input: {
   command: string
   cols: number
@@ -33,16 +75,21 @@ export function createContainerPty(input: {
   onExit: (code: number) => void
 }) {
   const parsed = parseContainerExec(input.command)
-  if (!parsed) throw new Error("Unsupported container shell command")
+  const serial = parsed ? undefined : parseSerialConsoleCommand(input.command)
+  if (!parsed && !serial) throw new Error("Unsupported container shell command")
 
   const id = randomUUID()
-  const proc = pty.spawn(parsed.runtime, ["exec", "-i", "-t", parsed.containerId, ...parsed.shell], {
-    name: "xterm-256color",
-    cols: input.cols,
-    rows: input.rows,
-    cwd: homedir(),
-    env: process.env,
+  const mode = parsed ? "container-exec" : "serial-console"
+  writeLog("pty", "spawning session", {
+    id,
+    mode,
+    runtime: parsed?.runtime ?? serial?.runtime,
+    containerId: parsed?.containerId,
+    command: input.command,
   })
+  const proc = parsed
+    ? pty.spawn(parsed.runtime, ["exec", "-i", "-t", parsed.containerId, ...parsed.shell], ptyOptions(input))
+    : pty.spawn(serial!.runtime, serial!.args, ptyOptions(input))
 
   sessions.set(id, { proc })
   proc.onData(input.onData)

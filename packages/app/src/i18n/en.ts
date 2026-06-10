@@ -729,11 +729,11 @@ export const dict = {
   "debugBar.mem.tipUnavailable": "Used JS heap vs heap limit. Chromium only.",
   "debugBar.mem.tip": "Used JS heap vs heap limit. {{used}} of {{limit}}.",
 
-  "containers.title": "Containers",
+  "containers.title": "Sandboxes",
   "containers.description": "Run and manage sandbox workloads on your machine.",
-  "containers.nav": "Containers",
+  "containers.nav": "Sandboxes",
   "containers.nav.home": "Home",
-  "containers.new": "New container",
+  "containers.new": "New sandbox",
   "containers.empty": "No containers yet.",
   "containers.start": "Start",
   "containers.start.failed": "Failed to start container",
@@ -781,7 +781,7 @@ export const dict = {
   "containers.openSession.submit": "Open session",
   "containers.openSession.mount": "Container mount: {{path}}",
   "containers.table.project": "Project",
-  "containers.running.title": "Running containers",
+  "containers.running.title": "Sandboxes",
   "containers.running.active": "{{count}} active",
   "containers.status.running": "running",
   "containers.status.stopped": "stopped",
@@ -814,6 +814,41 @@ export const dict = {
   "containers.create.kind.container": "Container",
   "containers.create.kind.desktop": "Linux desktop (QEMU)",
   "containers.create.memory": "Memory (MB)",
+  "containers.create.desktopHint":
+    "Linux desktops are for visual inspection over VNC. Use a container workload when you want an agent session with in-sandbox tools.",
+  "containers.create.preset": "Installer preset",
+  "containers.create.preset.custom": "Custom disk or ISO",
+  "containers.create.preset.ubuntu2404Arm64": "Ubuntu 24.04 LTS server (arm64)",
+  "containers.create.preset.ubuntu2404Amd64": "Ubuntu 24.04 LTS server (amd64)",
+  "containers.create.preset.downloadHint":
+    "The installer ISO will be downloaded to ~/.openlegion/images on first create.",
+  "containers.create.preset.downloading": "Downloading installer image…",
+  "containers.create.preset.downloadFailed": "Failed to download the installer image.",
+  "containers.create.preset.downloadUnavailable": "Desktop image download is only available in OpenLegion Desktop.",
+  "containers.create.imageRequired": "Choose an image or installer preset.",
+  "containers.badge.container": "Container",
+  "containers.badge.desktop": "Linux desktop",
+  "containers.badge.agentLinked": "Agent linked",
+  "containers.desktop.agentHint":
+    "Use Inspect → Desktop for the live Linux desktop. Agent sessions are available on container workloads.",
+  "containers.onboarding.title": "Get started with sandboxes",
+  "containers.onboarding.description":
+    "Create an isolated container for agent work, or a Linux desktop VM to inspect visually in the app.",
+  "containers.onboarding.dismiss": "Dismiss",
+  "containers.onboarding.step1.title": "1. Start local runtimes",
+  "containers.onboarding.step1.description":
+    "OpenLegion needs the sandbox daemon and Docker or QEMU. Use the button below if the daemon is offline.",
+  "containers.onboarding.step1.ready": "Sandbox daemon is ready.",
+  "containers.onboarding.step2.title": "2. Create your first sandbox",
+  "containers.onboarding.step2.description":
+    "Choose Container for agent sessions with bind mounts, or Linux desktop (QEMU) for an in-app VNC desktop.",
+  "containers.onboarding.step3.title": "3. Inspect or open an agent session",
+  "containers.onboarding.step3.description":
+    "Containers: Inspect for logs/shell, or Open session to bind a project and run an agent. Desktops: Inspect → Desktop for the live GUI.",
+  "containers.openSession.desktopUnsupported":
+    "Agent sessions are not available for Linux desktop VMs. Create a container workload to run an agent inside a sandbox.",
+  "containers.inspect.desktopShellHint":
+    "Serial console access appears after the guest OS is installed. Install Ubuntu from the Desktop tab, then restart the VM if shell stays unavailable.",
   "containers.agentSession.title": "Agent session",
   "containers.agentSession.empty": "No active agent session linked to a container.",
   "desktop.nav.label": "Desktop navigation",

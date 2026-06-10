@@ -7,6 +7,7 @@ import { createMemo, createSignal, For, Show } from "solid-js"
 import { DialogContainerCreate } from "@/components/dialog-container-create"
 import { DialogContainerInspect } from "@/components/dialog-container-inspect"
 import { DialogContainerOpenSession } from "@/components/dialog-container-open-session"
+import { ContainersOnboarding, readOnboardingDismissed } from "@/components/containers-onboarding"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -29,6 +30,7 @@ import {
   type ContainerCreateInput,
   type ContainerInfo,
 } from "@/utils/containers"
+import { isAgentCapable, workloadKindKey } from "@/utils/container-workload"
 import { showToast } from "@/utils/toast"
 
 function containerLabel(item: ContainerInfo) {
@@ -93,6 +95,21 @@ export default function ContainersPage() {
   )
 
   const agentWorkspace = createMemo(() => activeAgentWorkspace(workspaces.data ?? []))
+
+  const showOnboarding = createMemo(
+    () =>
+      (containers.data?.length ?? 0) === 0 &&
+      !containers.isLoading &&
+      !readOnboardingDismissed(platform.storage),
+  )
+
+  const canCreate = createMemo(() => enabled() && runtime.data?.arch !== undefined)
+
+  function showCreateDialog() {
+    const arch = runtime.data?.arch
+    if (!arch) return
+    dialog.show(() => <DialogContainerCreate onCreate={handleCreate} arch={arch} />)
+  }
 
   if (platform.platform !== "desktop") {
     return <Navigate href="/" />
@@ -232,7 +249,7 @@ export default function ContainersPage() {
       <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-8 py-10">
         <header class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex min-w-0 items-center gap-3">
-            <h1 class="text-xl text-v2-text-text-base">{language.t("containers.running.title")}</h1>
+            <h1 class="text-xl text-v2-text-text-base">{language.t("containers.title")}</h1>
             <Show when={activeCount() > 0}>
               <span class="desktop-pill desktop-pill-success">
                 {language.t("containers.running.active", { count: activeCount() })}
@@ -248,8 +265,8 @@ export default function ContainersPage() {
               </ButtonV2>
             </Show>
             <ButtonV2
-              onClick={() => dialog.show(() => <DialogContainerCreate onCreate={handleCreate} />)}
-              disabled={!enabled()}
+              onClick={() => showCreateDialog()}
+              disabled={!canCreate()}
             >
               {language.t("containers.new")}
             </ButtonV2>
@@ -287,11 +304,26 @@ export default function ContainersPage() {
           )}
         </Show>
 
+        <Show when={showOnboarding()}>
+          <ContainersOnboarding
+            runtime={runtime.data}
+            daemonReady={daemonReady()}
+            onEnsureDaemon={() => void ensureDaemon()}
+            onCreate={showCreateDialog}
+            ensuringDaemon={ensuringDaemon()}
+            storage={platform.storage}
+          />
+        </Show>
+
         <section class="flex min-h-0 flex-1 flex-col gap-3">
           <Show when={!containers.isLoading} fallback={<div class="flex justify-center p-10"><Spinner /></div>}>
             <Show
               when={(containers.data?.length ?? 0) > 0}
-              fallback={<div class="py-10 text-center text-sm text-v2-text-text-muted">{language.t("containers.empty")}</div>}
+              fallback={
+                <Show when={!showOnboarding()}>
+                  <div class="py-10 text-center text-sm text-v2-text-text-muted">{language.t("containers.empty")}</div>
+                </Show>
+              }
             >
               <For each={containers.data ?? []}>
                 {(item) => (
@@ -370,24 +402,38 @@ function ContainerCard(props: {
   onRemove: () => void
 }) {
   const running = () => (props.item.status ?? "stopped") === "running"
+  const agentCapable = () => isAgentCapable(props.item)
 
   return (
     <article class="desktop-container-card">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 font-mono text-sm text-v2-text-text-base">{containerLabel(props.item)}</div>
-        <span
-          classList={{
-            "desktop-pill": true,
-            "desktop-pill-running": running(),
-            "desktop-pill-stopped": !running(),
-          }}
-        >
-          {props.language.t(running() ? "containers.status.running" : "containers.status.stopped")}
-        </span>
+        <div class="flex flex-wrap justify-end gap-2">
+          <span class="desktop-pill desktop-pill-stopped">{props.language.t(workloadKindKey(props.item))}</span>
+          <Show when={props.workspace?.sessionId}>
+            <span class="desktop-pill desktop-pill-success">{props.language.t("containers.badge.agentLinked")}</span>
+          </Show>
+          <span
+            classList={{
+              "desktop-pill": true,
+              "desktop-pill-running": running(),
+              "desktop-pill-stopped": !running(),
+            }}
+          >
+            {props.language.t(running() ? "containers.status.running" : "containers.status.stopped")}
+          </span>
+        </div>
       </div>
-      <div class="text-xs text-v2-text-text-muted">{props.language.t(containerNetwork(props.item))}</div>
+      <div class="text-xs text-v2-text-text-muted">
+        {props.item.image}
+        <span class="mx-2">·</span>
+        {props.language.t(containerNetwork(props.item))}
+      </div>
+      <Show when={!agentCapable()}>
+        <p class="mt-2 text-xs leading-relaxed text-v2-text-text-muted">{props.language.t("containers.desktop.agentHint")}</p>
+      </Show>
       <div class="mt-2 flex flex-wrap gap-2">
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession}>
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession} disabled={!agentCapable()}>
           {props.language.t("containers.openSession")}
         </ButtonV2>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>

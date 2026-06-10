@@ -13,6 +13,13 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  arch: "arm64" | "x64"
+}
+
+export type EnsureDesktopImageResult = {
+  ok: boolean
+  path?: string
+  error?: string
 }
 
 export type EnsureMicrovmDaemonResult = {
@@ -101,6 +108,7 @@ export type ElectronAPI = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>
   containerPtyCreate: (input: {
     command: string
     cols: number

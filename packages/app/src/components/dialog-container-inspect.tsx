@@ -18,6 +18,7 @@ import {
   startContainer,
   type ContainerInfo,
 } from "@/utils/containers"
+import { inspectDefaultTab, isDesktopWorkload } from "@/utils/container-workload"
 import { showToast } from "@/utils/toast"
 
 type InspectTab = "logs" | "shell" | "display"
@@ -32,7 +33,7 @@ export function DialogContainerInspect(props: { container: ContainerInfo; onStar
   const platform = usePlatform()
   const server = useServer()
   const dialog = useDialog()
-  const [tab, setTab] = createSignal<InspectTab>("logs")
+  const [tab, setTab] = createSignal<InspectTab>(inspectDefaultTab(props.container))
   const [logs, setLogs] = createSignal("")
   const [shellCommand, setShellCommand] = createSignal<string | undefined>()
   const [logsError, setLogsError] = createSignal<string | undefined>()
@@ -51,6 +52,7 @@ export function DialogContainerInspect(props: { container: ContainerInfo; onStar
     const command = shellCommand()
     if (command) return command
     if (!running()) return ""
+    if (isDesktopWorkload(props.container)) return ""
     return defaultShellCommand(props.container)
   }
   const shellReady = () => running() && !!platform.containerPty
@@ -189,6 +191,10 @@ export function DialogContainerInspect(props: { container: ContainerInfo; onStar
 
   createEffect(() => {
     if (tab() !== "display") return
+    console.info("[openlegion:desktop-display] inspect tab opened", {
+      containerId: props.container.id,
+      kind: props.container.kind,
+    })
     void refreshDisplay()
   })
 
@@ -271,6 +277,9 @@ export function DialogContainerInspect(props: { container: ContainerInfo; onStar
         </Show>
 
         <Show when={tab() === "shell"}>
+          <Show when={isDesktopWorkload(props.container)}>
+            <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.inspect.desktopShellHint")}</p>
+          </Show>
           <Show
             when={platform.containerPty}
             fallback={

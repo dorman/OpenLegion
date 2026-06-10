@@ -33,6 +33,7 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  arch: "arm64" | "x64"
 }
 
 async function containerFetch(server: ServerConnection.HttpBase, path: string, init?: RequestInit) {

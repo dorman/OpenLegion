@@ -288,6 +288,8 @@ const createPlatform = (): Platform => {
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
 
+    ensureDesktopImage: (presetId) => window.api.ensureDesktopImage(presetId),
+
     containerPty: {
       create: (command, size) => window.api.containerPtyCreate({ command, ...size }),
       write: (id, data) => window.api.containerPtyWrite(id, data),

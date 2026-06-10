@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
 import { PINCH_ZOOM_ENABLED_KEY } from "./constants"
-import { exportDebugLogs, write as writeLog } from "./logging"
+import { classifyProcessExit, exportDebugLogs, processMeta, write as writeLog } from "./logging"
 import { getStore } from "./store"
 import { createUnresponsiveSampler } from "./unresponsive"
 
@@ -257,6 +257,7 @@ function wireWindowRecovery(win: BrowserWindow, name: string) {
 
   const show = async (message: string, detail: string, wait: boolean) => {
     if (showing || win.isDestroyed()) return
+    writeLog("lifecycle", "showing error dialog", { window: name, message, detail, wait, ...processMeta() }, "warn")
     showing = true
     try {
       while (!win.isDestroyed()) {
@@ -315,15 +316,26 @@ function wireWindowRecovery(win: BrowserWindow, name: string) {
   })
   win.webContents.on("render-process-gone", (_event, details) => {
     sampler.stopAndFlush()
+    const kind = classifyProcessExit(details)
     writeLog(
-      "window",
+      "lifecycle",
       "renderer process gone",
-      { window: name, currentURL: win.webContents.getURL(), details },
+      { window: name, currentURL: win.webContents.getURL(), kind, ...processMeta(), details },
       "error",
     )
+    const externalKill = kind === "external-sigterm"
     void show(
-      "OpenLegion window terminated unexpectedly",
-      [`Window: ${name}`, `Reason: ${details.reason}`, `Code: ${details.exitCode ?? "<unknown>"}`].join("\n"),
+      externalKill && !app.isPackaged
+        ? "OpenLegion development server was stopped"
+        : "OpenLegion window terminated unexpectedly",
+      externalKill && !app.isPackaged
+        ? [
+            `Window: ${name}`,
+            "The dev process received SIGTERM (external shutdown).",
+            "This is not a crash from the desktop sandbox view.",
+            "Run `bun run dev:desktop` in your own terminal for uninterrupted testing.",
+          ].join("\n")
+        : [`Window: ${name}`, `Reason: ${details.reason}`, `Code: ${details.exitCode ?? "<unknown>"}`].join("\n"),
       false,
     )
   })

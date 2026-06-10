@@ -14,7 +14,15 @@ import type { ServerReadyData, WslConfig } from "../preload/types"
 import { checkAppExists, resolveAppPath, wslPath } from "./apps"
 import { CHANNEL, UPDATER_ENABLED } from "./constants"
 import { registerIpcHandlers, sendDeepLinks, sendMenuCommand } from "./ipc"
-import { exportDebugLogs, initCrashReporter, initLogging, startNetLog, write as writeLog } from "./logging"
+import {
+  classifyProcessExit,
+  exportDebugLogs,
+  initCrashReporter,
+  initLogging,
+  processMeta,
+  startNetLog,
+  write as writeLog,
+} from "./logging"
 import { parseMarkdown } from "./markdown"
 import { createMenu } from "./menu"
 import {
@@ -34,6 +42,7 @@ import {
   setDockIcon,
 } from "./windows"
 import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
+import { ensureDesktopImage } from "./desktop-images"
 import {
   closeAllContainerPtys,
   closeContainerPty,
@@ -61,6 +70,7 @@ const jsCallStackFeature = "DocumentPolicyIncludeJSCallStacksInCrashReports"
 let logger: ReturnType<typeof initLogging>
 let mainWindow: BrowserWindow | null = null
 let server: SidecarListener | null = null
+let sessionStartedAt = Date.now()
 
 const pendingDeepLinks: string[] = []
 
@@ -139,6 +149,7 @@ const main = Effect.gen(function* () {
     onboardingTestRoot ? join(onboardingTestRoot, "desktop") : join(app.getPath("appData"), appId),
   )
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
+  sessionStartedAt = Date.now()
   logger = initLogging()
   initCrashReporter()
 
@@ -187,20 +198,41 @@ const main = Effect.gen(function* () {
   })
 
   app.on("before-quit", () => {
+    writeLog("lifecycle", "before-quit", processMeta(sessionStartedAt))
     closeAllContainerPtys()
     void killSidecar()
   })
 
   app.on("will-quit", () => {
+    writeLog("lifecycle", "will-quit", processMeta(sessionStartedAt))
     void killSidecar()
   })
 
   app.on("child-process-gone", (_event, details) => {
-    writeLog("utility", "child process gone", { details }, "error")
+    writeLog(
+      "lifecycle",
+      "child process gone",
+      {
+        ...processMeta(sessionStartedAt),
+        kind: classifyProcessExit({ reason: details.reason, exitCode: details.exitCode }),
+        details,
+      },
+      "error",
+    )
   })
 
   app.on("render-process-gone", (_event, webContents, details) => {
-    writeLog("window", "app render process gone", { url: webContents.getURL(), details }, "error")
+    writeLog(
+      "lifecycle",
+      "app render process gone",
+      {
+        ...processMeta(sessionStartedAt),
+        url: webContents.getURL(),
+        kind: classifyProcessExit(details),
+        details,
+      },
+      "error",
+    )
   })
 
   setRelaunchHandler(() => {
@@ -212,7 +244,19 @@ const main = Effect.gen(function* () {
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
-      void killSidecar().finally(() => app.exit(0))
+      writeLog(
+        "lifecycle",
+        "received shutdown signal",
+        { signal, ...processMeta(sessionStartedAt), devGracePeriodMs: app.isPackaged ? 0 : 8_000 },
+        "warn",
+      )
+      void killSidecar().finally(() => {
+        if (!app.isPackaged) {
+          setTimeout(() => app.exit(0), 8_000)
+          return
+        }
+        app.exit(0)
+      })
     })
   }
 
@@ -249,17 +293,24 @@ const main = Effect.gen(function* () {
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
+    ensureDesktopImage: (presetId) => ensureDesktopImage(presetId),
     containerPtyCreate: (event, input) => {
       try {
         let id = ""
         id = createContainerPty({
           ...input,
           onData: (data) => event.sender.send("container-pty-data", id, data),
-          onExit: (code) => event.sender.send("container-pty-exit", id, code),
+          onExit: (code) => {
+            writeLog("pty", "session exited", { id, code, command: input.command }, code === 0 ? "info" : "warn")
+            event.sender.send("container-pty-exit", id, code)
+          },
         })
+        writeLog("pty", "session created", { id, command: input.command })
         return { id }
       } catch (error) {
-        return { error: error instanceof Error ? error.message : String(error) }
+        const message = error instanceof Error ? error.message : String(error)
+        writeLog("pty", "session create failed", { command: input.command, error: message }, "error")
+        return { error: message }
       }
     },
     containerPtyWrite: (id, data) => writeContainerPty(id, data),
