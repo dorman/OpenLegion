@@ -4,10 +4,20 @@ import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { createStore } from "solid-js/store"
 import { createMemo, createSignal, For, Show } from "solid-js"
+import type { JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { presetsForArch } from "@/utils/desktop-presets"
 import type { ContainerCreateInput } from "@/utils/containers"
+
+function FormSection(props: { title: string; children: JSX.Element }) {
+  return (
+    <section class="desktop-form-section">
+      <h3 class="desktop-form-section-title">{props.title}</h3>
+      <div class="flex flex-col gap-3">{props.children}</div>
+    </section>
+  )
+}
 
 export function DialogContainerCreate(props: {
   onCreate: (input: ContainerCreateInput) => Promise<unknown>
@@ -116,147 +126,151 @@ export function DialogContainerCreate(props: {
       class="container-create-dialog"
     >
       <div class="container-create-dialog-body flex flex-col gap-4 px-4 pb-2">
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-v2-text-text-muted">{language.t("containers.create.kind")}</span>
-          <select
-            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-            value={store.kind}
-            onChange={(event) => {
-              const kind = event.currentTarget.value as "container" | "desktop"
-              setStore("kind", kind)
-              if (kind === "desktop") setStore({ image: "", preset: "custom" })
-              if (kind === "container" && !store.image.trim()) setStore("image", "alpine:latest")
-            }}
-          >
-            <option value="container">{language.t("containers.create.kind.container")}</option>
-            <option value="desktop">{language.t("containers.create.kind.desktop")}</option>
-          </select>
-        </label>
-
-        <Show when={store.kind === "desktop"}>
-          <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.desktopHint")}</p>
-        </Show>
-
-        <Show when={store.kind === "desktop"}>
+        <FormSection title={language.t("containers.create.section.workload")}>
           <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.preset")}</span>
+            <span class="text-v2-text-text-muted">{language.t("containers.create.kind")}</span>
             <select
               class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              value={store.preset}
+              value={store.kind}
               onChange={(event) => {
-                const preset = event.currentTarget.value
-                setStore({ preset, image: preset === "custom" ? store.image : "" })
+                const kind = event.currentTarget.value as "container" | "desktop"
+                setStore("kind", kind)
+                if (kind === "desktop") setStore({ image: "", preset: "custom" })
+                if (kind === "container" && !store.image.trim()) setStore("image", "alpine:latest")
               }}
             >
-              <For each={desktopPresets()}>
-                {(preset) => <option value={preset.id}>{language.t(preset.labelKey)}</option>}
-              </For>
+              <option value="container">{language.t("containers.create.kind.container")}</option>
+              <option value="desktop">{language.t("containers.create.kind.desktop")}</option>
             </select>
           </label>
-        </Show>
+          <Show when={store.kind === "desktop"}>
+            <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.desktopHint")}</p>
+          </Show>
+        </FormSection>
 
         <Show when={store.kind === "desktop"}>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.memory")}</span>
-            <input
-              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              value={store.memoryMb}
-              onInput={(event) => setStore("memoryMb", event.currentTarget.value)}
-            />
-          </label>
+          <FormSection title={language.t("containers.create.section.installer")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.preset")}</span>
+              <select
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.preset}
+                onChange={(event) => {
+                  const preset = event.currentTarget.value
+                  setStore({ preset, image: preset === "custom" ? store.image : "" })
+                }}
+              >
+                <For each={desktopPresets()}>
+                  {(preset) => <option value={preset.id}>{language.t(preset.labelKey)}</option>}
+                </For>
+              </select>
+            </label>
+
+            <Show when={store.preset === "custom"}>
+              <label class="flex flex-col gap-1 text-sm">
+                <span class="text-v2-text-text-muted">{language.t("containers.create.diskImage")}</span>
+                <div class="flex gap-2">
+                  <input
+                    class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                    placeholder="/Users/you/Downloads/ubuntu.iso"
+                    value={store.image}
+                    onInput={(event) => setStore("image", event.currentTarget.value)}
+                  />
+                  <ButtonV2 variant="neutral" onClick={() => void pickDiskImage()}>
+                    {language.t("containers.create.pickDiskImage")}
+                  </ButtonV2>
+                </div>
+                <span class="text-xs text-v2-text-text-muted">{language.t("containers.create.diskImageHint")}</span>
+              </label>
+            </Show>
+
+            <Show when={store.preset !== "custom"}>
+              <p class="text-xs text-v2-text-text-muted">{language.t("containers.create.preset.downloadHint")}</p>
+            </Show>
+
+            <Show when={downloading()}>
+              <div class="flex items-center gap-2 text-sm text-v2-text-text-muted">
+                <Spinner />
+                {language.t("containers.create.preset.downloading")}
+              </div>
+            </Show>
+          </FormSection>
+
+          <FormSection title={language.t("containers.create.section.resources")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.memory")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.memoryMb}
+                onInput={(event) => setStore("memoryMb", event.currentTarget.value)}
+              />
+            </label>
+          </FormSection>
         </Show>
 
-        <Show when={store.kind === "container" || store.preset === "custom"}>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">
-              {store.kind === "desktop"
-                ? language.t("containers.create.diskImage")
-                : language.t("containers.create.image")}
-            </span>
-            <div class="flex gap-2">
+        <Show when={store.kind === "container"}>
+          <FormSection title={language.t("containers.create.section.runtime")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.image")}</span>
               <input
-                class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                placeholder={store.kind === "desktop" ? "/Users/you/Downloads/ubuntu.iso" : undefined}
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
                 value={store.image}
                 onInput={(event) => setStore("image", event.currentTarget.value)}
               />
-              <Show when={store.kind === "desktop"}>
-                <ButtonV2 variant="neutral" onClick={() => void pickDiskImage()}>
-                  {language.t("containers.create.pickDiskImage")}
-                </ButtonV2>
-              </Show>
-            </div>
-            <Show when={store.kind === "desktop"}>
-              <span class="text-xs text-v2-text-text-muted">{language.t("containers.create.diskImageHint")}</span>
-            </Show>
-          </label>
-        </Show>
+            </label>
 
-        <Show when={store.kind === "desktop" && store.preset !== "custom"}>
-          <p class="text-xs text-v2-text-text-muted">{language.t("containers.create.preset.downloadHint")}</p>
-        </Show>
-
-        <label class="flex flex-col gap-1 text-sm">
-          <span class="text-v2-text-text-muted">{language.t("containers.create.name")}</span>
-          <input
-            class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-            value={store.name}
-            onInput={(event) => setStore("name", event.currentTarget.value)}
-          />
-        </label>
-
-        <Show when={store.kind === "container"}>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.command")}</span>
-            <input
-              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              value={store.command}
-              onInput={(event) => setStore("command", event.currentTarget.value)}
-            />
-          </label>
-        </Show>
-
-        <Show when={store.kind === "container"}>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.publish")}</span>
-            <input
-              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              placeholder="8080:80"
-              value={store.publish}
-              onInput={(event) => setStore("publish", event.currentTarget.value)}
-            />
-          </label>
-        </Show>
-
-        <Show when={store.kind === "container"}>
-          <div class="flex flex-col gap-2 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.volume")}</span>
-            <div class="flex gap-2">
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.command")}</span>
               <input
-                class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                placeholder="/host/path"
-                value={store.volumeHost}
-                onInput={(event) => setStore("volumeHost", event.currentTarget.value)}
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.command}
+                onInput={(event) => setStore("command", event.currentTarget.value)}
               />
-              <ButtonV2 variant="neutral" onClick={() => void pickVolume()}>
-                {language.t("containers.create.browse")}
-              </ButtonV2>
+            </label>
+
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.publish")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                placeholder="8080:80"
+                value={store.publish}
+                onInput={(event) => setStore("publish", event.currentTarget.value)}
+              />
+            </label>
+
+            <div class="flex flex-col gap-2 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.volume")}</span>
+              <div class="flex gap-2">
+                <input
+                  class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                  placeholder="/host/path"
+                  value={store.volumeHost}
+                  onInput={(event) => setStore("volumeHost", event.currentTarget.value)}
+                />
+                <ButtonV2 variant="neutral" onClick={() => void pickVolume()}>
+                  {language.t("containers.create.browse")}
+                </ButtonV2>
+              </div>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                placeholder="/workspace"
+                value={store.volumeContainer}
+                onInput={(event) => setStore("volumeContainer", event.currentTarget.value)}
+              />
             </div>
-            <input
-              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              placeholder="/workspace"
-              value={store.volumeContainer}
-              onInput={(event) => setStore("volumeContainer", event.currentTarget.value)}
-            />
-          </div>
+          </FormSection>
         </Show>
 
-        <Show when={downloading()}>
-          <div class="flex items-center gap-2 text-sm text-v2-text-text-muted">
-            <Spinner />
-            {language.t("containers.create.preset.downloading")}
-          </div>
-        </Show>
+        <FormSection title={language.t("containers.create.section.general")}>
+          <label class="flex flex-col gap-1 text-sm">
+            <span class="text-v2-text-text-muted">{language.t("containers.create.name")}</span>
+            <input
+              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+              value={store.name}
+              onInput={(event) => setStore("name", event.currentTarget.value)}
+            />
+          </label>
+        </FormSection>
 
         <Show when={error()}>
           <p class="text-sm text-v2-text-text-danger">{error()}</p>

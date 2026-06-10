@@ -84,6 +84,10 @@ export default defineConfig({
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
+    optimizeDeps: {
+      // Workspace UI sources (incl. logo assets) must rebundle on every cold dev start.
+      exclude: ["@openlegion-ai/ui", "@openlegion-ai/ui/logo"],
+    },
     build: {
       sourcemap: true,
       rollupOptions: {

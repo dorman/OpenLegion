@@ -865,7 +865,7 @@ function TitlebarBrand() {
       data-tauri-drag-region
       aria-label="OpenLegion"
     >
-      <Mark class="size-9 object-contain" alt="" />
+      <Mark class="size-11 object-contain" alt="" />
       <span class="text-[14px] font-semibold leading-none tracking-[-0.02em] text-text-strong">
         OpenLegion
       </span>

@@ -1,15 +1,16 @@
 #!/usr/bin/env bun
 /**
- * Regenerate desktop + favicon assets from packages/ui/src/assets/brand/openlegion-icon.png
+ * Regenerate desktop + favicon assets from packages/ui/src/assets/brand/openlegion-mark.png
  * Requires macOS `sips` and `iconutil`.
  */
 import { $ } from "bun"
-import { mkdir, rm } from "node:fs/promises"
+import { copyFile, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 
 const root = path.resolve(import.meta.dir, "..")
-const master = path.resolve(root, "../../ui/src/assets/brand/openlegion-icon.png")
-const faviconDir = path.resolve(root, "../../ui/src/assets/favicon")
+const brandDir = path.resolve(root, "../ui/src/assets/brand")
+const master = path.join(brandDir, "openlegion-mark.png")
+const faviconDir = path.resolve(root, "../ui/src/assets/favicon")
 
 const channels = ["dev", "beta", "prod"] as const
 
@@ -86,4 +87,20 @@ for (const channel of channels) {
   console.log(`Generated ${channel} icons`)
 }
 
+// Keep legacy tracked filenames in sync so cold starts / cached bundles cannot fall back
+// to the old green archer artwork still referenced in older logo.tsx builds.
+const logo = path.join(brandDir, "openlegion-logo.png")
+await copyFile(master, path.join(brandDir, "openlegion-icon.png"))
+await copyFile(logo, path.join(brandDir, "openlegion-wordmark.png"))
+
+async function writeBase64Module(png: string, out: string) {
+  const bytes = await Bun.file(png).arrayBuffer()
+  const b64 = Buffer.from(bytes).toString("base64")
+  await Bun.write(out, `export default "data:image/png;base64,${b64}"\n`)
+}
+
+await writeBase64Module(master, path.join(brandDir, "openlegion-mark.base64.ts"))
+await writeBase64Module(logo, path.join(brandDir, "openlegion-logo.base64.ts"))
+
 console.log("Favicon PNGs updated in packages/ui/src/assets/favicon")
+console.log("Synced openlegion-icon.png, openlegion-wordmark.png, and inline base64 logo modules")

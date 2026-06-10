@@ -4,16 +4,17 @@ import * as mod from "./logo"
 const docs = `### Overview
 OpenLegion logo assets: mark, splash, and wordmark.
 
-Use Mark for compact spaces, Logo for headers, Splash for hero sections.
+Use Mark for compact spaces, Logo for stacked wordmark, Splash for hero sections.
 
 ### API
-- \`Mark\`, \`Splash\`, and \`Logo\` components accept standard SVG props.
+- \`Mark\`, \`Splash\`, and \`Logo\` load brand PNGs from \`assets/brand\`.
 
 ### Variants and states
-- Multiple logo variants for different contexts.
+- \`Mark\` / \`Splash\`: circular hooded icon.
+- \`Logo\`: stacked icon + OpenLegion wordmark.
 
 ### Behavior
-- Pure SVG rendering.
+- White-on-transparent assets intended for dark desktop chrome.
 
 ### Accessibility
 - Provide title/aria-label when logos convey meaning.

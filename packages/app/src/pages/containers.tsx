@@ -30,7 +30,7 @@ import {
   type ContainerCreateInput,
   type ContainerInfo,
 } from "@/utils/containers"
-import { isAgentCapable, workloadKindKey } from "@/utils/container-workload"
+import { isAgentCapable, workloadKindKey, workloadPillClass } from "@/utils/container-workload"
 import { showToast } from "@/utils/toast"
 
 function containerLabel(item: ContainerInfo) {
@@ -273,7 +273,7 @@ export default function ContainersPage() {
           </div>
         </header>
 
-        <Show when={runtime.data}>
+        <Show when={!showOnboarding() && runtime.data}>
           {(status) => (
             <div class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-4">
               <div class="text-sm text-v2-text-text-muted">{language.t("containers.runtime.title")}</div>
@@ -355,8 +355,8 @@ export default function ContainersPage() {
           >
             {(workspace) => (
               <div class="flex flex-col gap-2">
-                <div class="text-sm" style={{ color: "var(--desktop-agent-accent)" }}>
-                  {language.t("containers.agentSession.title")} · plan
+                <div class="desktop-agent-accent text-sm font-medium">
+                  {language.t("containers.agentSession.title")}
                 </div>
                 <p class="text-sm leading-relaxed text-v2-text-text-muted">
                   {workspace().hostMount
@@ -409,7 +409,7 @@ function ContainerCard(props: {
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 font-mono text-sm text-v2-text-text-base">{containerLabel(props.item)}</div>
         <div class="flex flex-wrap justify-end gap-2">
-          <span class="desktop-pill desktop-pill-stopped">{props.language.t(workloadKindKey(props.item))}</span>
+          <span class={workloadPillClass(props.item)}>{props.language.t(workloadKindKey(props.item))}</span>
           <Show when={props.workspace?.sessionId}>
             <span class="desktop-pill desktop-pill-success">{props.language.t("containers.badge.agentLinked")}</span>
           </Show>
