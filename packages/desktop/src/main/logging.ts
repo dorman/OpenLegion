@@ -29,8 +29,57 @@ export function initLogging() {
     )
   log.initialize({ preload: false, spyRendererConsole: true })
   initConsoleTransport()
+  initProcessErrorHandlers()
   cleanup()
   return (logger = log)
+}
+
+export function initProcessErrorHandlers() {
+  if (process.listenerCount("uncaughtException") > 0) return
+
+  process.on("uncaughtException", (error) => {
+    write(
+      "process",
+      "uncaught exception",
+      {
+        ...processMeta(),
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      },
+      "error",
+    )
+  })
+
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : undefined
+    write(
+      "process",
+      "unhandled promise rejection",
+      {
+        ...processMeta(),
+        reason: error ? undefined : String(reason),
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      },
+      "error",
+    )
+  })
+
+  process.on("warning", (warning) => {
+    write(
+      "process",
+      "process warning",
+      {
+        ...processMeta(),
+        name: warning.name,
+        message: warning.message,
+        stack: warning.stack,
+      },
+      "warn",
+    )
+  })
 }
 
 export function initCrashReporter() {

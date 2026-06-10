@@ -3,12 +3,18 @@ import { Dialog, DialogFooter } from "@openlegion-ai/ui/v2/dialog-v2"
 import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { createStore } from "solid-js/store"
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
-import { usePlatform } from "@/context/platform"
-import { presetsForArch } from "@/utils/desktop-presets"
+import { usePlatform, type DesktopImageDownloadProgress } from "@/context/platform"
+import { presetById, presetsForArch } from "@/utils/desktop-presets"
 import type { ContainerCreateInput } from "@/utils/containers"
+
+function formatElapsed(seconds: number) {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+}
 
 function FormSection(props: { title: string; children: JSX.Element }) {
   return (
@@ -29,6 +35,8 @@ export function DialogContainerCreate(props: {
   const [error, setError] = createSignal<string | undefined>()
   const [pending, setPending] = createSignal(false)
   const [downloading, setDownloading] = createSignal(false)
+  const [downloadProgress, setDownloadProgress] = createSignal<DesktopImageDownloadProgress | undefined>()
+  const [downloadElapsedSec, setDownloadElapsedSec] = createSignal(0)
   const [store, setStore] = createStore({
     kind: "container" as "container" | "desktop",
     preset: "custom",
@@ -44,6 +52,25 @@ export function DialogContainerCreate(props: {
   const arch = createMemo((): "arm64" | "x64" => props.arch ?? "arm64")
 
   const desktopPresets = createMemo(() => presetsForArch(arch()))
+
+  const selectedPreset = createMemo(() => presetById(store.preset))
+
+  const selectedPresetLabel = createMemo(() => {
+    const preset = selectedPreset()
+    return preset ? language.t(preset.labelKey) : ""
+  })
+
+  createEffect(() => {
+    if (!downloading()) {
+      setDownloadElapsedSec(0)
+      return
+    }
+    const started = Date.now()
+    const timer = setInterval(() => {
+      setDownloadElapsedSec(Math.floor((Date.now() - started) / 1000))
+    }, 1000)
+    onCleanup(() => clearInterval(timer))
+  })
 
   async function pickDiskImage() {
     const file = await platform.openFilePickerDialog?.({
@@ -67,14 +94,35 @@ export function DialogContainerCreate(props: {
     const ensure = platform.ensureDesktopImage
     if (!ensure) throw new Error(language.t("containers.create.preset.downloadUnavailable"))
     setDownloading(true)
+    setDownloadProgress(undefined)
     try {
-      const result = await ensure(store.preset)
+      const result = await ensure(store.preset, {
+        onProgress: (progress) => setDownloadProgress(progress),
+      })
       if (!result.ok || !result.path) throw new Error(result.error ?? language.t("containers.create.preset.downloadFailed"))
       return result.path
     } finally {
       setDownloading(false)
+      setDownloadProgress(undefined)
     }
   }
+
+  const downloadStatusMessage = createMemo(() => {
+    const distro = selectedPresetLabel()
+    const progress = downloadProgress()
+    if (!progress) return language.t("containers.create.preset.downloadingChecking", { distro })
+
+    switch (progress.phase) {
+      case "cached":
+        return language.t("containers.create.preset.downloadingCached", { distro })
+      case "downloading":
+        return language.t("containers.create.preset.downloading", { distro })
+      case "finishing":
+        return language.t("containers.create.preset.downloadingFinishing", { distro })
+      default:
+        return language.t("containers.create.preset.downloadingChecking", { distro })
+    }
+  })
 
   async function submit() {
     setError(undefined)
@@ -184,14 +232,40 @@ export function DialogContainerCreate(props: {
               </label>
             </Show>
 
-            <Show when={store.preset !== "custom"}>
-              <p class="text-xs text-v2-text-text-muted">{language.t("containers.create.preset.downloadHint")}</p>
+            <Show when={store.preset !== "custom" && !downloading()}>
+              <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.preset.downloadHint")}</p>
+              <p class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 text-xs leading-relaxed text-v2-text-text-muted">
+                {language.t("containers.create.preset.downloadNotice", { distro: selectedPresetLabel() })}
+              </p>
             </Show>
 
             <Show when={downloading()}>
-              <div class="flex items-center gap-2 text-sm text-v2-text-text-muted">
-                <Spinner />
-                {language.t("containers.create.preset.downloading")}
+              <div
+                class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-3"
+                role="status"
+                aria-live="polite"
+              >
+                <div class="flex items-start gap-2 text-sm text-v2-text-text-base">
+                  <Spinner class="mt-0.5 shrink-0" />
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <p class="font-medium">{downloadStatusMessage()}</p>
+                    <Show when={(downloadProgress()?.downloadedMb ?? 0) > 0}>
+                      <p class="text-xs text-v2-text-text-muted">
+                        {language.t("containers.create.preset.downloadingProgress", {
+                          downloaded: downloadProgress()?.downloadedMb ?? 0,
+                        })}
+                      </p>
+                    </Show>
+                    <p class="text-xs text-v2-text-text-muted">
+                      {language.t("containers.create.preset.downloadingElapsed", {
+                        elapsed: formatElapsed(downloadElapsedSec()),
+                      })}
+                    </p>
+                    <p class="text-xs leading-relaxed text-v2-text-text-muted">
+                      {language.t("containers.create.preset.downloadingReassurance")}
+                    </p>
+                  </div>
+                </div>
               </div>
             </Show>
           </FormSection>
@@ -290,7 +364,9 @@ export function DialogContainerCreate(props: {
             (store.kind === "desktop" && store.preset === "custom" && !store.image.trim())
           }
         >
-          {language.t("containers.create.submit")}
+          {downloading()
+            ? language.t("containers.create.preset.downloadingSubmit")
+            : language.t("containers.create.submit")}
         </ButtonV2>
       </DialogFooter>
     </Dialog>

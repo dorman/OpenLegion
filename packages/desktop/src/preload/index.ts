@@ -72,6 +72,11 @@ const api: ElectronAPI = {
   containerRuntimeStatus: () => ipcRenderer.invoke("container-runtime-status"),
   ensureMicrovmDaemon: () => ipcRenderer.invoke("ensure-microvm-daemon"),
   ensureDesktopImage: (presetId) => ipcRenderer.invoke("ensure-desktop-image", presetId),
+  onDesktopImageDownloadProgress: (cb) => {
+    const handler = (_: unknown, progress: import("./types").DesktopImageDownloadProgress) => cb(progress)
+    ipcRenderer.on("desktop-image-download-progress", handler)
+    return () => ipcRenderer.removeListener("desktop-image-download-progress", handler)
+  },
   containerPtyCreate: (input) => ipcRenderer.invoke("container-pty-create", input),
   containerPtyWrite: (id, data) => ipcRenderer.invoke("container-pty-write", id, data),
   containerPtyResize: (id, cols, rows) => ipcRenderer.invoke("container-pty-resize", id, cols, rows),

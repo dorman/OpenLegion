@@ -22,6 +22,15 @@ export type EnsureDesktopImageResult = {
   error?: string
 }
 
+export type DesktopImageDownloadPhase = "checking" | "cached" | "downloading" | "finishing"
+
+export type DesktopImageDownloadProgress = {
+  presetId: string
+  phase: DesktopImageDownloadPhase
+  downloadedMb?: number
+  filename?: string
+}
+
 export type EnsureMicrovmDaemonResult = {
   ok: boolean
   url: string
@@ -109,6 +118,7 @@ export type ElectronAPI = {
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
   ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>
+  onDesktopImageDownloadProgress: (cb: (progress: DesktopImageDownloadProgress) => void) => () => void
   containerPtyCreate: (input: {
     command: string
     cols: number

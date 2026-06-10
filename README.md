@@ -58,7 +58,7 @@ flowchart LR
 ```
 
 1. **Desktop-first** — The Electron app (`bun run dev:desktop`) is the primary surface: **Sandboxes**, **Agents**, and **Settings** in one shell.
-2. **Two workload types** — Run **container** sandboxes (images, ports, bind mounts) or **Linux desktop** sandboxes (Ubuntu ISO/qcow2 via QEMU) from the same UI.
+2. **Two workload types** — Run **container** sandboxes (images, ports, bind mounts) or **Linux desktop** sandboxes (curated distro ISOs or custom qcow2 via QEMU) from the same UI.
 3. **Isolated runtimes** — The `openlegion-microvm` daemon can place Docker workloads on per-sandbox networks and host QEMU VMs with persisted disks under `~/.openlegion/`.
 4. **Inspect everything** — Logs, embedded shell (containers), and in-app VNC desktop view (QEMU workloads) without leaving the app.
 5. **Agents inside sandboxes** — Link a host project directory into a container sandbox and run an agent session whose file and shell tools execute **inside** the workload, gated by OpenLegion’s permission model.
@@ -95,7 +95,7 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 | Feature | Description |
 | --- | --- |
 | **Create container sandboxes** | Desktop dialog or CLI—image, name, command, ports, bind mounts |
-| **Create desktop sandboxes** | `kind: desktop` with Ubuntu arm64 ISO (Apple Silicon) or qcow2 disk; disks under `~/.openlegion/qemu-vms` |
+| **Create desktop sandboxes** | `kind: desktop` with a curated installer ISO (Ubuntu, Debian, Fedora, Rocky, AlmaLinux — filtered by host arm64/amd64) or a custom qcow2/ISO; installer images cache under `~/.openlegion/images`, VM disks under `~/.openlegion/qemu-vms` |
 | **Isolated networks** | Sandbox daemon places Docker workloads on dedicated networks (`network: isolated` in the UI) |
 | **Start stopped workloads** | Restart stopped containers and desktop VMs from the UI or `POST /global/containers/:id/start` |
 | **Logs, shell & desktop** | Inspect dialog with **Logs**, **Shell**, and **Desktop** tabs; live VNC for QEMU workloads |
