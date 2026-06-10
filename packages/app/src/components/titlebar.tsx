@@ -881,14 +881,19 @@ function ChannelIndicator() {
   return (
     <>
       {["beta", "dev"].includes(channel) && (
-        <div
-          classList={{
-            "font-medium px-2 rounded-sm uppercase font-mono": true,
-            "bg-icon-interactive-base text-[#FFF]": !desktopDev(),
-            "desktop-dev-badge": desktopDev(),
-          }}
-        >
-          {channel.toUpperCase()}
+        <div class="flex items-center gap-1.5">
+          <Show when={channel === "dev"}>
+            <span class="text-[11px] font-mono leading-none text-text-weak">{platform.version ?? "0.0.1"}</span>
+          </Show>
+          <div
+            classList={{
+              "font-medium px-2 rounded-sm uppercase font-mono": true,
+              "bg-icon-interactive-base text-[#FFF]": !desktopDev(),
+              "desktop-dev-badge": desktopDev(),
+            }}
+          >
+            {channel.toUpperCase()}
+          </div>
         </div>
       )}
     </>

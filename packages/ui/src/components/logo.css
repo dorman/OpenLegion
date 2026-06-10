@@ -4,17 +4,17 @@
   background: transparent;
 }
 
-/* White-on-transparent mark: darken on light surfaces */
-[data-color-scheme="light"] [data-component="logo-mark"],
-[data-color-scheme="light"] [data-component="logo-splash"],
-[data-color-scheme="light"] [data-component="logo-wordmark"] {
+/* White-on-transparent mark: darken on light surfaces (web only; desktop chrome is always dark) */
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-mark"],
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-splash"],
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-wordmark"] {
   filter: invert(1);
 }
 
 @media (prefers-color-scheme: light) {
-  :root:not([data-color-scheme="dark"]) [data-component="logo-mark"],
-  :root:not([data-color-scheme="dark"]) [data-component="logo-splash"],
-  :root:not([data-color-scheme="dark"]) [data-component="logo-wordmark"] {
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-mark"],
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-splash"],
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-wordmark"] {
     filter: invert(1);
   }
 }

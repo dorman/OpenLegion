@@ -243,7 +243,7 @@ Environment variables: `OPENLEGION_*` prefix. Container-related examples:
 | `bun run lint`        | Oxlint                 |
 | `bun run typecheck`   | Turbo typecheck        |
 
-Regenerate app icons after updating `packages/ui/src/assets/brand/openlegion-icon.png`:
+Regenerate app icons after updating `packages/ui/src/assets/brand/openlegion-mark.png`:
 
 ```bash
 cd packages/desktop
