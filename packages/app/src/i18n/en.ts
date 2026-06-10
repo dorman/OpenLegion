@@ -734,7 +734,7 @@ export const dict = {
   "containers.nav": "Sandboxes",
   "containers.nav.home": "Home",
   "containers.new": "New sandbox",
-  "containers.empty": "No containers yet.",
+  "containers.empty": "No sandboxes yet.",
   "containers.start": "Start",
   "containers.start.failed": "Failed to start container",
   "containers.started": "Container started",
@@ -757,8 +757,13 @@ export const dict = {
   "containers.table.image": "Image",
   "containers.table.name": "Name",
   "containers.table.actions": "Actions",
-  "containers.create.title": "New container",
-  "containers.create.description": "Create a sandboxed container on the local runtime.",
+  "containers.create.title": "New sandbox",
+  "containers.create.description": "Create a container or Linux desktop sandbox on your local runtime.",
+  "containers.create.section.workload": "Workload",
+  "containers.create.section.installer": "Installer",
+  "containers.create.section.resources": "Resources",
+  "containers.create.section.general": "General",
+  "containers.create.section.runtime": "Runtime",
   "containers.create.image": "Image",
   "containers.create.diskImage": "Disk image or installer ISO",
   "containers.create.diskImageHint":
@@ -770,7 +775,7 @@ export const dict = {
   "containers.create.volume": "Bind mount",
   "containers.create.browse": "Browse",
   "containers.create.pickVolume": "Choose host directory",
-  "containers.create.submit": "Create",
+  "containers.create.submit": "Create sandbox",
   "containers.openSession": "Open session",
   "containers.openSession.title": "Open agent session",
   "containers.openSession.description":
@@ -845,12 +850,13 @@ export const dict = {
   "containers.onboarding.step3.title": "3. Inspect or open an agent session",
   "containers.onboarding.step3.description":
     "Containers: Inspect for logs/shell, or Open session to bind a project and run an agent. Desktops: Inspect → Desktop for the live GUI.",
+  "containers.onboarding.step3.ready": "After your first sandbox is running, open Inspect to view logs, shell, or the live desktop.",
   "containers.openSession.desktopUnsupported":
     "Agent sessions are not available for Linux desktop VMs. Create a container workload to run an agent inside a sandbox.",
   "containers.inspect.desktopShellHint":
     "Serial console access appears after the guest OS is installed. Install Ubuntu from the Desktop tab, then restart the VM if shell stays unavailable.",
   "containers.agentSession.title": "Agent session",
-  "containers.agentSession.empty": "No active agent session linked to a container.",
+  "containers.agentSession.empty": "No active agent session linked to a sandbox.",
   "desktop.nav.label": "Desktop navigation",
   "desktop.nav.agents": "Agents",
   "session.header.container": "Sandbox container",

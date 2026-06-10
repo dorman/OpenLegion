@@ -1,5 +1,6 @@
 import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
 import { createSignal, Show } from "solid-js"
+import type { JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
 import type { Platform } from "@/context/platform"
 import type { ContainerRuntimeStatus } from "@/utils/containers"
@@ -22,6 +23,29 @@ export function dismissOnboarding(storage?: Platform["storage"]) {
   } catch {}
 }
 
+function RuntimePill(props: { label: string; ready: boolean; readyLabel: string; unavailableLabel: string }) {
+  return (
+    <span
+      classList={{
+        "desktop-pill": true,
+        "desktop-pill-success": props.ready,
+        "desktop-pill-stopped": !props.ready,
+      }}
+    >
+      {props.label}: {props.ready ? props.readyLabel : props.unavailableLabel}
+    </span>
+  )
+}
+
+function OnboardingStep(props: { title: string; children: JSX.Element }) {
+  return (
+    <li class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4">
+      <div class="text-sm font-medium text-v2-text-text-base">{props.title}</div>
+      <div class="desktop-onboarding-prose flex flex-col gap-2">{props.children}</div>
+    </li>
+  )
+}
+
 export function ContainersOnboarding(props: {
   runtime?: ContainerRuntimeStatus
   daemonReady: boolean
@@ -41,7 +65,7 @@ export function ContainersOnboarding(props: {
   return (
     <section class="rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-5">
       <div class="flex items-start justify-between gap-4">
-        <div>
+        <div class="desktop-onboarding-prose">
           <h2 class="text-base text-v2-text-text-base">{language.t("containers.onboarding.title")}</h2>
           <p class="mt-1 text-sm leading-relaxed text-v2-text-text-muted">{language.t("containers.onboarding.description")}</p>
         </div>
@@ -58,9 +82,32 @@ export function ContainersOnboarding(props: {
       </div>
 
       <ol class="mt-5 flex flex-col gap-4">
-        <li class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4">
-          <div class="text-sm font-medium text-v2-text-text-base">{language.t("containers.onboarding.step1.title")}</div>
+        <OnboardingStep title={language.t("containers.onboarding.step1.title")}>
           <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step1.description")}</p>
+          <Show when={runtime()}>
+            {(status) => (
+              <div class="flex flex-wrap gap-2">
+                <RuntimePill
+                  label={language.t("containers.runtime.docker")}
+                  ready={status().docker}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
+                <RuntimePill
+                  label={language.t("containers.runtime.microvm")}
+                  ready={status().microvm}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
+                <RuntimePill
+                  label={language.t("containers.runtime.qemu")}
+                  ready={status().qemu}
+                  readyLabel={language.t("containers.runtime.ready")}
+                  unavailableLabel={language.t("containers.runtime.unavailable")}
+                />
+              </div>
+            )}
+          </Show>
           <Show when={!props.daemonReady}>
             <ButtonV2 variant="neutral" size="normal" onClick={props.onEnsureDaemon} disabled={props.ensuringDaemon}>
               {props.ensuringDaemon
@@ -69,24 +116,21 @@ export function ContainersOnboarding(props: {
             </ButtonV2>
           </Show>
           <Show when={props.daemonReady}>
-            <span class="text-sm" style={{ color: "var(--desktop-agent-accent)" }}>
-              {language.t("containers.onboarding.step1.ready")}
-            </span>
+            <span class="desktop-agent-accent text-sm">{language.t("containers.onboarding.step1.ready")}</span>
           </Show>
-        </li>
+        </OnboardingStep>
 
-        <li class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4">
-          <div class="text-sm font-medium text-v2-text-text-base">{language.t("containers.onboarding.step2.title")}</div>
+        <OnboardingStep title={language.t("containers.onboarding.step2.title")}>
           <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step2.description")}</p>
           <ButtonV2 size="normal" onClick={props.onCreate} disabled={!stepOneReady() || !runtime()?.arch}>
             {language.t("containers.new")}
           </ButtonV2>
-        </li>
+        </OnboardingStep>
 
-        <li class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4">
-          <div class="text-sm font-medium text-v2-text-text-base">{language.t("containers.onboarding.step3.title")}</div>
+        <OnboardingStep title={language.t("containers.onboarding.step3.title")}>
           <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.description")}</p>
-        </li>
+          <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.ready")}</p>
+        </OnboardingStep>
       </ol>
     </section>
   )

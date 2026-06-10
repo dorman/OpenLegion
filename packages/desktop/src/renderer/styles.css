@@ -24,6 +24,8 @@
   --desktop-nav-active-bg: color-mix(in srgb, var(--v2-green-500) 12%, #121212);
   --desktop-nav-active-fg: var(--v2-green-500);
   --desktop-agent-accent: var(--v2-orange-500);
+  --desktop-workload-container: var(--v2-green-500);
+  --desktop-workload-desktop: var(--v2-blue-400);
   --desktop-card-border: color-mix(in srgb, var(--v2-alpha-light-10) 100%, transparent);
 
   --font-family-text: "JetBrainsMono Nerd Font Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -94,6 +96,44 @@
 [data-platform="desktop"] .desktop-pill-stopped {
   color: var(--v2-text-text-muted);
   background: var(--v2-background-bg-layer-01);
+}
+
+[data-platform="desktop"] .desktop-pill-container {
+  color: var(--desktop-workload-container);
+  border: 1px solid color-mix(in srgb, var(--desktop-workload-container) 35%, transparent);
+  background: color-mix(in srgb, var(--desktop-workload-container) 8%, transparent);
+}
+
+[data-platform="desktop"] .desktop-pill-desktop {
+  color: var(--desktop-workload-desktop);
+  border: 1px solid color-mix(in srgb, var(--desktop-workload-desktop) 35%, transparent);
+  background: color-mix(in srgb, var(--desktop-workload-desktop) 8%, transparent);
+}
+
+[data-platform="desktop"] .desktop-agent-accent {
+  color: var(--desktop-agent-accent);
+}
+
+[data-platform="desktop"] .desktop-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--desktop-card-border);
+  background: var(--v2-background-bg-layer-01);
+  padding: 1rem;
+}
+
+[data-platform="desktop"] .desktop-form-section-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--v2-text-text-muted);
+}
+
+[data-platform="desktop"] .desktop-onboarding-prose {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 [data-platform="desktop"] .desktop-container-card {

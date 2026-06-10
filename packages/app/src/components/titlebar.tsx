@@ -865,7 +865,7 @@ function TitlebarBrand() {
       data-tauri-drag-region
       aria-label="OpenLegion"
     >
-      <Mark class="size-9 object-contain" alt="" />
+      <Mark class="size-11 object-contain" alt="" />
       <span class="text-[14px] font-semibold leading-none tracking-[-0.02em] text-text-strong">
         OpenLegion
       </span>
@@ -881,14 +881,19 @@ function ChannelIndicator() {
   return (
     <>
       {["beta", "dev"].includes(channel) && (
-        <div
-          classList={{
-            "font-medium px-2 rounded-sm uppercase font-mono": true,
-            "bg-icon-interactive-base text-[#FFF]": !desktopDev(),
-            "desktop-dev-badge": desktopDev(),
-          }}
-        >
-          {channel.toUpperCase()}
+        <div class="flex items-center gap-1.5">
+          <Show when={channel === "dev"}>
+            <span class="text-[11px] font-mono leading-none text-text-weak">{platform.version ?? "0.0.1"}</span>
+          </Show>
+          <div
+            classList={{
+              "font-medium px-2 rounded-sm uppercase font-mono": true,
+              "bg-icon-interactive-base text-[#FFF]": !desktopDev(),
+              "desktop-dev-badge": desktopDev(),
+            }}
+          >
+            {channel.toUpperCase()}
+          </div>
         </div>
       )}
     </>

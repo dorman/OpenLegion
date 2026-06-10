@@ -1,4 +1,28 @@
 [data-component="logo-mark"] {
-  width: 16px;
-  aspect-ratio: 4/5;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+/* White-on-transparent mark: darken on light surfaces (web only; desktop chrome is always dark) */
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-mark"],
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-splash"],
+:root:not([data-platform="desktop"]) [data-color-scheme="light"] [data-component="logo-wordmark"] {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-mark"],
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-splash"],
+  :root:not([data-platform="desktop"]):not([data-color-scheme="dark"]) [data-component="logo-wordmark"] {
+    filter: invert(1);
+  }
+}
+
+[data-component="logo-splash"] {
+  object-fit: contain;
+}
+
+[data-component="logo-wordmark"] {
+  object-fit: contain;
 }

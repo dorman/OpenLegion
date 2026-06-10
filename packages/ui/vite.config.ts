@@ -49,11 +49,14 @@ async function fetchProviderIcons() {
   const providers = await fetch(`${url}/api.json`)
     .then((res) => res.json())
     .then((json) => Object.keys(json))
+  const skip = new Set(["openlegion", "openlegion-go"])
   await Promise.all(
-    providers.map((provider) =>
-      fetch(`${url}/logos/${provider}.svg`)
-        .then((res) => res.text())
-        .then((svg) => fs.writeFileSync(`./src/assets/icons/provider/${provider}.svg`, svg)),
-    ),
+    providers
+      .filter((provider) => !skip.has(provider))
+      .map((provider) =>
+        fetch(`${url}/logos/${provider}.svg`)
+          .then((res) => res.text())
+          .then((svg) => fs.writeFileSync(`./src/assets/icons/provider/${provider}.svg`, svg)),
+      ),
   )
 }

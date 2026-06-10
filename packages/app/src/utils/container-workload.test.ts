@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { isAgentCapable, isDesktopWorkload, inspectDefaultTab, workloadKindKey } from "./container-workload"
+import {
+  isAgentCapable,
+  isDesktopWorkload,
+  inspectDefaultTab,
+  workloadKindKey,
+  workloadPillClass,
+} from "./container-workload"
 import type { ContainerInfo } from "./containers"
 
 const container: ContainerInfo = {
@@ -35,5 +41,10 @@ describe("container-workload", () => {
   test("maps workload badge keys", () => {
     expect(workloadKindKey(container)).toBe("containers.badge.container")
     expect(workloadKindKey(desktop)).toBe("containers.badge.desktop")
+  })
+
+  test("maps workload pill classes", () => {
+    expect(workloadPillClass(container)).toBe("desktop-pill desktop-pill-container")
+    expect(workloadPillClass(desktop)).toBe("desktop-pill desktop-pill-desktop")
   })
 })
