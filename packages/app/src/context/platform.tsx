@@ -26,6 +26,15 @@ export type EnsureDesktopImageResult = {
   error?: string
 }
 
+export type DesktopImageDownloadPhase = "checking" | "cached" | "downloading" | "finishing"
+
+export type DesktopImageDownloadProgress = {
+  presetId: string
+  phase: DesktopImageDownloadPhase
+  downloadedMb?: number
+  filename?: string
+}
+
 export type EnsureMicrovmDaemonResult = {
   ok: boolean
   url: string
@@ -152,7 +161,10 @@ export type Platform = {
   ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
 
   /** Download or resolve a preset desktop VM image (desktop only) */
-  ensureDesktopImage?(presetId: string): Promise<EnsureDesktopImageResult>
+  ensureDesktopImage?(
+    presetId: string,
+    opts?: { onProgress?: (progress: DesktopImageDownloadProgress) => void },
+  ): Promise<EnsureDesktopImageResult>
 
   /** Interactive container shell bridged through the desktop main process (desktop only) */
   containerPty?: ContainerPty

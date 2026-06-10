@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./desktop-menu": "./src/desktop-menu.ts",
+    "./desktop-presets": "./src/utils/desktop-presets.ts",
     "./vite": "./vite.js",
     "./index.css": "./src/index.css"
   },

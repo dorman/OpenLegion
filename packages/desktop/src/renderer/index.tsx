@@ -288,7 +288,14 @@ const createPlatform = (): Platform => {
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
 
-    ensureDesktopImage: (presetId) => window.api.ensureDesktopImage(presetId),
+    ensureDesktopImage: async (presetId, opts) => {
+      const stop = opts?.onProgress ? window.api.onDesktopImageDownloadProgress(opts.onProgress) : undefined
+      try {
+        return await window.api.ensureDesktopImage(presetId)
+      } finally {
+        stop?.()
+      }
+    },
 
     containerPty: {
       create: (command, size) => window.api.containerPtyCreate({ command, ...size }),

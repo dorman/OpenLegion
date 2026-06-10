@@ -293,7 +293,7 @@ const main = Effect.gen(function* () {
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
-    ensureDesktopImage: (presetId) => ensureDesktopImage(presetId),
+    ensureDesktopImage: (event, presetId) => ensureDesktopImage(presetId, event.sender),
     containerPtyCreate: (event, input) => {
       try {
         let id = ""
