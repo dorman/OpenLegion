@@ -25,6 +25,8 @@ function stubContainer(overrides: Partial<Container.Interface> = {}): Container.
     logs: () => Effect.succeed({ logs: "boot ok\nnetwork up" }),
     shell: () => unexpected,
     display: () => unexpected,
+    composeUp: () => unexpected,
+    composeDown: () => unexpected,
     ...overrides,
   }
 }
