@@ -1,5 +1,5 @@
-import { createWriteStream } from "node:fs"
-import { access, mkdir, readdir, stat } from "node:fs/promises"
+import { createWriteStream, type WriteStream } from "node:fs"
+import { access, mkdir, readdir, stat, unlink } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { pipeline } from "node:stream/promises"
@@ -27,6 +27,17 @@ export type EnsureDesktopImageResult = {
   ok: boolean
   path?: string
   error?: string
+  cancelled?: boolean
+}
+
+let activeDownloadAbort: AbortController | undefined
+
+export function cancelDesktopImageDownload() {
+  activeDownloadAbort?.abort()
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError"
 }
 
 export function desktopImagesDir() {
@@ -126,13 +137,33 @@ function progressLogger(
 export async function ensureDesktopImage(
   presetId: string,
   sender?: WebContents,
+  signal?: AbortSignal,
 ): Promise<EnsureDesktopImageResult> {
+  activeDownloadAbort?.abort()
+  const abort = new AbortController()
+  activeDownloadAbort = abort
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, abort.signal])
+    : abort.signal
+
   const send = sender
     ? (progress: DesktopImageDownloadProgress) => {
         if (!sender.isDestroyed()) sender.send("desktop-image-download-progress", progress)
       }
     : undefined
 
+  try {
+    return await ensureDesktopImageInner(presetId, send, combinedSignal)
+  } finally {
+    if (activeDownloadAbort === abort) activeDownloadAbort = undefined
+  }
+}
+
+async function ensureDesktopImageInner(
+  presetId: string,
+  send: ((progress: DesktopImageDownloadProgress) => void) | undefined,
+  signal: AbortSignal,
+): Promise<EnsureDesktopImageResult> {
   emitProgress(send, { presetId, phase: "checking" })
 
   const resolved = resolveDownloadablePreset(presetId, hostArch())
@@ -190,8 +221,13 @@ export async function ensureDesktopImage(
   })
   emitProgress(send, { presetId, phase: "downloading", filename: download.filename, downloadedMb: 0 })
 
+  let tmpStream: WriteStream | undefined
   try {
-    const response = await fetch(download.url)
+    if (signal.aborted) {
+      return { ok: false, cancelled: true, error: "Download cancelled" }
+    }
+
+    const response = await fetch(download.url, { signal })
     if (!response.ok || !response.body) {
       const error = `Failed to download ${download.filename} (${response.status})`
       writeLog("desktop-image", "download failed", { presetId, filename: download.filename, status: response.status }, "error")
@@ -199,13 +235,14 @@ export async function ensureDesktopImage(
     }
 
     const tmp = `${dest}.partial`
+    tmpStream = createWriteStream(tmp)
     const source = Readable.fromWeb(response.body as import("stream/web").ReadableStream)
     await pipeline(
       source,
       progressLogger(presetId, download.filename, (downloadedMb) => {
         emitProgress(send, { presetId, phase: "downloading", filename: download.filename, downloadedMb })
       }),
-      createWriteStream(tmp),
+      tmpStream,
     )
     emitProgress(send, { presetId, phase: "finishing", filename: download.filename })
     const { rename } = await import("node:fs/promises")
@@ -219,6 +256,10 @@ export async function ensureDesktopImage(
     })
     return { ok: true, path: dest }
   } catch (error) {
+    if (isAbortError(error) || signal.aborted) {
+      writeLog("desktop-image", "download cancelled", { presetId, filename: download.filename }, "info")
+      return { ok: false, cancelled: true, error: "Download cancelled" }
+    }
     const message = error instanceof Error ? error.message : String(error)
     writeLog(
       "desktop-image",
@@ -227,5 +268,8 @@ export async function ensureDesktopImage(
       "error",
     )
     return { ok: false, error: message }
+  } finally {
+    tmpStream?.destroy()
+    await unlink(`${dest}.partial`).catch(() => undefined)
   }
 }

@@ -64,6 +64,14 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	if memoryMB <= 0 {
 		memoryMB = defaultQemuMemoryMB()
 	}
+	cpuCores := req.CpuCores
+	if cpuCores <= 0 {
+		cpuCores = defaultQemuCpuCores()
+	}
+	diskGB := req.DiskGb
+	if diskGB <= 0 {
+		diskGB = defaultQemuDiskGB()
+	}
 
 	image := strings.TrimSpace(req.Image)
 	if image == "" {
@@ -82,7 +90,7 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 	}
 
 	disk := filepath.Join(vmDir, "disk.qcow2")
-	isoPath, err := prepareDesktopDisk(image, disk)
+	isoPath, err := prepareDesktopDisk(image, disk, diskGB)
 	if err != nil {
 		_ = os.RemoveAll(vmDir)
 		return Result{}, err
@@ -100,6 +108,7 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		disk:         disk,
 		iso:          isoPath,
 		memoryMB:     memoryMB,
+		cpuCores:     cpuCores,
 		vncPort:      vncPort,
 		serialSocket: serialSocket,
 		pidFile:      filepath.Join(vmDir, "qemu.pid"),
@@ -203,6 +212,7 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 		vmDir:        vmDir,
 		disk:         disk,
 		memoryMB:     memoryMB,
+		cpuCores:     defaultQemuCpuCores(),
 		vncPort:      vncPort,
 		serialSocket: serialSocket,
 		pidFile:      filepath.Join(vmDir, "qemu.pid"),
@@ -326,6 +336,7 @@ type qemuStartConfig struct {
 	disk         string
 	iso          string
 	memoryMB     int
+	cpuCores     int
 	vncPort      int
 	serialSocket string
 	pidFile      string
@@ -341,6 +352,11 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 	args := []string{
 		"-machine", "virt",
 		"-m", strconv.Itoa(cfg.memoryMB),
+	}
+	if cfg.cpuCores > 0 {
+		args = append(args, "-smp", strconv.Itoa(cfg.cpuCores))
+	}
+	args = append(args,
 		"-vga", "none",
 		"-drive", "if=none,file=" + cfg.disk + ",format=qcow2,id=hd",
 		"-device", "virtio-blk-pci,drive=hd",
@@ -350,7 +366,7 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 		"-device", "qemu-xhci,id=xhci",
 		"-device", "usb-kbd,bus=xhci.0",
 		"-device", "usb-tablet,bus=xhci.0",
-	}
+	)
 	args = appendSerialConsoleArgs(args, cfg.serialSocket)
 	args = append(args,
 		"-parallel", "null",
@@ -510,12 +526,39 @@ func defaultQemuMemoryMB() int {
 	return value
 }
 
-func prepareDesktopDisk(source, dest string) (string, error) {
+func defaultQemuCpuCores() int {
+	raw := strings.TrimSpace(os.Getenv("OPENLEGION_QEMU_CPU_CORES"))
+	if raw == "" {
+		return 2
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return 2
+	}
+	return value
+}
+
+func defaultQemuDiskGB() int {
+	raw := strings.TrimSpace(os.Getenv("OPENLEGION_QEMU_DISK_GB"))
+	if raw == "" {
+		return 24
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return 24
+	}
+	return value
+}
+
+func prepareDesktopDisk(source, dest string, diskGB int) (string, error) {
+	if diskGB <= 0 {
+		diskGB = defaultQemuDiskGB()
+	}
 	if _, err := os.Stat(source); err != nil {
 		return "", fmt.Errorf("desktop image %q is missing", source)
 	}
 	if isISOPath(source) {
-		if err := createEmptyDisk(dest, 24); err != nil {
+		if err := createEmptyDisk(dest, diskGB); err != nil {
 			return "", err
 		}
 		return source, nil
@@ -674,7 +717,7 @@ func serialSocketPath(vmDir string) string {
 func appendSerialConsoleArgs(args []string, socket string) []string {
 	_ = os.Remove(socket)
 	return append(args,
-		"-chardev", "socket,id=serial0,path="+socket+",server=on,wait=off,format=raw",
+		"-chardev", "socket,id=serial0,path="+socket+",server=on,wait=off",
 		"-serial", "chardev:serial0",
 	)
 }

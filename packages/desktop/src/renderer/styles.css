@@ -1,3 +1,5 @@
+/* Desktop chrome is intentionally dark-only: the management shell matches terminal/security
+   tooling aesthetics and avoids maintaining a second light token set for Electron chrome. */
 [data-platform="desktop"] {
   color-scheme: dark;
 

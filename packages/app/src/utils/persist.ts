@@ -475,6 +475,26 @@ export const Persist = {
   },
 }
 
+export async function writePersisted(
+  target: { storage?: string; key: string },
+  value: string,
+  platform?: Platform,
+) {
+  const isDesktop = platform?.platform === "desktop" && !!platform.storage
+
+  if (isDesktop) {
+    await platform.storage?.(target.storage)?.setItem(target.key, value)
+    return
+  }
+
+  if (!target.storage) {
+    localStorageDirect().setItem(target.key, value)
+    return
+  }
+
+  localStorageWithPrefix(target.storage).setItem(target.key, value)
+}
+
 export function removePersisted(
   target: { storage?: string; legacyStorageNames?: string[]; key: string },
   platform?: Platform,

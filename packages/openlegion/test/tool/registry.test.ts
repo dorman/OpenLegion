@@ -32,6 +32,8 @@ import { InstanceState } from "@/effect/instance-state"
 import { Reference } from "@/reference/reference"
 import { RepositoryCache } from "@/reference/repository-cache"
 import { ContainerFiles } from "@/container/files"
+import { Container } from "@/container"
+import { AppProcess } from "@openlegion-ai/core/process"
 
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { MessageID, SessionID } from "@/session/schema"
@@ -70,7 +72,11 @@ const registryLayer = (opts: RegistryLayerOptions = {}) =>
       Layer.provide(Format.defaultLayer),
       Layer.provide(Layer.mergeAll(node, Database.defaultLayer, ContainerFiles.defaultLayer, Ripgrep.defaultLayer, Truncate.defaultLayer)),
     )
-    .pipe(Layer.provide(RuntimeFlags.layer(opts.flags ?? {})))
+    .pipe(
+      Layer.provide(RuntimeFlags.layer(opts.flags ?? {})),
+      Layer.provide(Container.defaultLayer),
+      Layer.provide(AppProcess.defaultLayer),
+    )
 
 // Fake Plugin.Service that returns a single plugin whose `tool` map contains
 // one definition with `args: undefined`. Used to exercise the plugin entry
@@ -100,6 +106,9 @@ const it = testEffect(Layer.mergeAll(registryLayer(), node, Agent.defaultLayer))
 const withBrokenPlugin = testEffect(
   Layer.mergeAll(registryLayer({ plugin: brokenPluginLayer }), node, Agent.defaultLayer),
 )
+const withDesktopPlan = testEffect(
+  Layer.mergeAll(registryLayer({ flags: { experimentalPlanMode: true, client: "desktop" } }), node, Agent.defaultLayer),
+)
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -112,6 +121,35 @@ describe("tool.registry", () => {
       const ids = yield* registry.ids()
 
       expect(ids).not.toContain("task_status")
+    }),
+  )
+
+  it.instance("exposes the sandbox tools", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+
+      for (const id of [
+        "sandbox_list",
+        "sandbox_inspect",
+        "sandbox_create",
+        "sandbox_start",
+        "sandbox_stop",
+        "sandbox_delete",
+        "sandbox_logs",
+        "sandbox_exec",
+        "sandbox_screenshot",
+      ]) {
+        expect(ids).toContain(id)
+      }
+    }),
+  )
+
+  withDesktopPlan.instance("exposes plan_exit for desktop when experimental plan mode is enabled", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const ids = yield* registry.ids()
+      expect(ids).toContain("plan_exit")
     }),
   )
 

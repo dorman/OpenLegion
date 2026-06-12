@@ -57,6 +57,7 @@ export function preferAppEnv(userDataPath: string) {
     ...(shell ? loadShellEnv(shell) : null),
     OPENLEGION_EXPERIMENTAL_ICON_DISCOVERY: "true",
     OPENLEGION_EXPERIMENTAL_FILEWATCHER: "true",
+    OPENLEGION_EXPERIMENTAL_PLAN_MODE: "true",
     OPENLEGION_CLIENT: "desktop",
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })

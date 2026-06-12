@@ -52,6 +52,7 @@ type Deps = {
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
   ensureDesktopImage: (event: IpcMainInvokeEvent, presetId: string) => Promise<EnsureDesktopImageResult>
+  cancelDesktopImageDownload: () => Promise<void> | void
   containerPtyCreate: (
     event: IpcMainInvokeEvent,
     input: { command: string; cols: number; rows: number },
@@ -95,6 +96,7 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("ensure-desktop-image", (event: IpcMainInvokeEvent, presetId: string) =>
     deps.ensureDesktopImage(event, presetId),
   )
+  ipcMain.handle("cancel-desktop-image-download", () => deps.cancelDesktopImageDownload())
   ipcMain.handle(
     "container-pty-create",
     (event: IpcMainInvokeEvent, input: { command: string; cols: number; rows: number }) =>

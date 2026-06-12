@@ -1,10 +1,11 @@
 import { createSimpleContext } from "@openlegion-ai/ui/context"
-import { checksum } from "@openlegion-ai/core/util/encode"
+import { base64Encode, checksum } from "@openlegion-ai/core/util/encode"
 import { useParams } from "@solidjs/router"
 import { batch, createMemo, createRoot, getOwner, onCleanup } from "solid-js"
 import { createStore, type SetStoreFunction } from "solid-js/store"
 import type { FileSelection } from "@/context/file"
-import { Persist, persisted } from "@/utils/persist"
+import type { Platform } from "@/context/platform"
+import { Persist, persisted, writePersisted } from "@/utils/persist"
 
 interface PartBase {
   content: string
@@ -144,6 +145,26 @@ function createPromptActions(
       })
     },
   }
+}
+
+/**
+ * Pre-fill the prompt draft for a session before navigating to it. Writes the
+ * same persisted shape `createPromptSession` reads, so the editor opens with
+ * the text in place and the user can review and send it.
+ *
+ * `directory` is the real project directory; prompt scopes are keyed by the
+ * route's `:dir` param, which is the base64-encoded form.
+ */
+export function seedPromptDraft(platform: Platform, directory: string, sessionID: string, text: string) {
+  return writePersisted(
+    Persist.session(base64Encode(directory), sessionID, "prompt"),
+    JSON.stringify({
+      prompt: [{ type: "text", content: text, start: 0, end: text.length }],
+      cursor: text.length,
+      context: { items: [] },
+    }),
+    platform,
+  )
 }
 
 const WORKSPACE_KEY = "__workspace__"

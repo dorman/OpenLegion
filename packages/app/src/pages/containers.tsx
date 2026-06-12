@@ -8,13 +8,17 @@ import { DialogContainerCreate } from "@/components/dialog-container-create"
 import { DialogContainerInspect } from "@/components/dialog-container-inspect"
 import { DialogContainerOpenSession } from "@/components/dialog-container-open-session"
 import { ContainersOnboarding, readOnboardingDismissed } from "@/components/containers-onboarding"
+import { ContainersComposePanel } from "@/components/containers-compose"
+import { RunningSandboxesPanel } from "@/components/running-sandboxes-panel"
+import { GuidedEmptyCards } from "@/components/guided-empty-cards"
+import { RuntimePill } from "@/components/runtime-pill"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
-import { openContainerSession } from "@/utils/container-session"
+import { askAgentAboutSandbox, openContainerSession } from "@/utils/container-session"
 import {
   listContainerWorkspaces,
   upsertContainerWorkspace,
@@ -30,8 +34,12 @@ import {
   type ContainerCreateInput,
   type ContainerInfo,
 } from "@/utils/containers"
-import { isAgentCapable, workloadKindKey, workloadPillClass } from "@/utils/container-workload"
+import { isAgentCapable, isInSandboxAgentCapable, isDesktopWorkload, workloadKindKey, workloadPillClass } from "@/utils/container-workload"
+import { warningsForWorkspaceHostMount } from "@/utils/sandbox-config-warnings"
 import { showToast } from "@/utils/toast"
+
+type StatusFilter = "all" | "running" | "stopped"
+type KindFilter = "all" | "container" | "desktop"
 
 function containerLabel(item: ContainerInfo) {
   if (item.name) return item.name
@@ -47,6 +55,15 @@ function activeAgentWorkspace(workspaces: ContainerWorkspace[]) {
   return workspaces.find((item) => item.sessionId)
 }
 
+function matchesFilters(item: ContainerInfo, statusFilter: StatusFilter, kindFilter: KindFilter) {
+  const running = (item.status ?? "stopped") === "running"
+  if (statusFilter === "running" && !running) return false
+  if (statusFilter === "stopped" && running) return false
+  if (kindFilter === "container" && isDesktopWorkload(item)) return false
+  if (kindFilter === "desktop" && !isDesktopWorkload(item)) return false
+  return true
+}
+
 export default function ContainersPage() {
   const platform = usePlatform()
   const language = useLanguage()
@@ -58,6 +75,10 @@ export default function ContainersPage() {
   const dialog = useDialog()
   const queryClient = useQueryClient()
   const [ensuringDaemon, setEnsuringDaemon] = createSignal(false)
+  const [selectedIds, setSelectedIds] = createSignal<string[]>([])
+  const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
+  const [kindFilter, setKindFilter] = createSignal<KindFilter>("all")
+  const [bulkPending, setBulkPending] = createSignal(false)
 
   const enabled = createMemo(() => platform.platform === "desktop" && server.isLocal() && !!server.current?.http)
 
@@ -90,6 +111,10 @@ export default function ContainersPage() {
 
   const daemonReady = createMemo(() => runtime.data?.microvm === true)
 
+  const filteredContainers = createMemo(() =>
+    (containers.data ?? []).filter((item) => matchesFilters(item, statusFilter(), kindFilter())),
+  )
+
   const activeCount = createMemo(
     () => (containers.data ?? []).filter((item) => (item.status ?? "stopped") === "running").length,
   )
@@ -97,13 +122,17 @@ export default function ContainersPage() {
   const agentWorkspace = createMemo(() => activeAgentWorkspace(workspaces.data ?? []))
 
   const showOnboarding = createMemo(
-    () =>
-      (containers.data?.length ?? 0) === 0 &&
-      !containers.isLoading &&
-      !readOnboardingDismissed(platform.storage),
+    () => !containers.isLoading && !readOnboardingDismissed(platform.storage),
   )
 
   const canCreate = createMemo(() => enabled() && runtime.data?.arch !== undefined)
+
+  const allVisibleSelected = createMemo(() => {
+    const items = filteredContainers()
+    if (items.length === 0) return false
+    const selected = new Set(selectedIds())
+    return items.every((item) => selected.has(item.id))
+  })
 
   function showCreateDialog() {
     const arch = runtime.data?.arch
@@ -168,8 +197,31 @@ export default function ContainersPage() {
     ))
   }
 
+  async function handleAskAgent(container: ContainerInfo) {
+    const conn = server.current
+    if (!conn) throw new Error(language.t("containers.error.noServer"))
+    return askAgentAboutSandbox({
+      conn,
+      container,
+      platform,
+      global,
+      layout,
+      createClient: serverSDK.createClient,
+      navigate,
+      pickDirectory: async () => {
+        const host = await platform.openDirectoryPickerDialog?.({
+          title: language.t("containers.openSession.pickProject"),
+        })
+        if (!host || Array.isArray(host)) return undefined
+        return host
+      },
+    })
+  }
+
   function showInspect(container: ContainerInfo) {
-    dialog.show(() => <DialogContainerInspect container={container} onStart={refresh} />)
+    dialog.show(() => (
+      <DialogContainerInspect container={container} onStart={refresh} onAskAgent={() => handleAskAgent(container)} />
+    ))
   }
 
   async function handleStart(id: string) {
@@ -202,7 +254,54 @@ export default function ContainersPage() {
     const http = server.current?.http
     if (!http) return
     await removeContainer(http, id)
+    setSelectedIds((current) => current.filter((item) => item !== id))
     await refresh()
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    )
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected()) {
+      const visible = new Set(filteredContainers().map((item) => item.id))
+      setSelectedIds((current) => current.filter((item) => !visible.has(item)))
+      return
+    }
+    const next = new Set(selectedIds())
+    for (const item of filteredContainers()) next.add(item.id)
+    setSelectedIds([...next])
+  }
+
+  async function runBulk(action: "start" | "stop" | "remove") {
+    const http = server.current?.http
+    const ids = selectedIds()
+    if (!http || ids.length === 0 || bulkPending()) return
+
+    setBulkPending(true)
+    try {
+      for (const id of ids) {
+        if (action === "start") await startContainer(http, id)
+        if (action === "stop") await stopContainer(http, id)
+        if (action === "remove") await removeContainer(http, id)
+      }
+      if (action === "remove") setSelectedIds([])
+      await refresh()
+      showToast({
+        variant: "success",
+        title: language.t(`containers.bulk.${action}Done`, { count: ids.length }),
+      })
+    } catch (err) {
+      showToast({
+        variant: "error",
+        title: language.t(`containers.bulk.${action}Failed`),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setBulkPending(false)
+    }
   }
 
   async function ensureDaemon() {
@@ -264,10 +363,7 @@ export default function ContainersPage() {
                   : language.t("containers.ensureDaemon")}
               </ButtonV2>
             </Show>
-            <ButtonV2
-              onClick={() => showCreateDialog()}
-              disabled={!canCreate()}
-            >
+            <ButtonV2 onClick={() => showCreateDialog()} disabled={!canCreate()}>
               {language.t("containers.new")}
             </ButtonV2>
           </div>
@@ -304,10 +400,17 @@ export default function ContainersPage() {
           )}
         </Show>
 
+        <Show when={!showOnboarding()}>
+          <ContainersComposePanel onChanged={refresh} />
+        </Show>
+
+        <RunningSandboxesPanel containers={containers.data ?? []} onInspect={showInspect} />
+
         <Show when={showOnboarding()}>
           <ContainersOnboarding
             runtime={runtime.data}
             daemonReady={daemonReady()}
+            sandboxCount={containers.data?.length ?? 0}
             onEnsureDaemon={() => void ensureDaemon()}
             onCreate={showCreateDialog}
             ensuringDaemon={ensuringDaemon()}
@@ -316,29 +419,128 @@ export default function ContainersPage() {
         </Show>
 
         <section class="flex min-h-0 flex-1 flex-col gap-3">
+          <Show when={(containers.data?.length ?? 0) > 0}>
+            <div class="flex flex-col gap-3 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-4">
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="flex min-w-[140px] flex-col gap-1 text-sm">
+                  <span class="text-v2-text-text-muted">{language.t("containers.filter.status")}</span>
+                  <select
+                    class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                    value={statusFilter()}
+                    onChange={(event) => setStatusFilter(event.currentTarget.value as StatusFilter)}
+                  >
+                    <option value="all">{language.t("containers.filter.status.all")}</option>
+                    <option value="running">{language.t("containers.filter.status.running")}</option>
+                    <option value="stopped">{language.t("containers.filter.status.stopped")}</option>
+                  </select>
+                </label>
+                <label class="flex min-w-[140px] flex-col gap-1 text-sm">
+                  <span class="text-v2-text-text-muted">{language.t("containers.filter.kind")}</span>
+                  <select
+                    class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                    value={kindFilter()}
+                    onChange={(event) => setKindFilter(event.currentTarget.value as KindFilter)}
+                  >
+                    <option value="all">{language.t("containers.filter.kind.all")}</option>
+                    <option value="container">{language.t("containers.filter.kind.container")}</option>
+                    <option value="desktop">{language.t("containers.filter.kind.desktop")}</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <label class="flex items-center gap-2 text-sm text-v2-text-text-muted">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected()}
+                    onChange={() => toggleSelectAllVisible()}
+                  />
+                  {language.t("containers.bulk.selectAll")}
+                </label>
+                <Show when={selectedIds().length > 0}>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm text-v2-text-text-muted">
+                      {language.t("containers.bulk.selected", { count: selectedIds().length })}
+                    </span>
+                    <ButtonV2 variant="ghost" size="normal" disabled={bulkPending()} onClick={() => void runBulk("start")}>
+                      {language.t("containers.bulk.start")}
+                    </ButtonV2>
+                    <ButtonV2 variant="ghost" size="normal" disabled={bulkPending()} onClick={() => void runBulk("stop")}>
+                      {language.t("containers.bulk.stop")}
+                    </ButtonV2>
+                    <ButtonV2 variant="ghost" size="normal" disabled={bulkPending()} onClick={() => void runBulk("remove")}>
+                      {language.t("containers.bulk.remove")}
+                    </ButtonV2>
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </Show>
+
           <Show when={!containers.isLoading} fallback={<div class="flex justify-center p-10"><Spinner /></div>}>
             <Show
               when={(containers.data?.length ?? 0) > 0}
               fallback={
                 <Show when={!showOnboarding()}>
-                  <div class="py-10 text-center text-sm text-v2-text-text-muted">{language.t("containers.empty")}</div>
+                  <div class="flex flex-col gap-4 py-4">
+                    <div class="text-center">
+                      <h2 class="text-sm font-medium text-v2-text-text-base">{language.t("containers.empty.title")}</h2>
+                      <p class="mt-1 text-sm text-v2-text-text-muted">{language.t("containers.empty")}</p>
+                    </div>
+                    <GuidedEmptyCards
+                      actions={[
+                        {
+                          titleKey: "containers.empty.createSandbox.title",
+                          descriptionKey: "containers.empty.createSandbox.description",
+                          actionKey: "containers.empty.createSandbox.action",
+                          onClick: showCreateDialog,
+                          disabled: !canCreate(),
+                        },
+                        {
+                          titleKey: "containers.empty.startDaemon.title",
+                          descriptionKey: "containers.empty.startDaemon.description",
+                          actionKey: "containers.empty.startDaemon.action",
+                          onClick: () => void ensureDaemon(),
+                          disabled: ensuringDaemon() || daemonReady(),
+                        },
+                        {
+                          titleKey: "containers.empty.openSession.title",
+                          descriptionKey: "containers.empty.openSession.description",
+                          actionKey: "containers.empty.openSession.action",
+                          onClick: () => navigate("/agents"),
+                        },
+                      ]}
+                    />
+                  </div>
                 </Show>
               }
             >
-              <For each={containers.data ?? []}>
-                {(item) => (
-                  <ContainerCard
-                    item={item}
-                    workspace={workspaceForContainer(workspaces.data ?? [], item)}
-                    language={language}
+              <Show
+                when={filteredContainers().length > 0}
+                fallback={
+                  <div class="py-10 text-center text-sm text-v2-text-text-muted">
+                    {language.t("containers.filter.noResults")}
+                  </div>
+                }
+              >
+                <For each={filteredContainers()}>
+                  {(item) => (
+                    <ContainerCard
+                      item={item}
+                      workspace={workspaceForContainer(workspaces.data ?? [], item)}
+                      selected={selectedIds().includes(item.id)}
+                      language={language}
+                      onToggleSelected={() => toggleSelected(item.id)}
                     onOpenSession={() => showOpenSession(item)}
+                    onAskAgent={() => void handleAskAgent(item)}
                     onInspect={() => showInspect(item)}
-                    onStart={() => void handleStart(item.id)}
-                    onStop={() => void handleStop(item.id)}
-                    onRemove={() => void handleRemove(item.id)}
-                  />
-                )}
-              </For>
+                      onStart={() => void handleStart(item.id)}
+                      onStop={() => void handleStop(item.id)}
+                      onRemove={() => void handleRemove(item.id)}
+                    />
+                  )}
+                </For>
+              </Show>
             </Show>
           </Show>
           <Show when={containers.error}>
@@ -372,46 +574,44 @@ export default function ContainersPage() {
   )
 }
 
-function RuntimePill(props: {
-  label: string
-  ready: boolean
-  readyLabel: string
-  unavailableLabel: string
-}) {
-  return (
-    <span
-      classList={{
-        "desktop-pill": true,
-        "desktop-pill-success": props.ready,
-        "desktop-pill-stopped": !props.ready,
-      }}
-    >
-      {props.label}: {props.ready ? props.readyLabel : props.unavailableLabel}
-    </span>
-  )
-}
-
 function ContainerCard(props: {
   item: ContainerInfo
   workspace?: ContainerWorkspace
+  selected: boolean
   language: ReturnType<typeof useLanguage>
+  onToggleSelected: () => void
   onOpenSession: () => void
+  onAskAgent: () => void
   onInspect: () => void
   onStart: () => void
   onStop: () => void
   onRemove: () => void
 }) {
   const running = () => (props.item.status ?? "stopped") === "running"
-  const agentCapable = () => isAgentCapable(props.item)
+  const inSandboxAgent = () => isInSandboxAgentCapable(props.item)
+  const hostAgent = () => isAgentCapable(props.item)
+  const warnings = createMemo(() => warningsForWorkspaceHostMount(props.workspace?.hostMount))
 
   return (
     <article class="desktop-container-card">
       <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0 font-mono text-sm text-v2-text-text-base">{containerLabel(props.item)}</div>
+        <div class="flex min-w-0 items-start gap-3">
+          <input
+            type="checkbox"
+            class="mt-1"
+            checked={props.selected}
+            onChange={() => props.onToggleSelected()}
+            aria-label={containerLabel(props.item)}
+          />
+          <div class="min-w-0 font-mono text-sm text-v2-text-text-base">{containerLabel(props.item)}</div>
+        </div>
         <div class="flex flex-wrap justify-end gap-2">
           <span class={workloadPillClass(props.item)}>{props.language.t(workloadKindKey(props.item))}</span>
           <Show when={props.workspace?.sessionId}>
             <span class="desktop-pill desktop-pill-success">{props.language.t("containers.badge.agentLinked")}</span>
+          </Show>
+          <Show when={warnings().length > 0}>
+            <span class="desktop-pill desktop-pill-stopped">{props.language.t("containers.warnings.badge")}</span>
           </Show>
           <span
             classList={{
@@ -429,13 +629,29 @@ function ContainerCard(props: {
         <span class="mx-2">·</span>
         {props.language.t(containerNetwork(props.item))}
       </div>
-      <Show when={!agentCapable()}>
-        <p class="mt-2 text-xs leading-relaxed text-v2-text-text-muted">{props.language.t("containers.desktop.agentHint")}</p>
+      <Show when={warnings().length > 0}>
+        <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-xs leading-relaxed text-v2-text-text-muted">
+          <For each={warnings()}>
+            {(warning) => <li>{props.language.t(warning.messageKey)}</li>}
+          </For>
+        </ul>
+      </Show>
+      <Show when={!inSandboxAgent()}>
+        <p class="mt-2 text-xs leading-relaxed text-v2-text-text-muted">
+          {props.language.t(
+            hostAgent() ? "containers.desktop.hostAgentHint" : "containers.desktop.agentHint",
+          )}
+        </p>
       </Show>
       <div class="mt-2 flex flex-wrap gap-2">
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession} disabled={!agentCapable()}>
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession} disabled={!inSandboxAgent()}>
           {props.language.t("containers.openSession")}
         </ButtonV2>
+        <Show when={hostAgent()}>
+          <ButtonV2 variant="ghost" size="normal" onClick={props.onAskAgent} disabled={!running()}>
+            {props.language.t("containers.askAgent")}
+          </ButtonV2>
+        </Show>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
           {props.language.t("containers.inspect")}
         </ButtonV2>

@@ -6,7 +6,7 @@ import "@openlegion-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { CreateInput, DisplayOutput, Info, ListOutput, LogsOutput, ShellOutput } from "@/container/schema"
+import { CreateInput, DisplayOutput, Info, ListOutput, LogsOutput, ShellOutput, ComposeInput, ComposeOutput } from "@/container/schema"
 import { UpsertPayload, Workspace } from "@/container/workspace"
 import { described } from "./metadata"
 
@@ -92,6 +92,8 @@ export const GlobalPaths = {
   containerRemove: "/global/containers/:id",
   containerWorkspaces: "/global/container-workspaces",
   containerWorkspace: "/global/container-workspaces/:containerId",
+  composeUp: "/global/compose/up",
+  composeDown: "/global/compose/down",
 } as const
 
 export const GlobalApi = HttpApi.make("global").add(
@@ -263,6 +265,28 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.containerWorkspaces.upsert",
           summary: "Upsert container workspace",
           description: "Create or update workspace metadata for a sandbox container.",
+        }),
+      ),
+      HttpApiEndpoint.post("composeUp", GlobalPaths.composeUp, {
+        payload: ComposeInput,
+        success: described(ComposeOutput, "Compose deploy output"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.compose.up",
+          summary: "Deploy compose stack",
+          description: "Run docker compose up -d for the given compose file path.",
+        }),
+      ),
+      HttpApiEndpoint.post("composeDown", GlobalPaths.composeDown, {
+        payload: ComposeInput,
+        success: described(ComposeOutput, "Compose stop output"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.compose.down",
+          summary: "Stop compose stack",
+          description: "Run docker compose down for the given compose file path.",
         }),
       ),
     )

@@ -11,6 +11,7 @@ describe("container", () => {
       const svc = yield* Container.Service
       expect(svc.list).toBeTypeOf("function")
       expect(svc.create).toBeTypeOf("function")
+      expect(svc.start).toBeTypeOf("function")
       expect(svc.stop).toBeTypeOf("function")
       expect(svc.remove).toBeTypeOf("function")
       expect(svc.logs).toBeTypeOf("function")

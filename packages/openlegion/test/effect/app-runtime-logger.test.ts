@@ -1,4 +1,4 @@
-import { expect } from "bun:test"
+import { expect, test } from "bun:test"
 import { Context, Deferred, Effect, Fiber, Layer, Logger } from "effect"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
 import { AppLayer } from "../../src/effect/app-runtime"
@@ -7,6 +7,7 @@ import { InstanceRef } from "../../src/effect/instance-ref"
 import * as EffectLogger from "@openlegion-ai/core/effect/logger"
 import * as Observability from "@openlegion-ai/core/effect/observability"
 import { attach } from "../../src/effect/run-service"
+import { bridgeStructuredRuntimeLog, initProcessLoggingBridge } from "../../src/effect/app-runtime"
 import { TestInstance } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 
@@ -103,3 +104,8 @@ it.instance(
     }).pipe(Effect.provide(Observability.layer)),
   { git: true },
 )
+
+test("initProcessLoggingBridge can be installed without throwing", () => {
+  initProcessLoggingBridge()
+  expect(() => bridgeStructuredRuntimeLog({ service: "test", level: "info", message: "hello" })).not.toThrow()
+})

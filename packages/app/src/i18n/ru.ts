@@ -1,3 +1,5 @@
+import { containers as containersI18n } from "./containers/ru"
+
 export const dict = {
   "command.category.suggested": "Предложено",
   "command.category.view": "Просмотр",
@@ -936,4 +938,5 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "Не удалось создать постоянный значок проекта",
   "error.childStore.storeCreateFailed": "Не удалось создать хранилище",
   "terminal.connectionLost.abnormalClose": "WebSocket закрыт аварийно: {{code}}",
+  ...containersI18n,
 }

@@ -197,6 +197,14 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
         .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
     })
 
+    const composeUp = Effect.fn("GlobalHttpApi.composeUp")(function* (ctx: { payload: { file: string } }) {
+      return yield* mapContainerError(container.composeUp(ctx.payload.file))
+    })
+
+    const composeDown = Effect.fn("GlobalHttpApi.composeDown")(function* (ctx: { payload: { file: string } }) {
+      return yield* mapContainerError(container.composeDown(ctx.payload.file))
+    })
+
     const upgradeRaw = Effect.fn("GlobalHttpApi.upgradeRaw")(function* (ctx: {
       request: HttpServerRequest.HttpServerRequest
     }) {
@@ -232,6 +240,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("containerRemove", containerRemove)
       .handle("containerWorkspaces", containerWorkspaces)
       .handle("containerWorkspaceUpsert", containerWorkspaceUpsert)
+      .handle("composeUp", composeUp)
+      .handle("composeDown", composeDown)
       .handleRaw("upgrade", upgradeRaw)
   }),
 )

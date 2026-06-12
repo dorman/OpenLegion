@@ -1,0 +1,127 @@
+import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
+import { createSignal } from "solid-js"
+import { useLanguage } from "@/context/language"
+import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
+import { deployComposeStack, stopComposeStack } from "@/utils/compose"
+import { recordSandboxAuditEntry } from "@/utils/sandbox-audit"
+import { showToast } from "@/utils/toast"
+import { writePersisted } from "@/utils/persist"
+
+const COMPOSE_FILE_KEY = "containers.compose.file"
+
+function readComposeFile(storage?: ReturnType<typeof usePlatform>["storage"]) {
+  try {
+    const value = storage?.("openlegion")?.getItem(COMPOSE_FILE_KEY)
+    if (value instanceof Promise) return ""
+    if (!value) return ""
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (typeof parsed === "string") return parsed
+    } catch {
+      return value
+    }
+    return ""
+  } catch {
+    return ""
+  }
+}
+
+export function ContainersComposePanel(props: { onChanged?: () => Promise<void> }) {
+  const language = useLanguage()
+  const platform = usePlatform()
+  const server = useServer()
+  const [file, setFile] = createSignal(readComposeFile(platform.storage))
+  const [pending, setPending] = createSignal<"deploy" | "stop" | undefined>()
+
+  async function persistFile(path: string) {
+    setFile(path)
+    await writePersisted({ storage: "openlegion", key: COMPOSE_FILE_KEY }, JSON.stringify(path), platform)
+  }
+
+  async function pickComposeFile() {
+    const picked = await platform.openFilePickerDialog?.({
+      title: language.t("containers.compose.pickFile"),
+      accept: ["yml", "yaml"],
+    })
+    if (!picked || Array.isArray(picked)) return
+    await persistFile(picked)
+  }
+
+  async function run(action: "deploy" | "stop") {
+    const http = server.current?.http
+    const path = file().trim()
+    if (!http || !path) return
+
+    setPending(action)
+    try {
+      const result =
+        action === "deploy" ? await deployComposeStack(http, path) : await stopComposeStack(http, path)
+      recordSandboxAuditEntry({
+        action: action === "deploy" ? "compose.deploy" : "compose.stop",
+        detail: path,
+        outcome: "allowed",
+      })
+      showToast({
+        variant: "success",
+        title:
+          action === "deploy" ? language.t("containers.compose.deployed") : language.t("containers.compose.stopped"),
+        description: result.output,
+      })
+      await props.onChanged?.()
+    } catch (err) {
+      recordSandboxAuditEntry({
+        action: action === "deploy" ? "compose.deploy" : "compose.stop",
+        detail: path,
+        outcome: "denied",
+      })
+      showToast({
+        variant: "error",
+        title: language.t("containers.compose.failed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setPending(undefined)
+    }
+  }
+
+  return (
+    <section class="flex flex-col gap-3 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-4">
+      <div>
+        <div class="text-sm text-v2-text-text-base">{language.t("containers.compose.title")}</div>
+        <p class="mt-1 text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.compose.description")}</p>
+      </div>
+      <label class="flex flex-col gap-1 text-sm">
+        <span class="text-v2-text-text-muted">{language.t("containers.compose.file")}</span>
+        <div class="flex gap-2">
+          <input
+            class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 font-mono text-xs"
+            placeholder="/path/to/docker-compose.yml"
+            value={file()}
+            onInput={(event) => void persistFile(event.currentTarget.value)}
+          />
+          <ButtonV2 variant="neutral" size="normal" onClick={() => void pickComposeFile()}>
+            {language.t("containers.compose.pickFile")}
+          </ButtonV2>
+        </div>
+      </label>
+      <div class="flex flex-wrap gap-2">
+        <ButtonV2
+          size="normal"
+          disabled={!file().trim() || pending() !== undefined}
+          onClick={() => void run("deploy")}
+        >
+          {pending() === "deploy" ? language.t("containers.compose.deploying") : language.t("containers.compose.deploy")}
+        </ButtonV2>
+        <ButtonV2
+          variant="neutral"
+          size="normal"
+          disabled={!file().trim() || pending() !== undefined}
+          onClick={() => void run("stop")}
+        >
+          {pending() === "stop" ? language.t("containers.compose.stopping") : language.t("containers.compose.stop")}
+        </ButtonV2>
+      </div>
+    </section>
+  )
+}

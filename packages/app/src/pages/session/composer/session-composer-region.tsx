@@ -9,6 +9,7 @@ import { usePrompt } from "@/context/prompt"
 import { useSync } from "@/context/sync"
 import { getSessionHandoff, setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionKey } from "@/pages/session/session-layout"
+import { SessionSandboxBanner } from "@/components/session-sandbox-banner"
 import { SessionPermissionDock } from "@/pages/session/composer/session-permission-dock"
 import { SessionQuestionDock } from "@/pages/session/composer/session-question-dock"
 import { SessionFollowupDock } from "@/pages/session/composer/session-followup-dock"
@@ -250,6 +251,9 @@ export function SessionComposerRegion(props: {
                 "margin-top": `${-lift()}px`,
               }}
             >
+              <Show when={route.params.id}>
+                <SessionSandboxBanner sessionID={route.params.id!} metadata={info()?.metadata} />
+              </Show>
               <Show when={props.followup?.items.length}>
                 <SessionFollowupDock
                   items={props.followup!.items}

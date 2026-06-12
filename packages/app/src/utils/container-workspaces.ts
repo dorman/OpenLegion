@@ -3,6 +3,7 @@ import { containerIdsMatch, type ContainerInfo, type ContainerRuntime } from "@/
 import { authTokenFromCredentials } from "@/utils/server"
 
 export const SESSION_CONTAINER_KEY = "openlegion.container"
+export const SESSION_SANDBOX_KEY = "openlegion.sandbox"
 export const DEFAULT_CONTAINER_MOUNT = "/workspace"
 
 export type ContainerWorkspace = {
@@ -72,6 +73,57 @@ export async function upsertContainerWorkspace(
 
 export function workspaceForContainer(workspaces: ContainerWorkspace[], container: ContainerInfo) {
   return workspaces.find((item) => containerIdsMatch(item.containerId, container.id))
+}
+
+export type SessionSandboxContext = {
+  id: string
+  name?: string
+  image?: string
+  runtime?: ContainerRuntime
+  kind?: "container" | "desktop"
+}
+
+export function sessionSandboxFromMetadata(metadata?: Record<string, unknown>) {
+  const value = metadata?.[SESSION_SANDBOX_KEY]
+  if (!value || typeof value !== "object") return undefined
+  const record = value as Record<string, unknown>
+  if (typeof record.id !== "string") return undefined
+  if (record.runtime !== undefined && record.runtime !== "docker" && record.runtime !== "podman" && record.runtime !== "microvm") {
+    return undefined
+  }
+  return {
+    id: record.id,
+    ...(typeof record.name === "string" ? { name: record.name } : {}),
+    ...(typeof record.image === "string" ? { image: record.image } : {}),
+    ...(record.runtime === "docker" || record.runtime === "podman" || record.runtime === "microvm"
+      ? { runtime: record.runtime }
+      : {}),
+    ...(record.kind === "container" || record.kind === "desktop" ? { kind: record.kind } : {}),
+  } satisfies SessionSandboxContext
+}
+
+export type LinkedSandboxContext = {
+  id: string
+  label: string
+  mode: "container" | "sandbox"
+}
+
+export function linkedSandboxFromMetadata(metadata?: Record<string, unknown>) {
+  const container = sessionContainerFromMetadata(metadata)
+  if (container) {
+    return {
+      id: container.id,
+      label: container.id,
+      mode: "container",
+    } satisfies LinkedSandboxContext
+  }
+  const sandbox = sessionSandboxFromMetadata(metadata)
+  if (!sandbox) return undefined
+  return {
+    id: sandbox.id,
+    label: sandbox.name ?? sandbox.id,
+    mode: "sandbox",
+  } satisfies LinkedSandboxContext
 }
 
 export type SessionContainerContext = {

@@ -23,6 +23,17 @@ import { Plugin } from "../plugin"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
+import {
+  SandboxCreateTool,
+  SandboxDeleteTool,
+  SandboxExecTool,
+  SandboxInspectTool,
+  SandboxListTool,
+  SandboxLogsTool,
+  SandboxScreenshotTool,
+  SandboxStartTool,
+  SandboxStopTool,
+} from "./sandbox"
 import * as Log from "@openlegion-ai/core/util/log"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
@@ -34,6 +45,8 @@ import { Effect, Layer, Context } from "effect"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ContainerFiles } from "@/container/files"
+import { Container } from "@/container"
+import { AppProcess } from "@openlegion-ai/core/process"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { Format } from "../format"
@@ -102,6 +115,8 @@ export const layer: Layer.Layer<
   | HttpClient.HttpClient
   | ChildProcessSpawner
   | ContainerFiles.Service
+  | Container.Service
+  | AppProcess.Service
   | Ripgrep.Service
   | Format.Service
   | Truncate.Service
@@ -133,6 +148,15 @@ export const layer: Layer.Layer<
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const sandboxList = yield* SandboxListTool
+    const sandboxInspect = yield* SandboxInspectTool
+    const sandboxCreate = yield* SandboxCreateTool
+    const sandboxStart = yield* SandboxStartTool
+    const sandboxStop = yield* SandboxStopTool
+    const sandboxDelete = yield* SandboxDeleteTool
+    const sandboxLogs = yield* SandboxLogsTool
+    const sandboxExec = yield* SandboxExecTool
+    const sandboxScreenshot = yield* SandboxScreenshotTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -240,6 +264,15 @@ export const layer: Layer.Layer<
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          sandboxList: Tool.init(sandboxList),
+          sandboxInspect: Tool.init(sandboxInspect),
+          sandboxCreate: Tool.init(sandboxCreate),
+          sandboxStart: Tool.init(sandboxStart),
+          sandboxStop: Tool.init(sandboxStop),
+          sandboxDelete: Tool.init(sandboxDelete),
+          sandboxLogs: Tool.init(sandboxLogs),
+          sandboxExec: Tool.init(sandboxExec),
+          sandboxScreenshot: Tool.init(sandboxScreenshot),
         })
 
         return {
@@ -259,8 +292,17 @@ export const layer: Layer.Layer<
             tool.search,
             tool.skill,
             tool.patch,
+            tool.sandboxList,
+            tool.sandboxInspect,
+            tool.sandboxCreate,
+            tool.sandboxStart,
+            tool.sandboxStop,
+            tool.sandboxDelete,
+            tool.sandboxLogs,
+            tool.sandboxExec,
+            tool.sandboxScreenshot,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
-            ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+            ...(flags.experimentalPlanMode && ["cli", "desktop", "app"].includes(flags.client) ? [tool.plan] : []),
           ],
           task: tool.task,
           read: tool.read,
@@ -391,7 +433,12 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(Ripgrep.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
     )
-    .pipe(Layer.provide(Database.defaultLayer), Layer.provide(RuntimeFlags.defaultLayer)),
+    .pipe(
+      Layer.provide(Database.defaultLayer),
+      Layer.provide(RuntimeFlags.defaultLayer),
+      Layer.provide(Container.defaultLayer),
+      Layer.provide(AppProcess.defaultLayer),
+    ),
 )
 
 function isZodType(value: unknown): value is z.ZodType {

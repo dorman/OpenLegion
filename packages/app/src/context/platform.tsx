@@ -24,6 +24,7 @@ export type EnsureDesktopImageResult = {
   ok: boolean
   path?: string
   error?: string
+  cancelled?: boolean
 }
 
 export type DesktopImageDownloadPhase = "checking" | "cached" | "downloading" | "finishing"
@@ -163,8 +164,11 @@ export type Platform = {
   /** Download or resolve a preset desktop VM image (desktop only) */
   ensureDesktopImage?(
     presetId: string,
-    opts?: { onProgress?: (progress: DesktopImageDownloadProgress) => void },
+    opts?: { onProgress?: (progress: DesktopImageDownloadProgress) => void; signal?: AbortSignal },
   ): Promise<EnsureDesktopImageResult>
+
+  /** Cancel an in-flight desktop image download (desktop only) */
+  cancelDesktopImageDownload?(): Promise<void> | void
 
   /** Interactive container shell bridged through the desktop main process (desktop only) */
   containerPty?: ContainerPty

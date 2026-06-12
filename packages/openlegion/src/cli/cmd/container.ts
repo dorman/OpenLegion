@@ -17,6 +17,7 @@ function runContainer<A, R>(effect: Effect.Effect<A, Container.Error, R>) {
     Effect.catchTag("ContainerLogsFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerShellFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerDisplayFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ComposeFailedError", (error) => fail(error.message)),
   )
 }
 
@@ -27,10 +28,13 @@ export const ContainerCommand = cmd({
     yargs
       .command(ContainerListCommand)
       .command(ContainerCreateCommand)
+      .command(ContainerStartCommand)
       .command(ContainerStopCommand)
       .command(ContainerRemoveCommand)
       .command(ContainerLogsCommand)
       .command(ContainerShellCommand)
+      .command(ContainerComposeUpCommand)
+      .command(ContainerComposeDownCommand)
       .demandCommand(),
   async handler() {},
 })
@@ -70,9 +74,22 @@ export const ContainerCreateCommand = effectCmd({
   builder: (yargs) =>
     yargs
       .option("image", {
-        describe: "container image",
+        describe: "container image or desktop ISO/QCOW path",
         type: "string",
-        demandOption: true,
+      })
+      .option("kind", {
+        describe: "workload kind",
+        type: "string",
+        choices: ["container", "desktop"],
+        default: "container",
+      })
+      .option("preset", {
+        describe: "desktop installer preset id (requires --image with ISO/QCOW path)",
+        type: "string",
+      })
+      .option("memory", {
+        describe: "memory limit in megabytes (desktop workloads)",
+        type: "number",
       })
       .option("name", {
         describe: "container name",
@@ -101,11 +118,18 @@ export const ContainerCreateCommand = effectCmd({
         string: true,
       }),
   handler: Effect.fn("Cli.container.create")(function* (args) {
+    const image = args.image?.trim()
+    if (!image) {
+      return yield* fail("--image is required (for desktop workloads, pass the ISO or QCOW path)")
+    }
+
     const created = yield* runContainer(
       Container.Service.use((svc) =>
         svc.create({
-          image: args.image,
+          kind: args.kind,
+          image,
           name: args.name,
+          memoryMb: args.memory,
           env: parseEnv(args.env),
           ports: parsePorts(args.publish),
           volumes: parseVolumes(args.volume),
@@ -118,8 +142,25 @@ export const ContainerCreateCommand = effectCmd({
       UI.Style.TEXT_SUCCESS_BOLD +
         `Created ${created.runtime} container ${created.id}` +
         (created.name ? ` (${created.name})` : "") +
+        (args.preset ? ` [preset: ${args.preset}]` : "") +
         UI.Style.TEXT_NORMAL,
     )
+  }),
+})
+
+export const ContainerStartCommand = effectCmd({
+  command: "start <id>",
+  describe: "start a stopped container",
+  instance: false,
+  builder: (yargs) =>
+    yargs.positional("id", {
+      describe: "container or sandbox id",
+      type: "string",
+      demandOption: true,
+    }),
+  handler: Effect.fn("Cli.container.start")(function* (args) {
+    yield* runContainer(Container.Service.use((svc) => svc.start(args.id)))
+    UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Started ${args.id}` + UI.Style.TEXT_NORMAL)
   }),
 })
 
@@ -175,6 +216,38 @@ export const ContainerShellCommand = effectCmd({
   handler: Effect.fn("Cli.container.shell")(function* (args) {
     const result = yield* runContainer(Container.Service.use((svc) => svc.shell(args.id)))
     console.log(result.command)
+  }),
+})
+
+export const ContainerComposeUpCommand = effectCmd({
+  command: "compose-up <file>",
+  describe: "deploy a docker compose stack (docker compose up -d)",
+  instance: false,
+  builder: (yargs) =>
+    yargs.positional("file", {
+      describe: "path to docker-compose.yml",
+      type: "string",
+      demandOption: true,
+    }),
+  handler: Effect.fn("Cli.container.composeUp")(function* (args) {
+    const result = yield* runContainer(Container.Service.use((svc) => svc.composeUp(args.file)))
+    UI.println(UI.Style.TEXT_SUCCESS_BOLD + result.output + UI.Style.TEXT_NORMAL)
+  }),
+})
+
+export const ContainerComposeDownCommand = effectCmd({
+  command: "compose-down <file>",
+  describe: "stop a docker compose stack (docker compose down)",
+  instance: false,
+  builder: (yargs) =>
+    yargs.positional("file", {
+      describe: "path to docker-compose.yml",
+      type: "string",
+      demandOption: true,
+    }),
+  handler: Effect.fn("Cli.container.composeDown")(function* (args) {
+    const result = yield* runContainer(Container.Service.use((svc) => svc.composeDown(args.file)))
+    UI.println(UI.Style.TEXT_SUCCESS_BOLD + result.output + UI.Style.TEXT_NORMAL)
   }),
 })
 

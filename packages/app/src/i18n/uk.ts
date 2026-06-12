@@ -1,3 +1,5 @@
+import { containers as containersI18n } from "./containers/uk"
+
 export const dict = {
   "command.category.suggested": "Рекомендовані",
   "command.category.view": "Вигляд",
@@ -966,4 +968,5 @@ export const dict = {
   "workspace.reset.archived.one": "1 сесію буде заархівовано.",
   "workspace.reset.archived.many": "{{count}} сесій буде заархівовано.",
   "workspace.reset.note": "Це скине робочу область, щоб вона відповідала гілці за замовчуванням.",
+  ...containersI18n,
 }

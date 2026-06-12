@@ -290,12 +290,25 @@ const createPlatform = (): Platform => {
 
     ensureDesktopImage: async (presetId, opts) => {
       const stop = opts?.onProgress ? window.api.onDesktopImageDownloadProgress(opts.onProgress) : undefined
+      const abort = opts?.signal
+      const onAbort = abort
+        ? () => {
+            void window.api.cancelDesktopImageDownload()
+          }
+        : undefined
+      if (abort && onAbort) {
+        if (abort.aborted) throw new DOMException("Aborted", "AbortError")
+        abort.addEventListener("abort", onAbort, { once: true })
+      }
       try {
         return await window.api.ensureDesktopImage(presetId)
       } finally {
+        if (abort && onAbort) abort.removeEventListener("abort", onAbort)
         stop?.()
       }
     },
+
+    cancelDesktopImageDownload: () => window.api.cancelDesktopImageDownload(),
 
     containerPty: {
       create: (command, size) => window.api.containerPtyCreate({ command, ...size }),

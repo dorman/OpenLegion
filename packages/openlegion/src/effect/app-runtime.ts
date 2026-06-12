@@ -1,5 +1,6 @@
 import { Layer, ManagedRuntime } from "effect"
 import { attach } from "./run-service"
+import * as Log from "@openlegion-ai/core/util/log"
 import * as Observability from "@openlegion-ai/core/effect/observability"
 
 import { FSUtil } from "@openlegion-ai/core/fs-util"
@@ -53,6 +54,46 @@ import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Container } from "@/container"
+
+const runtimeLog = Log.create({ service: "app-runtime" })
+let processLoggingBridgeInstalled = false
+
+export type StructuredRuntimeLog = {
+  service: string
+  level: "info" | "warn" | "error"
+  message: string
+  extra?: Record<string, unknown>
+}
+
+export function bridgeStructuredRuntimeLog(entry: StructuredRuntimeLog) {
+  const logger = Log.create({ service: entry.service })
+  logger[entry.level](entry.message, entry.extra)
+}
+
+export function initProcessLoggingBridge() {
+  if (processLoggingBridgeInstalled) return
+  processLoggingBridgeInstalled = true
+
+  process.on("uncaughtException", (error) => {
+    runtimeLog.error("uncaught exception", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    })
+  })
+
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : undefined
+    runtimeLog.error("unhandled rejection", {
+      reason: error ? undefined : String(reason),
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+    })
+  })
+}
+
+initProcessLoggingBridge()
 
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,

@@ -171,10 +171,17 @@
     }
   }
 
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"],
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"] {
     height: auto;
     max-height: min(92vh, 720px);
+  }
+
+  /* The desktop tab sends the frame size to the VM as its resolution, so the
+     inspect dialog needs real estate for a usable desktop. */
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
+    width: min(calc(100vw - 32px), 1200px);
+    height: min(92vh, 900px);
+    max-height: min(92vh, 900px);
   }
 
   [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"],
@@ -189,6 +196,18 @@
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) .container-inspect-dialog-body {
     min-height: 0;
     flex: 1;
+  }
+
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) .container-create-dialog-body {
     overflow-y: auto;
+  }
+
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) .container-inspect-dialog-body {
+    overflow: hidden;
+  }
+
+  /* noVNC mounts a scroll container as the direct child of the viewport. */
+  .desktop-display-viewport > div {
+    overscroll-behavior: contain;
   }
 }

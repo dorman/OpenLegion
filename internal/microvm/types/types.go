@@ -20,6 +20,8 @@ type CreateVMRequest struct {
 	Volumes []VolumeMapping   `json:"volumes,omitempty"`
 	Command []string          `json:"command,omitempty"`
 	MemoryMB int              `json:"memoryMb,omitempty"`
+	CpuCores int              `json:"cpuCores,omitempty"`
+	DiskGb   int              `json:"diskGb,omitempty"`
 }
 
 type VMInfo struct {

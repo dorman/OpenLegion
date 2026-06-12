@@ -583,10 +583,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const agentList = createMemo(() =>
     sync.data.agent
-      .filter((agent) => !agent.hidden && agent.mode !== "primary")
+      .filter(
+        (agent) =>
+          !agent.hidden &&
+          (agent.mode !== "primary" || (agent.name === "plan" && settings.general.showPlanAgent())),
+      )
       .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
   )
-  const agentNames = createMemo(() => local.agent.list().map((agent) => agent.name))
+  const selectableAgents = createMemo(() =>
+    local.agent.list().filter((agent) => agent.name !== "plan" || settings.general.showPlanAgent()),
+  )
+  const agentNames = createMemo(() => selectableAgents().map((agent) => agent.name))
 
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
@@ -1348,7 +1355,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (!search) return projects()
     return projects().filter((project) => displayName(project).toLowerCase().includes(search))
   })
-  const showAgentControl = createMemo(() => settings.general.showCustomAgents() && agentNames().length > 0)
+  const showAgentControl = createMemo(
+    () =>
+      (settings.general.showCustomAgents() || settings.general.showPlanAgent()) && agentNames().length > 0,
+  )
   const selectProject = (worktree: string) => {
     setPicker({
       projectOpen: false,

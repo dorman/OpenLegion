@@ -120,13 +120,33 @@ const clearAuthToken = () => {
 }
 
 const platform: Platform = {
-  platform: "web",
+  platform: import.meta.env.VITE_E2E_DESKTOP ? "desktop" : "web",
   version: pkg.version,
   openLink,
   back,
   forward,
   restart,
   notify,
+  ...(import.meta.env.VITE_E2E_DESKTOP
+    ? {
+        containerRuntimeStatus: async () => ({
+          docker: true,
+          microvm: true,
+          qemu: true,
+          microvmUrl: "http://127.0.0.1:8765",
+          arch: "arm64" as const,
+        }),
+        storage: (scope = "openlegion") => ({
+          getItem: (key: string) => localStorage.getItem(`${scope}:${key}`),
+          setItem: (key: string, value: string) => {
+            localStorage.setItem(`${scope}:${key}`, value)
+          },
+          removeItem: (key: string) => {
+            localStorage.removeItem(`${scope}:${key}`)
+          },
+        }),
+      }
+    : {}),
   getDefaultServer: async () => {
     const stored = readDefaultServerUrl()
     return stored ? ServerConnection.Key.make(stored) : null
