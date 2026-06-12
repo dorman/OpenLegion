@@ -1,26 +1,28 @@
 import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
-import { createSignal, Show } from "solid-js"
-import type { JSX } from "solid-js"
-import { RuntimePill } from "@/components/runtime-pill"
+import { Dialog, DialogFooter } from "@openlegion-ai/ui/v2/dialog-v2"
+import { useDialog } from "@openlegion-ai/ui/context/dialog"
+import { Show } from "solid-js"
+import type { Accessor, JSX } from "solid-js"
+import { RuntimeStatusPills } from "@/components/runtime-pill"
 import { useLanguage } from "@/context/language"
 import type { Platform } from "@/context/platform"
 import type { ContainerRuntimeStatus } from "@/utils/containers"
 
 const DISMISS_KEY = "containers.onboarding.dismissed"
 
-export function readOnboardingDismissed(storage?: Platform["storage"]) {
+/** Async-safe read: desktop storage may return a Promise. */
+export async function readOnboardingDismissed(storage?: Platform["storage"]) {
   try {
-    const value = storage?.("openlegion")?.getItem(DISMISS_KEY)
-    if (value instanceof Promise) return false
+    const value = await storage?.("openlegion")?.getItem(DISMISS_KEY)
     return value === "1"
   } catch {
     return false
   }
 }
 
-export function dismissOnboarding(storage?: Platform["storage"]) {
+export async function dismissOnboarding(storage?: Platform["storage"]) {
   try {
-    storage?.("openlegion")?.setItem(DISMISS_KEY, "1")
+    await storage?.("openlegion")?.setItem(DISMISS_KEY, "1")
   } catch {}
 }
 
@@ -33,95 +35,76 @@ function OnboardingStep(props: { title: string; children: JSX.Element }) {
   )
 }
 
-export function ContainersOnboarding(props: {
-  runtime?: ContainerRuntimeStatus
-  daemonReady: boolean
-  sandboxCount: number
+/**
+ * First-run guide shown as a dialog. The page owns when to open it (first
+ * launch, or the header's "Get started" button) and marks it dismissed via
+ * the dialog's onClose. CTAs that open other dialogs simply replace this one.
+ */
+export function DialogContainersOnboarding(props: {
+  runtime: Accessor<ContainerRuntimeStatus | undefined>
+  daemonReady: Accessor<boolean>
+  sandboxCount: Accessor<number>
   onEnsureDaemon: () => void
   onCreate: () => void
-  ensuringDaemon: boolean
-  storage?: Platform["storage"]
+  ensuringDaemon: Accessor<boolean>
 }) {
   const language = useLanguage()
-  const [dismissed, setDismissed] = createSignal(readOnboardingDismissed(props.storage))
+  const dialog = useDialog()
 
-  if (dismissed()) return null
-
-  const runtime = () => props.runtime
-  const stepOneReady = () => props.daemonReady && (runtime()?.docker === true || runtime()?.qemu === true)
+  const stepOneReady = () =>
+    props.daemonReady() && (props.runtime()?.docker === true || props.runtime()?.qemu === true)
 
   return (
-    <section class="rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-5">
-      <div class="flex items-start justify-between gap-4">
-        <div class="desktop-onboarding-prose">
-          <h2 class="text-base text-v2-text-text-base">{language.t("containers.onboarding.title")}</h2>
-          <p class="mt-1 text-sm leading-relaxed text-v2-text-text-muted">{language.t("containers.onboarding.description")}</p>
-        </div>
-        <ButtonV2
-          variant="ghost"
-          size="normal"
-          onClick={() => {
-            dismissOnboarding(props.storage)
-            setDismissed(true)
-          }}
-        >
-          {language.t("containers.onboarding.dismiss")}
-        </ButtonV2>
+    <Dialog
+      title={language.t("containers.onboarding.title")}
+      description={language.t("containers.onboarding.description")}
+      size="large"
+      fit
+      class="container-onboarding-dialog"
+    >
+      <div class="container-onboarding-dialog-body flex flex-col gap-4 px-4 pb-2">
+        <ol class="flex flex-col gap-4">
+          <OnboardingStep title={language.t("containers.onboarding.step1.title")}>
+            <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step1.description")}</p>
+            <Show when={props.runtime()}>{(status) => <RuntimeStatusPills status={status()} />}</Show>
+            <Show when={!props.daemonReady()}>
+              <ButtonV2
+                variant="neutral"
+                size="normal"
+                onClick={props.onEnsureDaemon}
+                disabled={props.ensuringDaemon()}
+              >
+                {props.ensuringDaemon()
+                  ? language.t("containers.ensureDaemon.starting")
+                  : language.t("containers.ensureDaemon")}
+              </ButtonV2>
+            </Show>
+            <Show when={props.daemonReady()}>
+              <span class="desktop-agent-accent text-sm">{language.t("containers.onboarding.step1.ready")}</span>
+            </Show>
+          </OnboardingStep>
+
+          <OnboardingStep title={language.t("containers.onboarding.step2.title")}>
+            <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step2.description")}</p>
+            <ButtonV2 size="normal" onClick={props.onCreate} disabled={!stepOneReady() || !props.runtime()?.arch}>
+              {language.t("containers.new")}
+            </ButtonV2>
+          </OnboardingStep>
+
+          <OnboardingStep title={language.t("containers.onboarding.step3.title")}>
+            <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.description")}</p>
+            <Show when={props.sandboxCount() > 0}>
+              <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.ready")}</p>
+            </Show>
+          </OnboardingStep>
+        </ol>
       </div>
 
-      <ol class="mt-5 flex flex-col gap-4">
-        <OnboardingStep title={language.t("containers.onboarding.step1.title")}>
-          <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step1.description")}</p>
-          <Show when={runtime()}>
-            {(status) => (
-              <div class="flex flex-wrap gap-2">
-                <RuntimePill
-                  label={language.t("containers.runtime.docker")}
-                  ready={status().docker}
-                  readyLabel={language.t("containers.runtime.ready")}
-                  unavailableLabel={language.t("containers.runtime.unavailable")}
-                />
-                <RuntimePill
-                  label={language.t("containers.runtime.microvm")}
-                  ready={status().microvm}
-                  readyLabel={language.t("containers.runtime.ready")}
-                  unavailableLabel={language.t("containers.runtime.unavailable")}
-                />
-                <RuntimePill
-                  label={language.t("containers.runtime.qemu")}
-                  ready={status().qemu}
-                  readyLabel={language.t("containers.runtime.ready")}
-                  unavailableLabel={language.t("containers.runtime.unavailable")}
-                />
-              </div>
-            )}
-          </Show>
-          <Show when={!props.daemonReady}>
-            <ButtonV2 variant="neutral" size="normal" onClick={props.onEnsureDaemon} disabled={props.ensuringDaemon}>
-              {props.ensuringDaemon
-                ? language.t("containers.ensureDaemon.starting")
-                : language.t("containers.ensureDaemon")}
-            </ButtonV2>
-          </Show>
-          <Show when={props.daemonReady}>
-            <span class="desktop-agent-accent text-sm">{language.t("containers.onboarding.step1.ready")}</span>
-          </Show>
-        </OnboardingStep>
-
-        <OnboardingStep title={language.t("containers.onboarding.step2.title")}>
-          <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step2.description")}</p>
-          <ButtonV2 size="normal" onClick={props.onCreate} disabled={!stepOneReady() || !runtime()?.arch}>
-            {language.t("containers.new")}
-          </ButtonV2>
-        </OnboardingStep>
-
-        <OnboardingStep title={language.t("containers.onboarding.step3.title")}>
-          <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.description")}</p>
-          <Show when={props.sandboxCount > 0}>
-            <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.ready")}</p>
-          </Show>
-        </OnboardingStep>
-      </ol>
-    </section>
+      <DialogFooter>
+        <ButtonV2 variant="ghost" onClick={() => dialog.close()}>
+          {language.t("containers.onboarding.dismiss")}
+        </ButtonV2>
+      </DialogFooter>
+    </Dialog>
   )
 }
