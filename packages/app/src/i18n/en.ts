@@ -861,6 +861,7 @@ export const dict = {
   "containers.onboarding.description":
     "Create an isolated container for agent work, or a Linux desktop VM to inspect visually in the app.",
   "containers.onboarding.dismiss": "Dismiss",
+  "containers.onboarding.open": "Get started",
   "containers.onboarding.step1.title": "1. Start local runtimes",
   "containers.onboarding.step1.description":
     "OpenLegion needs the sandbox daemon and Docker or QEMU. Use the button below if the daemon is offline.",
@@ -954,7 +955,6 @@ export const dict = {
   "containers.compose.deployed": "Compose stack deployed",
   "containers.compose.stopped": "Compose stack stopped",
   "containers.compose.failed": "Compose command failed",
-  "containers.workspace.title": "Running sandboxes",
   "containers.create.section.security": "Image hardening",
   "containers.create.security.nonRoot": "Run as a non-root USER in your Dockerfile when possible.",
   "containers.create.security.noSecrets": "Do not bake secrets, tokens, or SSH keys into image layers.",

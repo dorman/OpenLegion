@@ -171,7 +171,8 @@
     }
   }
 
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"] {
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-container"],
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-onboarding-dialog) [data-slot="dialog-container"] {
     height: auto;
     max-height: min(92vh, 720px);
   }
@@ -185,6 +186,7 @@
   }
 
   [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"],
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-onboarding-dialog) [data-slot="dialog-body"],
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-body"] {
     display: flex;
     flex-direction: column;
@@ -193,12 +195,14 @@
   }
 
   [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) .container-create-dialog-body,
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-onboarding-dialog) .container-onboarding-dialog-body,
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) .container-inspect-dialog-body {
     min-height: 0;
     flex: 1;
   }
 
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) .container-create-dialog-body {
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) .container-create-dialog-body,
+  [data-component="dialog"]:has([data-slot="dialog-content"].container-onboarding-dialog) .container-onboarding-dialog-body {
     overflow-y: auto;
   }
 
