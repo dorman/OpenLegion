@@ -88,6 +88,7 @@ export default function ContainersPage() {
   const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
   const [kindFilter, setKindFilter] = createSignal<KindFilter>("all")
   const [bulkPending, setBulkPending] = createSignal(false)
+  let onboardingDismissedThisSession = false
 
   const enabled = createMemo(() => platform.platform === "desktop" && server.isLocal() && !!server.current?.http)
 
@@ -149,19 +150,24 @@ export default function ContainersPage() {
     return <Navigate href="/" />
   }
 
+  function markOnboardingDismissed() {
+    onboardingDismissedThisSession = true
+    void dismissOnboarding(platform.storage)
+  }
+
   function showOnboardingDialog() {
     dialog.show(
       () => (
         <DialogContainersOnboarding
-          runtime={runtime.data}
-          daemonReady={daemonReady()}
-          sandboxCount={containers.data?.length ?? 0}
+          runtime={() => runtime.data}
+          daemonReady={daemonReady}
+          sandboxCount={() => containers.data?.length ?? 0}
           onEnsureDaemon={() => void ensureDaemon()}
           onCreate={showCreateDialog}
-          ensuringDaemon={ensuringDaemon()}
+          ensuringDaemon={ensuringDaemon}
         />
       ),
-      () => dismissOnboarding(platform.storage),
+      markOnboardingDismissed,
     )
   }
 
@@ -175,8 +181,11 @@ export default function ContainersPage() {
     onCleanup(() => {
       cancelled = true
     })
-    void readOnboardingDismissed(platform.storage).then((dismissed) => {
-      if (!dismissed && !cancelled) showOnboardingDialog()
+    void readOnboardingDismissed(platform.storage).then(async (dismissed) => {
+      if (cancelled || onboardingDismissedThisSession || dismissed) return
+      const stillDismissed = await readOnboardingDismissed(platform.storage)
+      if (cancelled || onboardingDismissedThisSession || stillDismissed) return
+      showOnboardingDialog()
     })
   })
 
