@@ -86,6 +86,7 @@ const SUBCOMMANDS = [
   ["db", "path"],
   ["container", "list"],
   ["container", "create"],
+  ["container", "start"],
   ["container", "stop"],
   ["container", "rm"],
 ] as const

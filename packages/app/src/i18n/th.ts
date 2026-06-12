@@ -1,3 +1,5 @@
+import { containers as containersI18n } from "./containers/th"
+
 export const dict = {
   "command.category.suggested": "แนะนำ",
   "command.category.view": "มุมมอง",
@@ -923,4 +925,5 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "ไม่สามารถสร้างไอคอนโปรเจกต์ถาวร",
   "error.childStore.storeCreateFailed": "ไม่สามารถสร้างที่เก็บ",
   "terminal.connectionLost.abnormalClose": "WebSocket ปิดอย่างผิดปกติ: {{code}}",
+  ...containersI18n,
 }

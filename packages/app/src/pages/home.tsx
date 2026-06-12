@@ -21,6 +21,7 @@ import { DateTime } from "luxon"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { DialogSelectServer } from "@/components/dialog-select-server"
+import { GuidedEmptyCards } from "@/components/guided-empty-cards"
 import { ServerConnection, useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
@@ -35,8 +36,10 @@ import { useGlobal } from "@/context/global"
 import { useCommand } from "@/context/command"
 import { useSettings } from "@/context/settings"
 import { ServerHealthIndicator } from "@/components/server/server-row"
+import { linkedSandboxFromMetadata } from "@/utils/container-workspaces"
 
 const HOME_SESSION_LIMIT = 15
+type AgentsSessionFilter = "all" | "sandbox" | "active" | "attention"
 const HOME_ROW_LAYOUT =
   "flex min-w-0 w-full shrink-0 cursor-default items-center rounded-[6px] bg-transparent text-left transition-[background-color,color,box-shadow] duration-[120ms] ease-in-out focus-visible:outline-none"
 const HOME_ROW_BASE = `${HOME_ROW_LAYOUT} border-0`
@@ -120,11 +123,13 @@ function HomeDesign() {
   const global = useGlobal()
   const command = useCommand()
   const notification = useNotification()
+  const permission = usePermission()
   let focusSessionSearch: (() => void) | undefined
   const [state, setState] = createStore({
     search: "",
     project: undefined as string | undefined,
     searchFocused: false,
+    agentFilter: "all" as AgentsSessionFilter,
   })
 
   const projects = createMemo(() => layout.projects.list())
@@ -155,7 +160,28 @@ function HomeDesign() {
       projectByID,
     }),
   )
-  const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
+  const records = createMemo(() => {
+    const filtered = allRecords().filter((record) => {
+      if (!desktopShell() || state.agentFilter === "all") return true
+      const linked = linkedSandboxFromMetadata(record.session.metadata)
+      if (state.agentFilter === "sandbox") return !!linked
+      const [child] = sync.child(record.session.directory, { bootstrap: false })
+      const working = child.session_working(record.session.id)
+      const needsPermission = !!sessionPermissionRequest(child.session, child.permission, record.session.id, (item) => {
+        return !permission.autoResponds(item, record.session.directory)
+      })
+      if (state.agentFilter === "active") return working && !needsPermission
+      if (state.agentFilter === "attention") {
+        return (
+          needsPermission ||
+          notification.session.unseenHasError(record.session.id) ||
+          notification.session.unseenCount(record.session.id) > 0
+        )
+      }
+      return true
+    })
+    return filtered.slice(0, HOME_SESSION_LIMIT)
+  })
   const searchResults = createMemo(() => {
     const query = search().toLowerCase()
     if (!query) return []
@@ -325,6 +351,21 @@ function HomeDesign() {
             onClose={closeSearch}
             onSelect={selectSearchSession}
           />
+          <Show when={desktopShell()}>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <For each={(["all", "sandbox", "active", "attention"] as const)}>
+                {(filter) => (
+                  <ButtonV2
+                    variant={state.agentFilter === filter ? "neutral" : "ghost"}
+                    size="normal"
+                    onClick={() => setState("agentFilter", filter)}
+                  >
+                    {language.t(`home.agents.filter.${filter}`)}
+                  </ButtonV2>
+                )}
+              </For>
+            </div>
+          </Show>
           <div class="mt-3 min-h-0 flex-1 overflow-y-auto">
             <div class="pt-3 flex flex-col gap-6">
               <Show
@@ -335,7 +376,41 @@ function HomeDesign() {
                   when={groups().length > 0}
                   fallback={
                     <div class="flex min-w-0 flex-col gap-4">
-                      <HomeSessionGroupHeader title={language.t("home.sessions.empty")} onNewSession={openNewSession} />
+                      <Show
+                        when={desktopShell()}
+                        fallback={
+                          <HomeSessionGroupHeader title={language.t("home.sessions.empty")} onNewSession={openNewSession} />
+                        }
+                      >
+                        <div class="px-4">
+                          <h2 class="text-sm font-medium text-v2-text-text-base">{language.t("home.sessions.empty")}</h2>
+                          <p class="mt-1 text-sm text-v2-text-text-muted">
+                            {language.t("home.sessions.empty.description")}
+                          </p>
+                        </div>
+                        <GuidedEmptyCards
+                          actions={[
+                            {
+                              titleKey: "home.empty.guided.createSandbox.title",
+                              descriptionKey: "home.empty.guided.createSandbox.description",
+                              actionKey: "home.empty.guided.createSandbox.action",
+                              onClick: () => navigate("/containers"),
+                            },
+                            {
+                              titleKey: "home.empty.guided.startDaemon.title",
+                              descriptionKey: "home.empty.guided.startDaemon.description",
+                              actionKey: "home.empty.guided.startDaemon.action",
+                              onClick: () => navigate("/containers"),
+                            },
+                            {
+                              titleKey: "home.empty.guided.openSession.title",
+                              descriptionKey: "home.empty.guided.openSession.description",
+                              actionKey: "home.empty.guided.openSession.action",
+                              onClick: openNewSession,
+                            },
+                          ]}
+                        />
+                      </Show>
                     </div>
                   }
                 >
@@ -348,7 +423,14 @@ function HomeDesign() {
                         />
                         <div class="flex min-w-0 flex-col gap-px">
                           <For each={group.sessions}>
-                            {(record) => <HomeSessionRow record={record} openSession={openSession} />}
+                            {(record) => (
+                              <HomeSessionRow
+                                record={record}
+                                openSession={openSession}
+                                showSandboxLink={desktopShell()}
+                                showQuickResume={desktopShell()}
+                              />
+                            )}
                           </For>
                         </div>
                       </div>
@@ -904,11 +986,18 @@ function HomeSessionGroupHeader(props: { title: string; onNewSession?: () => voi
   )
 }
 
-function HomeSessionRow(props: { record: HomeSessionRecord; openSession: (session: Session) => void }) {
+function HomeSessionRow(props: {
+  record: HomeSessionRecord
+  openSession: (session: Session) => void
+  showSandboxLink?: boolean
+  showQuickResume?: boolean
+}) {
   const globalSync = useServerSync()
   const notification = useNotification()
   const permission = usePermission()
+  const language = useLanguage()
   const [sessionStore] = globalSync.child(props.record.session.directory, { bootstrap: false })
+  const linkedSandbox = createMemo(() => linkedSandboxFromMetadata(props.record.session.metadata))
   const title = createMemo(() => sessionTitle(props.record.session.title) || props.record.session.id)
   const unseenCount = createMemo(() => notification.session.unseenCount(props.record.session.id))
   const hasError = createMemo(() => notification.session.unseenHasError(props.record.session.id))
@@ -926,12 +1015,13 @@ function HomeSessionRow(props: { record: HomeSessionRecord; openSession: (sessio
   const showStatus = createMemo(() => isWorking() || hasPermissions() || hasError() || unseenCount() > 0)
 
   return (
-    <button
-      type="button"
-      data-component="home-session-row"
-      class={`${HOME_ROW} h-10 gap-2 px-6 py-3 pl-4`}
-      onClick={() => props.openSession(props.record.session)}
-    >
+    <div class="group flex min-w-0 items-center gap-1">
+      <button
+        type="button"
+        data-component="home-session-row"
+        class={`${HOME_ROW} h-10 min-w-0 flex-1 gap-2 px-6 py-3 pl-4`}
+        onClick={() => props.openSession(props.record.session)}
+      >
       <Show
         when={showStatus()}
         fallback={
@@ -970,7 +1060,28 @@ function HomeSessionRow(props: { record: HomeSessionRecord; openSession: (sessio
           {props.record.projectName}
         </span>
       </Show>
-    </button>
+      <Show when={props.showSandboxLink && linkedSandbox()}>
+        {(linked) => (
+          <span class="desktop-pill desktop-pill-success shrink-0 text-[11px]">
+            {language.t("home.agents.sandboxLink", { name: linked().label })}
+          </span>
+        )}
+      </Show>
+      </button>
+      <Show when={props.showQuickResume}>
+        <ButtonV2
+          variant="ghost"
+          size="normal"
+          class="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          onClick={(event: MouseEvent) => {
+            event.stopPropagation()
+            props.openSession(props.record.session)
+          }}
+        >
+          {language.t("home.agents.quickResume")}
+        </ButtonV2>
+      </Show>
+    </div>
   )
 }
 

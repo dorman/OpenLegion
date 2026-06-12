@@ -11,6 +11,8 @@ export const CreateInput = Schema.Struct({
   image: Schema.String,
   name: Schema.optional(Schema.String),
   memoryMb: Schema.optional(Schema.Number),
+  cpuCores: Schema.optional(Schema.Number),
+  diskGb: Schema.optional(Schema.Number),
   env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   ports: Schema.optional(
     Schema.Array(
@@ -67,3 +69,13 @@ export const DisplayOutput = Schema.Struct({
   password: Schema.optional(Schema.String),
 }).annotate({ identifier: "ContainerDisplayOutput" })
 export type DisplayOutput = typeof DisplayOutput.Type
+
+export const ComposeInput = Schema.Struct({
+  file: Schema.String,
+}).annotate({ identifier: "ComposeInput" })
+export type ComposeInput = typeof ComposeInput.Type
+
+export const ComposeOutput = Schema.Struct({
+  output: Schema.String,
+}).annotate({ identifier: "ComposeOutput" })
+export type ComposeOutput = typeof ComposeOutput.Type

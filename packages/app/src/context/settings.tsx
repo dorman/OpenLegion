@@ -33,6 +33,7 @@ export interface Settings {
     editToolPartsExpanded: boolean
     showSessionProgressBar: boolean
     showCustomAgents: boolean
+    showPlanAgent: boolean
     newLayoutDesigns?: boolean
   }
   updates: {
@@ -47,6 +48,7 @@ export interface Settings {
   keybinds: Record<string, string>
   permissions: {
     autoApprove: boolean
+    preset: "" | "strict" | "dev"
   }
   notifications: NotificationSettings
   sounds: SoundSettings
@@ -121,6 +123,7 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
     showCustomAgents: false,
+    showPlanAgent: false,
   },
   updates: {
     startup: true,
@@ -134,6 +137,7 @@ const defaultSettings: Settings = {
   keybinds: {},
   permissions: {
     autoApprove: false,
+    preset: "",
   },
   notifications: {
     agent: true,
@@ -244,6 +248,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         setShowCustomAgents(value: boolean) {
           setStore("general", "showCustomAgents", value)
         },
+        showPlanAgent: withFallback(() => store.general?.showPlanAgent, defaultSettings.general.showPlanAgent),
+        setShowPlanAgent(value: boolean) {
+          setStore("general", "showPlanAgent", value)
+        },
         newLayoutDesigns: withFallback(() => store.general?.newLayoutDesigns, newLayoutDesignsDefault),
         setNewLayoutDesigns(value: boolean) {
           setStore("general", "newLayoutDesigns", value)
@@ -294,6 +302,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         autoApprove: withFallback(() => store.permissions?.autoApprove, defaultSettings.permissions.autoApprove),
         setAutoApprove(value: boolean) {
           setStore("permissions", "autoApprove", value)
+        },
+        preset: withFallback(() => store.permissions?.preset ?? "", defaultSettings.permissions.preset),
+        setPreset(value: "" | "strict" | "dev") {
+          setStore("permissions", "preset", value)
         },
       },
       notifications: {

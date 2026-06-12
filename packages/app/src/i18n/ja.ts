@@ -1,3 +1,5 @@
+import { containers as containersI18n } from "./containers/ja"
+
 export const dict = {
   "command.category.suggested": "おすすめ",
   "command.category.view": "表示",
@@ -851,4 +853,5 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "永続プロジェクトアイコンの作成に失敗しました",
   "error.childStore.storeCreateFailed": "ストアの作成に失敗しました",
   "terminal.connectionLost.abnormalClose": "WebSocket が異常終了しました: {{code}}",
+  ...containersI18n,
 }

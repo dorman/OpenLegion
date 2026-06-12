@@ -1,5 +1,6 @@
 import { dict as en } from "./en"
 type Keys = keyof typeof en
+import { containers as containersI18n } from "./containers/no"
 
 export const dict = {
   "command.category.suggested": "Foreslått",
@@ -934,4 +935,5 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "Kunne ikke opprette vedvarende prosjektikon",
   "error.childStore.storeCreateFailed": "Kunne ikke opprette lager",
   "terminal.connectionLost.abnormalClose": "WebSocket lukket unormalt: {{code}}",
+  ...containersI18n,
 } satisfies Partial<Record<Keys, string>>

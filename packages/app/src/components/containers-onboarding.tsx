@@ -1,6 +1,7 @@
 import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
 import { createSignal, Show } from "solid-js"
 import type { JSX } from "solid-js"
+import { RuntimePill } from "@/components/runtime-pill"
 import { useLanguage } from "@/context/language"
 import type { Platform } from "@/context/platform"
 import type { ContainerRuntimeStatus } from "@/utils/containers"
@@ -23,20 +24,6 @@ export function dismissOnboarding(storage?: Platform["storage"]) {
   } catch {}
 }
 
-function RuntimePill(props: { label: string; ready: boolean; readyLabel: string; unavailableLabel: string }) {
-  return (
-    <span
-      classList={{
-        "desktop-pill": true,
-        "desktop-pill-success": props.ready,
-        "desktop-pill-stopped": !props.ready,
-      }}
-    >
-      {props.label}: {props.ready ? props.readyLabel : props.unavailableLabel}
-    </span>
-  )
-}
-
 function OnboardingStep(props: { title: string; children: JSX.Element }) {
   return (
     <li class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4">
@@ -49,6 +36,7 @@ function OnboardingStep(props: { title: string; children: JSX.Element }) {
 export function ContainersOnboarding(props: {
   runtime?: ContainerRuntimeStatus
   daemonReady: boolean
+  sandboxCount: number
   onEnsureDaemon: () => void
   onCreate: () => void
   ensuringDaemon: boolean
@@ -129,7 +117,9 @@ export function ContainersOnboarding(props: {
 
         <OnboardingStep title={language.t("containers.onboarding.step3.title")}>
           <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.description")}</p>
-          <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.ready")}</p>
+          <Show when={props.sandboxCount > 0}>
+            <p class="text-sm text-v2-text-text-muted">{language.t("containers.onboarding.step3.ready")}</p>
+          </Show>
         </OnboardingStep>
       </ol>
     </section>

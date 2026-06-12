@@ -72,6 +72,7 @@ const api: ElectronAPI = {
   containerRuntimeStatus: () => ipcRenderer.invoke("container-runtime-status"),
   ensureMicrovmDaemon: () => ipcRenderer.invoke("ensure-microvm-daemon"),
   ensureDesktopImage: (presetId) => ipcRenderer.invoke("ensure-desktop-image", presetId),
+  cancelDesktopImageDownload: () => ipcRenderer.invoke("cancel-desktop-image-download"),
   onDesktopImageDownloadProgress: (cb) => {
     const handler = (_: unknown, progress: import("./types").DesktopImageDownloadProgress) => cb(progress)
     ipcRenderer.on("desktop-image-download-progress", handler)

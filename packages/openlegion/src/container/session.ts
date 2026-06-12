@@ -1,8 +1,32 @@
 import path from "path"
 import { Option, Schema } from "effect"
-import { Runtime } from "./schema"
+import { Runtime, WorkloadKind } from "./schema"
 
 export const SESSION_CONTAINER_KEY = "openlegion.container"
+
+/**
+ * Marks a session as dedicated to assisting with a sandbox. Unlike
+ * SESSION_CONTAINER (which runs the session's tools inside a container), the
+ * session runs on the host and operates on the sandbox via the sandbox_*
+ * tools; the prompt loop injects the sandbox's live state each turn.
+ */
+export const SESSION_SANDBOX_KEY = "openlegion.sandbox"
+
+export const SessionSandbox = Schema.Struct({
+  id: Schema.String,
+  name: Schema.optional(Schema.String),
+  image: Schema.optional(Schema.String),
+  runtime: Schema.optional(Runtime),
+  kind: Schema.optional(WorkloadKind),
+}).annotate({ identifier: "SessionSandbox" })
+export type SessionSandbox = typeof SessionSandbox.Type
+
+const decodeSandbox = Schema.decodeUnknownOption(SessionSandbox)
+
+export function sessionSandbox(metadata?: Record<string, unknown>) {
+  if (!metadata) return undefined
+  return Option.getOrUndefined(decodeSandbox(metadata[SESSION_SANDBOX_KEY]))
+}
 
 export const SessionContainer = Schema.Struct({
   id: Schema.String,

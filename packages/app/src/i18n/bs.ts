@@ -1,3 +1,5 @@
+import { containers as containersI18n } from "./containers/bs"
+
 export const dict = {
   "command.category.suggested": "Predloženo",
   "command.category.view": "Prikaz",
@@ -933,4 +935,5 @@ export const dict = {
   "error.childStore.persistedProjectIconCreateFailed": "Nije uspjelo kreiranje trajne ikone projekta",
   "error.childStore.storeCreateFailed": "Nije uspjelo kreiranje skladišta",
   "terminal.connectionLost.abnormalClose": "WebSocket zatvoren nenormalno: {{code}}",
+  ...containersI18n,
 }

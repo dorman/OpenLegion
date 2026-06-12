@@ -1,4 +1,5 @@
 import { AppProcess } from "@openlegion-ai/core/process"
+import * as Log from "@openlegion-ai/core/util/log"
 import { Context, Effect, Layer, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import * as MicroVMClient from "./microvm-client"
@@ -13,6 +14,8 @@ type ListOutput = ContainerSchema.ListOutput
 type Runtime = ContainerSchema.Runtime
 
 type CliRuntime = "docker" | "podman"
+
+const log = Log.create({ service: "container" })
 
 export class RuntimeNotFoundError extends Schema.TaggedErrorClass<RuntimeNotFoundError>()(
   "ContainerRuntimeNotFoundError",
@@ -52,6 +55,10 @@ export class DisplayFailedError extends Schema.TaggedErrorClass<DisplayFailedErr
   message: Schema.String,
 }) {}
 
+export class ComposeFailedError extends Schema.TaggedErrorClass<ComposeFailedError>()("ComposeFailedError", {
+  message: Schema.String,
+}) {}
+
 export class StartFailedError extends Schema.TaggedErrorClass<StartFailedError>()("ContainerStartFailedError", {
   message: Schema.String,
 }) {}
@@ -67,6 +74,7 @@ export type Error =
   | LogsFailedError
   | ShellFailedError
   | DisplayFailedError
+  | ComposeFailedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
@@ -79,6 +87,8 @@ export interface Interface {
   readonly logs: (id: string, input?: { tail?: number }) => Effect.Effect<ContainerSchema.LogsOutput, Error>
   readonly shell: (id: string) => Effect.Effect<ContainerSchema.ShellOutput, Error>
   readonly display: (id: string) => Effect.Effect<ContainerSchema.DisplayOutput, Error>
+  readonly composeUp: (file: string) => Effect.Effect<ContainerSchema.ComposeOutput, Error>
+  readonly composeDown: (file: string) => Effect.Effect<ContainerSchema.ComposeOutput, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -99,8 +109,12 @@ function buildCreateArgs(input: CreateInput) {
     const suffix = item.readOnly ? ":ro" : ""
     return ["--volume", `${item.host}:${item.container}${suffix}`]
   })
+  const cpus =
+    input.cpuCores !== undefined && Number.isFinite(input.cpuCores) && input.cpuCores > 0
+      ? ["--cpus", String(input.cpuCores)]
+      : []
   const command = input.command ?? []
-  return ["container", "create", ...name, ...env, ...ports, ...volumes, input.image, ...command]
+  return ["container", "create", ...name, ...env, ...ports, ...volumes, ...cpus, input.image, ...command]
 }
 
 const SANDBOX_LABEL_PREFIX = "openlegion.sandbox.id="
@@ -288,6 +302,7 @@ export const layer = Layer.effect(
     })
 
     const list = Effect.fn("Container.list")(function* () {
+      log.info("list")
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
         const statusBySandbox = yield* sandboxDockerStatus()
@@ -312,6 +327,7 @@ export const layer = Layer.effect(
     })
 
     const create = Effect.fn("Container.create")(function* (input: CreateInput) {
+      log.info("create", { image: input.image, kind: input.kind, name: input.name, memoryMb: input.memoryMb })
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
         return yield* microvmClient.create(input).pipe(
@@ -362,6 +378,7 @@ export const layer = Layer.effect(
     })
 
     const start = Effect.fn("Container.start")(function* (id: string) {
+      log.info("start", { id })
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
         return yield* microvmClient.start(id).pipe(
@@ -380,6 +397,7 @@ export const layer = Layer.effect(
     })
 
     const stop = Effect.fn("Container.stop")(function* (id: string) {
+      log.info("stop", { id })
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
         return yield* microvmClient.stop(id).pipe(Effect.mapError((message) => new StopFailedError({ message })))
@@ -394,6 +412,7 @@ export const layer = Layer.effect(
     })
 
     const remove = Effect.fn("Container.remove")(function* (id: string) {
+      log.info("remove", { id })
       const runtime = yield* detectRuntime()
       if (runtime === "microvm") {
         return yield* microvmClient.remove(id).pipe(Effect.mapError((message) => new RemoveFailedError({ message })))
@@ -447,7 +466,40 @@ export const layer = Layer.effect(
       })
     })
 
-    return Service.of({ list, create, start, stop, remove, logs, shell, display })
+    const composeRuntime = Effect.fnUntraced(function* () {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* new ComposeFailedError({
+          message: "Compose stacks require Docker. Set OPENLEGION_CONTAINER_RUNTIME=docker or use docker directly.",
+        })
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      return runtime
+    })
+
+    const composeUp = Effect.fn("Container.composeUp")(function* (file: string) {
+      const runtime = yield* composeRuntime()
+      const result = yield* run(runtime, ["compose", "-f", file, "up", "-d", "--remove-orphans"])
+      if (result.code !== 0) {
+        return yield* new ComposeFailedError({
+          message: normalizeMessage(result, "Failed to deploy compose stack"),
+        })
+      }
+      return { output: result.stdout.trim() || "Compose stack deployed." }
+    })
+
+    const composeDown = Effect.fn("Container.composeDown")(function* (file: string) {
+      const runtime = yield* composeRuntime()
+      const result = yield* run(runtime, ["compose", "-f", file, "down", "--remove-orphans"])
+      if (result.code !== 0) {
+        return yield* new ComposeFailedError({
+          message: normalizeMessage(result, "Failed to stop compose stack"),
+        })
+      }
+      return { output: result.stdout.trim() || "Compose stack stopped." }
+    })
+
+    return Service.of({ list, create, start, stop, remove, logs, shell, display, composeUp, composeDown })
   }),
 )
 

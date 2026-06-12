@@ -33,6 +33,7 @@ export default defineConfig({
     env: {
       VITE_OPENLEGION_SERVER_HOST: serverHost,
       VITE_OPENLEGION_SERVER_PORT: serverPort,
+      VITE_E2E_DESKTOP: "1",
     },
   },
   use: {

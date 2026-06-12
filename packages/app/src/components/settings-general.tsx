@@ -27,6 +27,11 @@ import {
   terminalInput,
   useSettings,
 } from "@/context/settings"
+import {
+  isPermissionPresetID,
+  permissionPreset,
+  permissionPresets,
+} from "@openlegion-ai/core/v1/config/permission-preset"
 import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
 import { Link } from "./link"
@@ -400,6 +405,49 @@ export const SettingsGeneral: Component = () => {
               onChange={(checked) => settings.general.setShowSessionProgressBar(checked)}
             />
           </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.general.row.showPlanAgent.title")}
+          description={language.t("settings.general.row.showPlanAgent.description")}
+        >
+          <div data-action="settings-show-plan-agent">
+            <Switch
+              checked={settings.general.showPlanAgent()}
+              onChange={(checked) => settings.general.setShowPlanAgent(checked)}
+            />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.permissions.row.preset.title")}
+          description={language.t("settings.permissions.row.preset.description")}
+        >
+          <Select
+            data-action="settings-permission-preset"
+            options={[
+              { id: "", label: language.t("settings.permissions.row.preset.default") },
+              ...permissionPresets.map((item) => ({ id: item.id, label: item.label })),
+            ]}
+            current={(() => {
+              const preset = settings.permissions.preset()
+              if (!preset) return { id: "", label: language.t("settings.permissions.row.preset.default") }
+              return { id: preset, label: permissionPreset(preset).label }
+            })()}
+            value={(option) => option.id}
+            label={(option) => option.label}
+            onSelect={(option) => {
+              if (!option) return
+              const next = option.id
+              settings.permissions.setPreset(isPermissionPresetID(next) ? next : "")
+              if (!isPermissionPresetID(next)) return
+              void serverSync.updateConfig({ permission: permissionPreset(next).permission })
+            }}
+            variant="secondary"
+            size="small"
+            triggerVariant="settings"
+            triggerStyle={{ "min-width": "180px" }}
+          />
         </SettingsRow>
 
         <SettingsRow

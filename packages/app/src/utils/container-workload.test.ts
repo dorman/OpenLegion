@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   isAgentCapable,
   isDesktopWorkload,
+  isInSandboxAgentCapable,
   inspectDefaultTab,
   workloadKindKey,
   workloadPillClass,
@@ -28,9 +29,14 @@ describe("container-workload", () => {
     expect(isDesktopWorkload(container)).toBe(false)
   })
 
-  test("agent capability excludes desktops", () => {
+  test("host agent capability includes desktops", () => {
     expect(isAgentCapable(container)).toBe(true)
-    expect(isAgentCapable(desktop)).toBe(false)
+    expect(isAgentCapable(desktop)).toBe(true)
+  })
+
+  test("in-sandbox agent sessions exclude desktops", () => {
+    expect(isInSandboxAgentCapable(container)).toBe(true)
+    expect(isInSandboxAgentCapable(desktop)).toBe(false)
   })
 
   test("uses display tab for desktop inspect", () => {

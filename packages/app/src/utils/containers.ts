@@ -22,6 +22,8 @@ export type ContainerCreateInput = {
   image: string
   name?: string
   memoryMb?: number
+  cpuCores?: number
+  diskGb?: number
   env?: Record<string, string>
   ports?: { host: string; container: string }[]
   volumes?: { host: string; container: string; readOnly?: boolean }[]

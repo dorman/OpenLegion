@@ -1,9 +1,13 @@
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { A, useLocation } from "@solidjs/router"
+import { useQuery } from "@tanstack/solid-query"
 import { createMemo, For, ParentProps, Show } from "solid-js"
+import { RuntimePill } from "@/components/runtime-pill"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
+import { listContainerWorkspaces } from "@/utils/container-workspaces"
 
 type NavItem = {
   id: string
@@ -14,10 +18,32 @@ type NavItem = {
 
 export function DesktopShell(props: ParentProps) {
   const platform = usePlatform()
+  const server = useServer()
   const settings = useSettings()
   const language = useLanguage()
   const location = useLocation()
   const dialog = useDialog()
+
+  const runtime = useQuery(() => ({
+    queryKey: ["desktop-shell", "runtime"],
+    enabled: platform.platform === "desktop",
+    refetchInterval: 10_000,
+    queryFn: async () => platform.containerRuntimeStatus?.(),
+  }))
+
+  const workspaces = useQuery(() => ({
+    queryKey: ["container-workspaces", server.key],
+    enabled: platform.platform === "desktop" && server.isLocal() && !!server.current?.http,
+    queryFn: async () => {
+      const http = server.current?.http
+      if (!http) return []
+      return listContainerWorkspaces(http)
+    },
+  }))
+
+  const linkedSandboxes = createMemo(() =>
+    (workspaces.data ?? []).filter((item) => item.hostMount && item.sessionId),
+  )
 
   const enabled = createMemo(() => platform.platform === "desktop" && settings.general.newLayoutDesigns())
 
@@ -77,6 +103,36 @@ export function DesktopShell(props: ParentProps) {
               </Show>
             )}
           </For>
+          <Show when={linkedSandboxes().length > 0}>
+            <div class="mt-4 flex flex-col gap-2 border-t border-v2-border-border-base pt-3">
+              <div class="px-1 text-[11px] font-medium uppercase tracking-[0.04em] text-v2-text-text-muted">
+                {language.t("desktop.linkedSandboxes.title")}
+              </div>
+              <For each={linkedSandboxes()}>
+                {(item) => (
+                  <A href="/containers" class="desktop-nav-item text-xs">
+                    <span class="truncate">{item.name ?? item.containerId.slice(0, 12)}</span>
+                    <span class="truncate text-v2-text-text-faint">{item.hostMount}</span>
+                  </A>
+                )}
+              </For>
+            </div>
+          </Show>
+          <div class="mt-auto flex flex-col gap-2 border-t border-v2-border-border-base pt-3">
+            <div class="px-1 text-[11px] font-medium uppercase tracking-[0.04em] text-v2-text-text-muted">
+              {language.t("desktop.daemon.title")}
+            </div>
+            <Show when={runtime.data}>
+              {(status) => (
+                <RuntimePill
+                  label={language.t("containers.runtime.microvm")}
+                  ready={status().microvm}
+                  readyLabel={language.t("desktop.daemon.ready")}
+                  unavailableLabel={language.t("desktop.daemon.unavailable")}
+                />
+              )}
+            </Show>
+          </div>
         </nav>
         <div class="flex min-h-0 min-w-0 flex-1 flex-col">{props.children}</div>
       </div>

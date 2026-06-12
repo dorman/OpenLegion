@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dorman/openlegion/internal/docker"
@@ -232,6 +233,9 @@ func buildCreateArgs(req types.CreateVMRequest, envelope sandbox.Envelope) ([]st
 			suffix = ":ro"
 		}
 		args = append(args, "--volume", fmt.Sprintf("%s:%s%s", volume.Host, volume.Container, suffix))
+	}
+	if req.CpuCores > 0 {
+		args = append(args, "--cpus", strconv.Itoa(req.CpuCores))
 	}
 
 	args = append(args, sandbox.HardeningArgs()...)

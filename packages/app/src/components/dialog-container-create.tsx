@@ -9,6 +9,8 @@ import { useLanguage } from "@/context/language"
 import { usePlatform, type DesktopImageDownloadProgress } from "@/context/platform"
 import { presetById, presetsForArch } from "@/utils/desktop-presets"
 import type { ContainerCreateInput } from "@/utils/containers"
+import { warningsForCreateInput } from "@/utils/sandbox-config-warnings"
+import { SANDBOX_TEMPLATES, type SandboxTemplateFormState } from "@/utils/sandbox-templates"
 
 function formatElapsed(seconds: number) {
   const mins = Math.floor(seconds / 60)
@@ -25,6 +27,20 @@ function FormSection(props: { title: string; children: JSX.Element }) {
   )
 }
 
+const defaultFormState = (): SandboxTemplateFormState => ({
+  kind: "container",
+  preset: "custom",
+  image: "alpine:latest",
+  name: "",
+  command: "sleep 3600",
+  memoryMb: "2048",
+  cpuCores: "2",
+  diskGb: "24",
+  volumeHost: "",
+  volumeContainer: "/workspace",
+  publish: "",
+})
+
 export function DialogContainerCreate(props: {
   onCreate: (input: ContainerCreateInput) => Promise<unknown>
   arch?: "arm64" | "x64"
@@ -37,17 +53,9 @@ export function DialogContainerCreate(props: {
   const [downloading, setDownloading] = createSignal(false)
   const [downloadProgress, setDownloadProgress] = createSignal<DesktopImageDownloadProgress | undefined>()
   const [downloadElapsedSec, setDownloadElapsedSec] = createSignal(0)
-  const [store, setStore] = createStore({
-    kind: "container" as "container" | "desktop",
-    preset: "custom",
-    image: "alpine:latest",
-    name: "",
-    command: "sleep 3600",
-    memoryMb: "2048",
-    volumeHost: "",
-    volumeContainer: "/workspace",
-    publish: "",
-  })
+  const [downloadFailed, setDownloadFailed] = createSignal(false)
+  const [store, setStore] = createStore(defaultFormState())
+  let downloadAbort: AbortController | undefined
 
   const arch = createMemo((): "arm64" | "x64" => props.arch ?? "arm64")
 
@@ -58,6 +66,17 @@ export function DialogContainerCreate(props: {
   const selectedPresetLabel = createMemo(() => {
     const preset = selectedPreset()
     return preset ? language.t(preset.labelKey) : ""
+  })
+
+  const configWarnings = createMemo(() =>
+    store.kind === "container"
+      ? warningsForCreateInput({ volumeHost: store.volumeHost })
+      : [],
+  )
+
+  onCleanup(() => {
+    downloadAbort?.abort()
+    void platform.cancelDesktopImageDownload?.()
   })
 
   createEffect(() => {
@@ -71,6 +90,14 @@ export function DialogContainerCreate(props: {
     }, 1000)
     onCleanup(() => clearInterval(timer))
   })
+
+  function applyTemplate(templateId: string) {
+    const template = SANDBOX_TEMPLATES.find((item) => item.id === templateId)
+    if (!template) return
+    setStore({ ...defaultFormState(), ...template.apply(arch()) })
+    setError(undefined)
+    setDownloadFailed(false)
+  }
 
   async function pickDiskImage() {
     const file = await platform.openFilePickerDialog?.({
@@ -89,21 +116,46 @@ export function DialogContainerCreate(props: {
     setStore("volumeHost", host)
   }
 
+  function cancelDownload() {
+    downloadAbort?.abort()
+    void platform.cancelDesktopImageDownload?.()
+    setDownloading(false)
+    setDownloadProgress(undefined)
+    setDownloadFailed(true)
+    setError(language.t("containers.create.preset.downloadCancelled"))
+  }
+
   async function resolveDesktopImage() {
     if (store.preset === "custom") return store.image.trim()
     const ensure = platform.ensureDesktopImage
     if (!ensure) throw new Error(language.t("containers.create.preset.downloadUnavailable"))
+
+    downloadAbort?.abort()
+    downloadAbort = new AbortController()
     setDownloading(true)
+    setDownloadFailed(false)
     setDownloadProgress(undefined)
+    setError(undefined)
+
     try {
       const result = await ensure(store.preset, {
         onProgress: (progress) => setDownloadProgress(progress),
+        signal: downloadAbort.signal,
       })
-      if (!result.ok || !result.path) throw new Error(result.error ?? language.t("containers.create.preset.downloadFailed"))
+      if (result.cancelled) {
+        throw new Error(language.t("containers.create.preset.downloadCancelled"))
+      }
+      if (!result.ok || !result.path) {
+        throw new Error(result.error ?? language.t("containers.create.preset.downloadFailed"))
+      }
       return result.path
+    } catch (err) {
+      setDownloadFailed(true)
+      throw err
     } finally {
       setDownloading(false)
       setDownloadProgress(undefined)
+      downloadAbort = undefined
     }
   }
 
@@ -124,6 +176,11 @@ export function DialogContainerCreate(props: {
     }
   })
 
+  function parseResource(value: string) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }
+
   async function submit() {
     setError(undefined)
     setPending(true)
@@ -141,7 +198,9 @@ export function DialogContainerCreate(props: {
           return [{ host, container }]
         })
 
-      const memoryMb = Number(store.memoryMb)
+      const memoryMb = parseResource(store.memoryMb)
+      const cpuCores = parseResource(store.cpuCores)
+      const diskGb = parseResource(store.diskGb)
       const image = store.kind === "desktop" ? await resolveDesktopImage() : store.image.trim()
       if (!image) throw new Error(language.t("containers.create.imageRequired"))
 
@@ -149,7 +208,9 @@ export function DialogContainerCreate(props: {
         kind: store.kind,
         image,
         name: store.name.trim() || undefined,
-        memoryMb: store.kind === "desktop" && Number.isFinite(memoryMb) && memoryMb > 0 ? memoryMb : undefined,
+        memoryMb: store.kind === "desktop" ? memoryMb : undefined,
+        cpuCores,
+        diskGb: store.kind === "desktop" ? diskGb : undefined,
         command: store.kind === "container" && command.length > 0 ? command : undefined,
         ports: ports.length > 0 ? ports : undefined,
         volumes:
@@ -174,6 +235,21 @@ export function DialogContainerCreate(props: {
       class="container-create-dialog"
     >
       <div class="container-create-dialog-body flex flex-col gap-4 px-4 pb-2">
+        <FormSection title={language.t("containers.templates.title")}>
+          <div class="flex flex-wrap gap-2">
+            <For each={SANDBOX_TEMPLATES}>
+              {(template) => (
+                <ButtonV2 variant="neutral" size="normal" onClick={() => applyTemplate(template.id)}>
+                  {language.t(template.labelKey)}
+                </ButtonV2>
+              )}
+            </For>
+          </div>
+          <p class="text-xs leading-relaxed text-v2-text-text-muted">
+            {language.t("containers.templates.hint")}
+          </p>
+        </FormSection>
+
         <FormSection title={language.t("containers.create.section.workload")}>
           <label class="flex flex-col gap-1 text-sm">
             <span class="text-v2-text-text-muted">{language.t("containers.create.kind")}</span>
@@ -239,32 +315,51 @@ export function DialogContainerCreate(props: {
               </p>
             </Show>
 
-            <Show when={downloading()}>
+            <Show when={downloading() || downloadFailed()}>
               <div
-                class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-3"
+                class="flex flex-col gap-3 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-3"
                 role="status"
                 aria-live="polite"
               >
-                <div class="flex items-start gap-2 text-sm text-v2-text-text-base">
-                  <Spinner class="mt-0.5 shrink-0" />
-                  <div class="flex min-w-0 flex-col gap-1">
-                    <p class="font-medium">{downloadStatusMessage()}</p>
-                    <Show when={(downloadProgress()?.downloadedMb ?? 0) > 0}>
+                <Show
+                  when={downloading()}
+                  fallback={
+                    <p class="text-sm text-v2-text-text-muted">{language.t("containers.create.preset.downloadFailed")}</p>
+                  }
+                >
+                  <div class="flex items-start gap-2 text-sm text-v2-text-text-base">
+                    <Spinner class="mt-0.5 shrink-0" />
+                    <div class="flex min-w-0 flex-col gap-1">
+                      <p class="font-medium">{downloadStatusMessage()}</p>
+                      <Show when={(downloadProgress()?.downloadedMb ?? 0) > 0}>
+                        <p class="text-xs text-v2-text-text-muted">
+                          {language.t("containers.create.preset.downloadingProgress", {
+                            downloaded: downloadProgress()?.downloadedMb ?? 0,
+                          })}
+                        </p>
+                      </Show>
                       <p class="text-xs text-v2-text-text-muted">
-                        {language.t("containers.create.preset.downloadingProgress", {
-                          downloaded: downloadProgress()?.downloadedMb ?? 0,
+                        {language.t("containers.create.preset.downloadingElapsed", {
+                          elapsed: formatElapsed(downloadElapsedSec()),
                         })}
                       </p>
-                    </Show>
-                    <p class="text-xs text-v2-text-text-muted">
-                      {language.t("containers.create.preset.downloadingElapsed", {
-                        elapsed: formatElapsed(downloadElapsedSec()),
-                      })}
-                    </p>
-                    <p class="text-xs leading-relaxed text-v2-text-text-muted">
-                      {language.t("containers.create.preset.downloadingReassurance")}
-                    </p>
+                      <p class="text-xs leading-relaxed text-v2-text-text-muted">
+                        {language.t("containers.create.preset.downloadingReassurance")}
+                      </p>
+                    </div>
                   </div>
+                </Show>
+                <div class="flex flex-wrap gap-2">
+                  <Show when={downloading()}>
+                    <ButtonV2 variant="neutral" size="normal" onClick={() => cancelDownload()}>
+                      {language.t("containers.create.preset.downloadCancel")}
+                    </ButtonV2>
+                  </Show>
+                  <Show when={downloadFailed() && store.preset !== "custom"}>
+                    <ButtonV2 size="normal" onClick={() => void submit()} disabled={pending()}>
+                      {language.t("containers.create.preset.downloadRetry")}
+                    </ButtonV2>
+                  </Show>
                 </div>
               </div>
             </Show>
@@ -277,6 +372,22 @@ export function DialogContainerCreate(props: {
                 class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
                 value={store.memoryMb}
                 onInput={(event) => setStore("memoryMb", event.currentTarget.value)}
+              />
+            </label>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.cpuCores")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.cpuCores}
+                onInput={(event) => setStore("cpuCores", event.currentTarget.value)}
+              />
+            </label>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.diskGb")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.diskGb}
+                onInput={(event) => setStore("diskGb", event.currentTarget.value)}
               />
             </label>
           </FormSection>
@@ -333,6 +444,37 @@ export function DialogContainerCreate(props: {
               />
             </div>
           </FormSection>
+
+          <FormSection title={language.t("containers.create.section.resources")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.cpuCores")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.cpuCores}
+                onInput={(event) => setStore("cpuCores", event.currentTarget.value)}
+              />
+            </label>
+          </FormSection>
+
+          <FormSection title={language.t("containers.create.section.security")}>
+            <ul class="list-disc space-y-1 pl-5 text-xs leading-relaxed text-v2-text-text-muted">
+              <li>{language.t("containers.create.security.nonRoot")}</li>
+              <li>{language.t("containers.create.security.noSecrets")}</li>
+              <li>{language.t("containers.create.security.pinDigest")}</li>
+              <li>{language.t("containers.create.security.minimal")}</li>
+            </ul>
+          </FormSection>
+        </Show>
+
+        <Show when={configWarnings().length > 0}>
+          <div class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-3">
+            <p class="text-sm font-medium text-v2-text-text-base">{language.t("containers.warnings.title")}</p>
+            <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-xs leading-relaxed text-v2-text-text-muted">
+              <For each={configWarnings()}>
+                {(warning) => <li>{language.t(warning.messageKey)}</li>}
+              </For>
+            </ul>
+          </div>
         </Show>
 
         <FormSection title={language.t("containers.create.section.general")}>

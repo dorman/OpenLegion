@@ -59,6 +59,8 @@ import { Truncate } from "@/tool/truncate"
 import { FSUtil } from "@openlegion-ai/core/fs-util"
 import { CrossSpawnSpawner } from "@openlegion-ai/core/cross-spawn-spawner"
 import { ContainerFiles } from "@/container/files"
+import { Container } from "@/container"
+import { AppProcess } from "@openlegion-ai/core/process"
 import { Ripgrep } from "@openlegion-ai/core/filesystem/ripgrep"
 import { Format } from "../../src/format"
 import { Reference } from "../../src/reference/reference"
@@ -146,6 +148,8 @@ function makeHttp() {
     Layer.provide(Ripgrep.defaultLayer),
     Layer.provide(Format.defaultLayer),
     Layer.provide(ContainerFiles.defaultLayer),
+    Layer.provide(Container.defaultLayer),
+    Layer.provide(AppProcess.defaultLayer),
     Layer.provide(RuntimeFlags.layer({ experimentalEventSystem: true })),
     Layer.provideMerge(todo),
     Layer.provideMerge(question),
@@ -169,6 +173,7 @@ function makeHttp() {
     SessionPrompt.layer.pipe(
       Layer.provide(SessionRevert.defaultLayer),
       Layer.provide(Image.defaultLayer),
+      Layer.provide(Container.defaultLayer),
       Layer.provide(Reference.defaultLayer),
       Layer.provide(SessionSummary.defaultLayer),
       Layer.provideMerge(run),

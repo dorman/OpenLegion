@@ -42,7 +42,7 @@ import {
   setDockIcon,
 } from "./windows"
 import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
-import { ensureDesktopImage } from "./desktop-images"
+import { ensureDesktopImage, cancelDesktopImageDownload } from "./desktop-images"
 import {
   closeAllContainerPtys,
   closeContainerPty,
@@ -294,6 +294,9 @@ const main = Effect.gen(function* () {
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
     ensureDesktopImage: (event, presetId) => ensureDesktopImage(presetId, event.sender),
+  cancelDesktopImageDownload: () => {
+    cancelDesktopImageDownload()
+  },
     containerPtyCreate: (event, input) => {
       try {
         let id = ""

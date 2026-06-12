@@ -123,6 +123,17 @@ export async function exportDebugLogs() {
 
 export { classifyProcessExit, type ProcessExitKind } from "./process-exit"
 
+export type StructuredLog = {
+  service: string
+  level: "info" | "warn" | "error"
+  message: string
+  extra?: Record<string, unknown>
+}
+
+export function bridgeStructuredLog(entry: StructuredLog) {
+  write(entry.service, entry.message, entry.extra, entry.level)
+}
+
 export function processMeta(sessionStartedAt?: number) {
   return {
     pid: process.pid,

@@ -118,6 +118,7 @@ export type ElectronAPI = {
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
   ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>
+  cancelDesktopImageDownload: () => Promise<void>
   onDesktopImageDownloadProgress: (cb: (progress: DesktopImageDownloadProgress) => void) => () => void
   containerPtyCreate: (input: {
     command: string

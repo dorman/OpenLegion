@@ -26,6 +26,8 @@ Everything runs **on your machine**. There is no hosted control plane; data, cre
 
 ![OpenLegion desktop VM display](./docs/screenshots/desktop-vm-display.png)
 
+Screenshots are maintained manually — see [docs/screenshots/README.md](./docs/screenshots/README.md) when refreshing product imagery after UI changes.
+
 ---
 
 ## Who this is for
@@ -95,7 +97,7 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 | Feature | Description |
 | --- | --- |
 | **Create container sandboxes** | Desktop dialog or CLI—image, name, command, ports, bind mounts |
-| **Create desktop sandboxes** | `kind: desktop` with a curated installer ISO (Ubuntu, Debian, Fedora, Rocky, AlmaLinux — filtered by host arm64/amd64) or a custom qcow2/ISO; installer images cache under `~/.openlegion/images`, VM disks under `~/.openlegion/qemu-vms` |
+| **Create desktop sandboxes** | `kind: desktop` with a curated installer ISO (Ubuntu, Debian, Fedora, Rocky, AlmaLinux — filtered by host arm64/amd64; see [desktop presets](./packages/app/src/utils/desktop-presets.ts)) or a custom qcow2/ISO; installer images cache under `~/.openlegion/images`, VM disks under `~/.openlegion/qemu-vms` |
 | **Isolated networks** | Sandbox daemon places Docker workloads on dedicated networks (`network: isolated` in the UI) |
 | **Start stopped workloads** | Restart stopped containers and desktop VMs from the UI or `POST /global/containers/:id/start` |
 | **Logs, shell & desktop** | Inspect dialog with **Logs**, **Shell**, and **Desktop** tabs; live VNC for QEMU workloads |
@@ -115,15 +117,15 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 - **Agents page** — recent agent sessions (`/agents`)
 - **Settings** — in-app settings dialog from the sidebar
 - **Dev builds** — channel badge and app version in the titlebar
-- **Theme** — dark charcoal shell with green accents, orange agent-session highlights, and monospace typography on desktop
+- **Theme** — dark charcoal shell with green accents, orange agent-session highlights, and monospace typography on desktop. The Electron chrome is **dark-only by design** (no light desktop theme); the in-app settings theme still applies inside agent sessions on web/desktop builds.
 
 ### Roadmap
 
-- [ ] **Compose project management** — create and manage multi-service stacks from the desktop UI
-- [ ] **Multi-sandbox workspaces** — run several stacks side by side with clear isolation boundaries in the UI
-- [ ] **Project sandboxes** — register sandbox host paths as projects in the sidebar
-- [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run
-- [ ] **Security-team views** — audit-friendly session logs and policy hints for common misconfigurations
+- [x] **Compose project management** — basic deploy/stop from a compose file on the Sandboxes page
+- [x] **Multi-sandbox workspaces** — tabbed panel when multiple sandboxes are running
+- [x] **Project sandboxes** — linked project paths shown in the desktop sidebar
+- [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run (basic hardening hints in create dialog today)
+- [x] **Security-team views** — audit tab in inspect dialog for local sandbox permission events
 
 The [`packages/containers`](./packages/containers/) directory is **CI build images** for GitHub Actions only—not the end-user runtime.
 
@@ -146,7 +148,7 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 - [Docker](https://docs.docker.com/get-docker/) (or Podman) for container sandboxes — on macOS, [Colima](https://github.com/abiosoft/colima) is a common local Docker backend
 - [QEMU](https://www.qemu.org/) (`brew install qemu`) for desktop sandboxes on macOS
 - [Go](https://go.dev) **1.22+** (to build/run the sandbox daemon locally)
-- macOS, Linux, or Windows (desktop development is most tested on **macOS** today; icon regeneration in `predev` uses macOS `sips`/`iconutil`)
+- macOS, Linux, or Windows (desktop development is most tested on **macOS** today; icon regeneration in `predev` uses macOS `sips`/`iconutil` — Linux/Windows dev builds use committed icons under `packages/desktop/icons/`)
 
 ---
 
