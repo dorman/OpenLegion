@@ -10,7 +10,8 @@ Use Mark for compact spaces, Logo for stacked wordmark, Splash for hero sections
 - \`Mark\`, \`Splash\`, and \`Logo\` load brand PNGs from \`assets/brand\`.
 
 ### Variants and states
-- \`Mark\` / \`Splash\`: circular hooded icon.
+- \`Mark\`: eyeless hood icon.
+- \`Splash\`: loading emblem (eyeless hood mark + wordmark, transparent background).
 - \`Logo\`: stacked icon + OpenLegion wordmark.
 
 ### Behavior
@@ -47,7 +48,7 @@ export const Basic = {
       </div>
       <div>
         <div style={{ color: "var(--text-weak)", "font-size": "12px" }}>Splash</div>
-        <mod.Splash class="size-20 object-contain" />
+        <mod.Splash class="w-40 object-contain" />
       </div>
       <div>
         <div style={{ color: "var(--text-weak)", "font-size": "12px" }}>Logo</div>

@@ -27,6 +27,7 @@ import {
   SandboxCreateTool,
   SandboxDeleteTool,
   SandboxExecTool,
+  SandboxInputTool,
   SandboxInspectTool,
   SandboxListTool,
   SandboxLogsTool,
@@ -157,6 +158,7 @@ export const layer: Layer.Layer<
     const sandboxLogs = yield* SandboxLogsTool
     const sandboxExec = yield* SandboxExecTool
     const sandboxScreenshot = yield* SandboxScreenshotTool
+    const sandboxInput = yield* SandboxInputTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -273,6 +275,7 @@ export const layer: Layer.Layer<
           sandboxLogs: Tool.init(sandboxLogs),
           sandboxExec: Tool.init(sandboxExec),
           sandboxScreenshot: Tool.init(sandboxScreenshot),
+          sandboxInput: Tool.init(sandboxInput),
         })
 
         return {
@@ -301,6 +304,7 @@ export const layer: Layer.Layer<
             tool.sandboxLogs,
             tool.sandboxExec,
             tool.sandboxScreenshot,
+            tool.sandboxInput,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && ["cli", "desktop", "app"].includes(flags.client) ? [tool.plan] : []),
           ],

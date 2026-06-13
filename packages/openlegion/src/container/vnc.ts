@@ -1,10 +1,10 @@
 import { deflateSync } from "node:zlib"
 
 /**
- * Minimal RFB 3.x client that captures a single framebuffer screenshot over a
- * VNC websocket (the transport the sandbox daemon exposes for desktop VMs).
- * Speaks only what a one-shot screenshot needs: None/VNC-auth security, a
- * 32bpp true-colour pixel format, and Raw encoding.
+ * Minimal RFB 3.x client for the VNC websocket the sandbox daemon exposes for
+ * desktop VMs. Speaks only what screenshots and input need: None/VNC-auth
+ * security, a 32bpp true-colour pixel format, Raw encoding, and
+ * KeyEvent/PointerEvent messages.
  */
 
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -322,7 +322,9 @@ function blitRaw(fb: Buffer, fbWidth: number, fbHeight: number, x: number, y: nu
   }
 }
 
-async function captureFrame(stream: ByteStream, send: Send, password?: string): Promise<VncScreenshot> {
+type VncConnection = { stream: ByteStream; send: Send; width: number; height: number }
+
+async function handshake(stream: ByteStream, send: Send, password?: string): Promise<VncConnection> {
   await negotiateSecurity(stream, send, password)
 
   send(Buffer.from([1])) // ClientInit: shared
@@ -332,7 +334,10 @@ async function captureFrame(stream: ByteStream, send: Send, password?: string): 
   const nameLength = serverInit.readUInt32BE(20)
   if (nameLength > 0) await stream.read(nameLength)
   if (width === 0 || height === 0) throw new VncError("server reported an empty framebuffer")
+  return { stream, send, width, height }
+}
 
+async function captureScreen({ stream, send, width, height }: VncConnection): Promise<VncScreenshot> {
   clientSetup(send, width, height)
 
   const fb = Buffer.alloc(width * height * 4)
@@ -372,11 +377,10 @@ async function captureFrame(stream: ByteStream, send: Send, password?: string): 
   }
 }
 
-export function captureVncScreenshot(input: {
-  url: string
-  password?: string
-  timeoutMs?: number
-}): Promise<VncScreenshot> {
+function withVncSession<T>(
+  input: { url: string; password?: string; timeoutMs?: number },
+  run: (conn: VncConnection) => Promise<T>,
+): Promise<T> {
   const WebSocketCtor = (globalThis as { WebSocket?: new (url: string) => WebSocket }).WebSocket
   if (!WebSocketCtor) {
     return Promise.reject(new VncError("WebSocket is not available in this runtime"))
@@ -395,7 +399,7 @@ export function captureVncScreenshot(input: {
     socket.binaryType = "arraybuffer"
 
     let settled = false
-    const finish = (result: { ok: true; value: VncScreenshot } | { ok: false; error: Error }) => {
+    const finish = (result: { ok: true; value: T } | { ok: false; error: Error }) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
@@ -406,7 +410,7 @@ export function captureVncScreenshot(input: {
       else reject(result.error)
     }
     const timer = setTimeout(() => {
-      const error = new VncError(`screenshot timed out after ${timeoutMs}ms`)
+      const error = new VncError(`the display session timed out after ${timeoutMs}ms`)
       stream.fail(error)
       finish({ ok: false, error })
     }, timeoutMs)
@@ -416,11 +420,234 @@ export function captureVncScreenshot(input: {
       stream.push(data instanceof Uint8Array ? data : new Uint8Array(data))
     }
     socket.onerror = () => stream.fail(new VncError("websocket connection to the display failed"))
-    socket.onclose = () => stream.fail(new VncError("the display connection closed before the screenshot completed"))
+    socket.onclose = () => stream.fail(new VncError("the display connection closed unexpectedly"))
 
-    captureFrame(stream, (data) => socket.send(data), input.password).then(
-      (value) => finish({ ok: true, value }),
-      (error) => finish({ ok: false, error: error instanceof Error ? error : new Error(String(error)) }),
-    )
+    handshake(stream, (data) => socket.send(data), input.password)
+      .then(run)
+      .then(
+        (value) => finish({ ok: true, value }),
+        (error) => finish({ ok: false, error: error instanceof Error ? error : new Error(String(error)) }),
+      )
+  })
+}
+
+export function captureVncScreenshot(input: {
+  url: string
+  password?: string
+  timeoutMs?: number
+}): Promise<VncScreenshot> {
+  return withVncSession(input, captureScreen)
+}
+
+// ---------------------------------------------------------------------------
+// Input: KeyEvent / PointerEvent messages and high-level actions.
+// ---------------------------------------------------------------------------
+
+export type VncInputAction =
+  | { action: "type"; text: string }
+  | { action: "key"; key: string }
+  | { action: "click" | "double_click"; x: number; y: number; button?: "left" | "middle" | "right" }
+  | { action: "move"; x: number; y: number }
+  | { action: "scroll"; x: number; y: number; direction: "up" | "down"; amount?: number }
+  | { action: "wait"; ms: number }
+
+const KEYSTROKE_DELAY_MS = 12
+const ACTION_DELAY_MS = 50
+const DOUBLE_CLICK_GAP_MS = 80
+const SETTLE_BEFORE_SCREENSHOT_MS = 1_000
+const MAX_WAIT_MS = 10_000
+const MAX_SCROLL_TICKS = 10
+
+const BUTTON_MASKS = { left: 1, middle: 2, right: 4 } as const
+const SCROLL_MASKS = { up: 8, down: 16 } as const
+
+// X11 keysyms. Characters map to their codepoint (Latin-1) or the Unicode
+// keysym range; everything else needs a name from this table.
+const MODIFIER_KEYSYMS: Record<string, number> = {
+  ctrl: 0xffe3,
+  control: 0xffe3,
+  shift: 0xffe1,
+  alt: 0xffe9,
+  option: 0xffe9,
+  altgr: 0xffea,
+  meta: 0xffeb,
+  super: 0xffeb,
+  win: 0xffeb,
+  cmd: 0xffeb,
+}
+
+const NAMED_KEYSYMS: Record<string, number> = {
+  enter: 0xff0d,
+  return: 0xff0d,
+  esc: 0xff1b,
+  escape: 0xff1b,
+  backspace: 0xff08,
+  tab: 0xff09,
+  space: 0x20,
+  delete: 0xffff,
+  del: 0xffff,
+  insert: 0xff63,
+  home: 0xff50,
+  end: 0xff57,
+  pageup: 0xff55,
+  pagedown: 0xff56,
+  up: 0xff52,
+  down: 0xff54,
+  left: 0xff51,
+  right: 0xff53,
+  printscreen: 0xff61,
+  menu: 0xff67,
+  plus: 0x2b,
+  minus: 0x2d,
+}
+for (let i = 1; i <= 12; i++) NAMED_KEYSYMS[`f${i}`] = 0xffbe + i - 1
+
+function charKeysym(char: string): number {
+  const codepoint = char.codePointAt(0)!
+  if (codepoint === 0x0a) return NAMED_KEYSYMS.return!
+  if (codepoint === 0x09) return NAMED_KEYSYMS.tab!
+  if (codepoint <= 0xff) return codepoint
+  return 0x01000000 + codepoint // RFB carries other Unicode at this offset
+}
+
+function resolveKeysym(token: string): number {
+  const named = MODIFIER_KEYSYMS[token.toLowerCase()] ?? NAMED_KEYSYMS[token.toLowerCase()]
+  if (named !== undefined) return named
+  if ([...token].length === 1) return charKeysym(token)
+  throw new VncError(`unknown key "${token}"`)
+}
+
+/** Parse a key combo like "ctrl+alt+t" into modifier keysyms plus the key itself. */
+export function parseKeyCombo(combo: string): { modifiers: number[]; key: number } {
+  const trimmed = combo.trim()
+  if (trimmed === "") throw new VncError("empty key")
+  if ([...trimmed].length === 1) return { modifiers: [], key: charKeysym(trimmed) }
+  const tokens = trimmed.split("+").map((token) => token.trim())
+  // a trailing empty token means a literal "+" was the key, e.g. "ctrl++"
+  const key = tokens.pop()!
+  const keysym = key === "" ? charKeysym("+") : resolveKeysym(key)
+  const modifiers = tokens
+    .filter((token) => token !== "")
+    .map((token) => {
+      const modifier = MODIFIER_KEYSYMS[token.toLowerCase()]
+      if (modifier === undefined) throw new VncError(`"${token}" is not a modifier key (use ctrl, shift, alt, or super)`)
+      return modifier
+    })
+  return { modifiers, key: keysym }
+}
+
+function keyEvent(send: Send, keysym: number, down: boolean) {
+  const msg = Buffer.alloc(8)
+  msg[0] = 4
+  msg[1] = down ? 1 : 0
+  msg.writeUInt32BE(keysym >>> 0, 4)
+  send(msg)
+}
+
+function pointerEvent(send: Send, mask: number, x: number, y: number) {
+  const msg = Buffer.alloc(6)
+  msg[0] = 5
+  msg[1] = mask
+  msg.writeUInt16BE(x, 2)
+  msg.writeUInt16BE(y, 4)
+  send(msg)
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+async function tapKey(send: Send, keysym: number) {
+  keyEvent(send, keysym, true)
+  keyEvent(send, keysym, false)
+}
+
+async function performAction(conn: VncConnection, action: VncInputAction) {
+  const { send, width, height } = conn
+  const clampX = (x: number) => Math.max(0, Math.min(Math.round(x), width - 1))
+  const clampY = (y: number) => Math.max(0, Math.min(Math.round(y), height - 1))
+
+  switch (action.action) {
+    case "type": {
+      for (const char of action.text) {
+        const codepoint = char.codePointAt(0)!
+        if (codepoint < 0x20 && codepoint !== 0x0a && codepoint !== 0x09) continue
+        await tapKey(send, charKeysym(char))
+        await sleep(KEYSTROKE_DELAY_MS)
+      }
+      return
+    }
+    case "key": {
+      const { modifiers, key } = parseKeyCombo(action.key)
+      for (const modifier of modifiers) keyEvent(send, modifier, true)
+      await tapKey(send, key)
+      for (const modifier of [...modifiers].reverse()) keyEvent(send, modifier, false)
+      return
+    }
+    case "click":
+    case "double_click": {
+      const x = clampX(action.x)
+      const y = clampY(action.y)
+      const mask = BUTTON_MASKS[action.button ?? "left"]
+      const clicks = action.action === "double_click" ? 2 : 1
+      pointerEvent(send, 0, x, y)
+      for (let i = 0; i < clicks; i++) {
+        if (i > 0) await sleep(DOUBLE_CLICK_GAP_MS)
+        pointerEvent(send, mask, x, y)
+        pointerEvent(send, 0, x, y)
+      }
+      return
+    }
+    case "move": {
+      pointerEvent(send, 0, clampX(action.x), clampY(action.y))
+      return
+    }
+    case "scroll": {
+      const x = clampX(action.x)
+      const y = clampY(action.y)
+      const mask = SCROLL_MASKS[action.direction]
+      const ticks = Math.max(1, Math.min(Math.round(action.amount ?? 3), MAX_SCROLL_TICKS))
+      pointerEvent(send, 0, x, y)
+      for (let i = 0; i < ticks; i++) {
+        pointerEvent(send, mask, x, y)
+        pointerEvent(send, 0, x, y)
+        await sleep(KEYSTROKE_DELAY_MS)
+      }
+      return
+    }
+    case "wait": {
+      await sleep(Math.max(0, Math.min(action.ms, MAX_WAIT_MS)))
+      return
+    }
+  }
+}
+
+function estimateActionsMs(actions: readonly VncInputAction[]) {
+  let total = SETTLE_BEFORE_SCREENSHOT_MS
+  for (const action of actions) {
+    total += 500
+    if (action.action === "type") total += action.text.length * KEYSTROKE_DELAY_MS * 2
+    if (action.action === "wait") total += Math.min(action.ms, MAX_WAIT_MS)
+  }
+  return total
+}
+
+/**
+ * Perform a sequence of input actions over one RFB connection, then capture a
+ * screenshot of the resulting screen after a short settle delay.
+ */
+export function performVncActions(input: {
+  url: string
+  password?: string
+  actions: readonly VncInputAction[]
+  timeoutMs?: number
+  settleMs?: number
+}): Promise<VncScreenshot> {
+  const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS + estimateActionsMs(input.actions)
+  return withVncSession({ url: input.url, password: input.password, timeoutMs }, async (conn) => {
+    for (const action of input.actions) {
+      await performAction(conn, action)
+      await sleep(ACTION_DELAY_MS)
+    }
+    await sleep(input.settleMs ?? SETTLE_BEFORE_SCREENSHOT_MS)
+    return captureScreen(conn)
   })
 }

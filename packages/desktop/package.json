@@ -1,7 +1,7 @@
 {
   "name": "@openlegion-ai/desktop",
   "private": true,
-  "version": "1.15.13",
+  "version": "0.0.1",
   "type": "module",
   "license": "MIT",
   "homepage": "https://openlegion.dev",

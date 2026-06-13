@@ -2,7 +2,7 @@ import { AppProcess } from "@openlegion-ai/core/process"
 import { Effect, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { Container } from "@/container"
-import { captureVncScreenshot } from "@/container/vnc"
+import { captureVncScreenshot, performVncActions, type VncInputAction } from "@/container/vnc"
 import * as Tool from "./tool"
 
 const MAX_EXEC_OUTPUT_BYTES = 256 * 1024
@@ -25,6 +25,46 @@ const LogsParameters = Schema.Struct({
   }),
 })
 type LogsParameters = typeof LogsParameters.Type
+
+const InputAction = Schema.Struct({
+  action: Schema.Literals(["type", "key", "click", "double_click", "move", "scroll", "wait"]).annotate({
+    description: "The kind of input to send",
+  }),
+  text: Schema.optional(Schema.String).annotate({
+    description: 'Text to type, for action "type". Newlines press Enter.',
+  }),
+  key: Schema.optional(Schema.String).annotate({
+    description:
+      'Key or combo to press, for action "key". Single characters, named keys (enter, esc, tab, backspace, delete, arrows, home, end, pageup, pagedown, f1-f12), or modifier combos like "ctrl+c" or "ctrl+alt+t".',
+  }),
+  x: Schema.optional(Schema.Number).annotate({
+    description: "Pointer x coordinate in screen pixels, for click, double_click, move, and scroll",
+  }),
+  y: Schema.optional(Schema.Number).annotate({
+    description: "Pointer y coordinate in screen pixels, for click, double_click, move, and scroll",
+  }),
+  button: Schema.optional(Schema.Literals(["left", "middle", "right"])).annotate({
+    description: "Mouse button for click and double_click (default left)",
+  }),
+  direction: Schema.optional(Schema.Literals(["up", "down"])).annotate({
+    description: 'Scroll direction, for action "scroll"',
+  }),
+  amount: Schema.optional(Schema.Number).annotate({
+    description: "Number of scroll ticks (default 3, max 10)",
+  }),
+  ms: Schema.optional(Schema.Number).annotate({
+    description: 'Milliseconds to pause, for action "wait" (max 10000)',
+  }),
+})
+type InputAction = typeof InputAction.Type
+
+const InputParameters = Schema.Struct({
+  id: SandboxID,
+  actions: Schema.Array(InputAction).annotate({
+    description: "The input actions to perform, in order, over a single connection to the display",
+  }),
+})
+type InputParameters = typeof InputParameters.Type
 
 const ExecParameters = Schema.Struct({
   id: SandboxID,
@@ -289,6 +329,121 @@ export const SandboxScreenshotTool = Tool.define(
             title: `Screenshot ${shot.width}x${shot.height}`,
             output: `Captured a ${shot.width}x${shot.height} screenshot of the sandbox display (attached).`,
             metadata: { containerId: params.id, width: shot.width, height: shot.height },
+            attachments: [
+              {
+                type: "file" as const,
+                mime: "image/png",
+                url: `data:image/png;base64,${shot.png.toString("base64")}`,
+              },
+            ],
+          }
+        }).pipe(Effect.catch(sandboxError)),
+    }
+  }),
+)
+
+/** Validate the flat action structs and narrow them to discriminated VNC actions. */
+function parseInputActions(items: readonly InputAction[]): VncInputAction[] | { invalid: string } {
+  if (items.length === 0) return { invalid: "actions must not be empty" }
+  const actions: VncInputAction[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]!
+    const at = `actions[${i}] (${item.action})`
+    switch (item.action) {
+      case "type": {
+        if (item.text === undefined || item.text === "") return { invalid: `${at} requires "text"` }
+        actions.push({ action: "type", text: item.text })
+        break
+      }
+      case "key": {
+        if (item.key === undefined || item.key.trim() === "") return { invalid: `${at} requires "key"` }
+        actions.push({ action: "key", key: item.key })
+        break
+      }
+      case "click":
+      case "double_click":
+      case "move":
+      case "scroll": {
+        if (item.x === undefined || item.y === undefined || !Number.isFinite(item.x) || !Number.isFinite(item.y)) {
+          return { invalid: `${at} requires numeric "x" and "y"` }
+        }
+        if (item.action === "scroll") {
+          if (item.direction === undefined) return { invalid: `${at} requires "direction"` }
+          actions.push({ action: "scroll", x: item.x, y: item.y, direction: item.direction, amount: item.amount })
+        } else if (item.action === "move") {
+          actions.push({ action: "move", x: item.x, y: item.y })
+        } else {
+          actions.push({ action: item.action, x: item.x, y: item.y, button: item.button })
+        }
+        break
+      }
+      case "wait": {
+        if (item.ms === undefined || !Number.isFinite(item.ms) || item.ms <= 0) {
+          return { invalid: `${at} requires a positive "ms"` }
+        }
+        actions.push({ action: "wait", ms: item.ms })
+        break
+      }
+    }
+  }
+  return actions
+}
+
+function describeInputAction(action: VncInputAction) {
+  switch (action.action) {
+    case "type":
+      return `type ${JSON.stringify(action.text.length > 40 ? `${action.text.slice(0, 40)}…` : action.text)}`
+    case "key":
+      return `key ${action.key}`
+    case "click":
+    case "double_click":
+      return `${action.action.replace("_", " ")} ${action.button ?? "left"} at ${action.x},${action.y}`
+    case "move":
+      return `move to ${action.x},${action.y}`
+    case "scroll":
+      return `scroll ${action.direction} at ${action.x},${action.y}`
+    case "wait":
+      return `wait ${action.ms}ms`
+  }
+}
+
+export const SandboxInputTool = Tool.define(
+  "sandbox_input",
+  Effect.gen(function* () {
+    const container = yield* Container.Service
+
+    return {
+      description:
+        'Send keyboard and mouse input to a desktop sandbox\'s screen, then return a screenshot of the result. Only works for sandboxes with a display (kind "desktop"). Actions run in order: type text, press keys or combos (e.g. "ctrl+c", "enter"), click/double-click/move/scroll at pixel coordinates, or wait for the UI to react. Take a sandbox_screenshot first to find coordinates, and check the returned screenshot to verify the effect before continuing.',
+      parameters: InputParameters,
+      execute: (params: InputParameters, ctx: Tool.Context) =>
+        Effect.gen(function* () {
+          const parsed = parseInputActions(params.actions)
+          if (!Array.isArray(parsed)) {
+            return {
+              title: "Invalid input actions",
+              output: `Error: ${parsed.invalid}`,
+              metadata: { containerId: params.id, error: true },
+            }
+          }
+
+          const summary = parsed.map(describeInputAction).join(", ")
+          yield* ctx.ask({
+            permission: PERMISSION,
+            patterns: [`input ${params.id} ${summary}`],
+            always: [`input ${params.id} *`],
+            metadata: { containerId: params.id, actions: summary },
+          })
+
+          const display = yield* container.display(params.id)
+          const shot = yield* Effect.tryPromise({
+            try: () => performVncActions({ url: display.url, password: display.password, actions: parsed }),
+            catch: (err) => (err instanceof Error ? err : new Error(String(err))),
+          })
+          return {
+            title: summary.length > 80 ? `${summary.slice(0, 80)}…` : summary,
+            output: `Performed ${parsed.length} input action${parsed.length === 1 ? "" : "s"} (${summary}). A ${shot.width}x${shot.height} screenshot of the resulting screen is attached.`,
+            metadata: { containerId: params.id, actions: parsed.length, width: shot.width, height: shot.height },
             attachments: [
               {
                 type: "file" as const,

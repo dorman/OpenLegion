@@ -1,6 +1,14 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { inflateSync } from "node:zlib"
-import { captureVncScreenshot, desEncryptBlock, encodePng, vncAuthResponse, VncError } from "@/container/vnc"
+import {
+  captureVncScreenshot,
+  desEncryptBlock,
+  encodePng,
+  parseKeyCombo,
+  performVncActions,
+  vncAuthResponse,
+  VncError,
+} from "@/container/vnc"
 
 // ---------------------------------------------------------------------------
 // Mock RFB 3.8 server over websocket. Serves a 4x2 framebuffer: top row red,
@@ -143,6 +151,103 @@ const serve = (mode: Mode) => {
   return `ws://127.0.0.1:${server.port}/`
 }
 
+type RecordedInput = { type: "key"; down: boolean; keysym: number } | { type: "pointer"; mask: number; x: number; y: number }
+
+function readClientMessage(buf: Buffer, offset: number): { message?: { type: number; length: number }; next: number } {
+  if (offset >= buf.length) return { next: offset }
+  const type = buf[offset]!
+  if (type === 0) return { message: { type, length: 20 }, next: offset + 20 }
+  if (type === 2) {
+    if (offset + 4 > buf.length) return { next: offset }
+    const count = buf.readUInt16BE(offset + 2)
+    return { message: { type, length: 4 + count * 4 }, next: offset + 4 + count * 4 }
+  }
+  if (type === 3) return { message: { type, length: 10 }, next: offset + 10 }
+  if (type === 4) return { message: { type, length: 8 }, next: offset + 8 }
+  if (type === 5) return { message: { type, length: 6 }, next: offset + 6 }
+  throw new Error(`unexpected client message type ${type}`)
+}
+
+function decodeClientMessages(buf: Buffer) {
+  const events: RecordedInput[] = []
+  let offset = 0
+  while (offset < buf.length) {
+    const parsed = readClientMessage(buf, offset)
+    if (!parsed.message) break
+    const slice = buf.subarray(offset, parsed.next)
+    if (parsed.message.type === 4) {
+      events.push({ type: "key", down: slice[1] === 1, keysym: slice.readUInt32BE(4) })
+    } else if (parsed.message.type === 5) {
+      events.push({ type: "pointer", mask: slice[1]!, x: slice.readUInt16BE(2), y: slice.readUInt16BE(4) })
+    }
+    offset = parsed.next
+  }
+  return events
+}
+
+function startInputServer() {
+  const recorded: RecordedInput[] = []
+  const states = new WeakMap<object, State>()
+  const server = Bun.serve({
+    port: 0,
+    fetch(request, srv) {
+      if (srv.upgrade(request)) return undefined
+      return new Response("expected websocket", { status: 400 })
+    },
+    websocket: {
+      open(ws) {
+        states.set(ws, { phase: "version", received: Buffer.alloc(0), challenge: Buffer.alloc(16, 7) })
+        ws.send(Buffer.from("RFB 003.008\n", "latin1"))
+      },
+      message(ws, raw) {
+        const state = states.get(ws)!
+        const incoming = typeof raw === "string" ? Buffer.from(raw, "latin1") : Buffer.from(raw)
+        state.received = Buffer.concat([state.received, incoming])
+
+        const take = (n: number) => {
+          if (state.received.length < n) return undefined
+          const out = state.received.subarray(0, n)
+          state.received = state.received.subarray(n)
+          return out
+        }
+
+        for (;;) {
+          if (state.phase === "version") {
+            const version = take(12)
+            if (!version) return
+            ws.send(Buffer.from([1, 1]))
+            state.phase = "security"
+          } else if (state.phase === "security") {
+            const choice = take(1)
+            if (!choice) return
+            ws.send(Buffer.from([0, 0, 0, 0]))
+            state.phase = "client-init"
+          } else if (state.phase === "client-init") {
+            const init = take(1)
+            if (!init) return
+            ws.send(serverInitMessage())
+            state.phase = "input"
+          } else if (state.phase === "input") {
+            const parsed = readClientMessage(state.received, 0)
+            if (!parsed.message) return
+            const slice = state.received.subarray(0, parsed.next)
+            recorded.push(...decodeClientMessages(slice))
+            state.received = state.received.subarray(parsed.next)
+            if (parsed.message.type === 3) {
+              ws.send(frameUpdateMessage())
+              state.phase = "done"
+            }
+          } else {
+            return
+          }
+        }
+      },
+    },
+  })
+  servers.push(server)
+  return { url: `ws://127.0.0.1:${server.port}/`, events: recorded }
+}
+
 afterAll(() => {
   for (const server of servers) server.stop(true)
 })
@@ -236,6 +341,46 @@ describe("container.vnc", () => {
     expect(pixels).toEqual([
       [1, 2, 3, 4],
       [5, 6, 7, 8],
+    ])
+  })
+
+  test("parseKeyCombo resolves modifiers and named keys", () => {
+    expect(parseKeyCombo("a")).toEqual({ modifiers: [], key: 0x61 })
+    expect(parseKeyCombo("ctrl+c")).toEqual({ modifiers: [0xffe3], key: 0x63 })
+    expect(parseKeyCombo("ctrl+shift+enter")).toEqual({ modifiers: [0xffe3, 0xffe1], key: 0xff0d })
+    expect(parseKeyCombo("ctrl++")).toEqual({ modifiers: [0xffe3], key: 0x2b })
+    expect(() => parseKeyCombo("")).toThrow(/empty key/)
+    expect(() => parseKeyCombo("ctrl+wat+x")).toThrow(/not a modifier/)
+    expect(() => parseKeyCombo("wat")).toThrow(/unknown key/)
+  })
+
+  test("performVncActions sends key and pointer events then captures a screenshot", async () => {
+    const mock = startInputServer()
+    const shot = await performVncActions({
+      url: mock.url,
+      settleMs: 10,
+      timeoutMs: 5000,
+      actions: [
+        { action: "key", key: "enter" },
+        { action: "click", x: 1.4, y: 0.4, button: "right" },
+      ],
+    })
+
+    expect(shot.width).toBe(WIDTH)
+    expect(decodePixels(shot.png).pixels[0]).toEqual([255, 0, 0, 255])
+
+    const keys = mock.events.filter((event): event is Extract<RecordedInput, { type: "key" }> => event.type === "key")
+    const pointers = mock.events.filter(
+      (event): event is Extract<RecordedInput, { type: "pointer" }> => event.type === "pointer",
+    )
+    expect(keys).toEqual([
+      { type: "key", down: true, keysym: 0xff0d },
+      { type: "key", down: false, keysym: 0xff0d },
+    ])
+    expect(pointers).toEqual([
+      { type: "pointer", mask: 0, x: 1, y: 0 },
+      { type: "pointer", mask: 4, x: 1, y: 0 },
+      { type: "pointer", mask: 0, x: 1, y: 0 },
     ])
   })
 })

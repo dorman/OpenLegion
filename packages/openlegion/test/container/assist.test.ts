@@ -44,6 +44,7 @@ describe("container.assist", () => {
     expect(prompt).toContain("- image: ubuntu-desktop")
     expect(prompt).toContain("network up")
     expect(prompt).toContain("sandbox_exec")
+    expect(prompt).toContain("sandbox_input")
   })
 
   test("notes when the sandbox is missing and skips logs", async () => {

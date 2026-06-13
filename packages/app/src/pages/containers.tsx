@@ -45,7 +45,7 @@ import {
   workloadPillClass,
 } from "@/utils/container-workload"
 import { warningsForWorkspaceHostMount } from "@/utils/sandbox-config-warnings"
-import { showToast } from "@/utils/toast"
+import { dismissToast, showToast } from "@/utils/toast"
 
 type StatusFilter = "all" | "running" | "stopped"
 type KindFilter = "all" | "container" | "desktop"
@@ -88,6 +88,8 @@ export default function ContainersPage() {
   const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
   const [kindFilter, setKindFilter] = createSignal<KindFilter>("all")
   const [bulkPending, setBulkPending] = createSignal(false)
+  const [startingIds, setStartingIds] = createSignal<string[]>([])
+  const [stoppingIds, setStoppingIds] = createSignal<string[]>([])
   let onboardingDismissedThisSession = false
 
   const enabled = createMemo(() => platform.platform === "desktop" && server.isLocal() && !!server.current?.http)
@@ -271,28 +273,58 @@ export default function ContainersPage() {
 
   async function handleStart(id: string) {
     const http = server.current?.http
-    if (!http) return
+    if (!http || startingIds().includes(id)) return
+    setStartingIds((current) => [...current, id])
+    const toastId = showToast({
+      variant: "loading",
+      title: language.t("containers.start.inProgress"),
+    })
     try {
       await startContainer(http, id)
       await refresh()
+      dismissToast(toastId)
       showToast({
         variant: "success",
         title: language.t("containers.started"),
       })
     } catch (err) {
+      dismissToast(toastId)
       showToast({
         variant: "error",
         title: language.t("containers.start.failed"),
         description: err instanceof Error ? err.message : String(err),
       })
+    } finally {
+      setStartingIds((current) => current.filter((item) => item !== id))
     }
   }
 
   async function handleStop(id: string) {
     const http = server.current?.http
-    if (!http) return
-    await stopContainer(http, id)
-    await refresh()
+    if (!http || stoppingIds().includes(id)) return
+    setStoppingIds((current) => [...current, id])
+    const toastId = showToast({
+      variant: "loading",
+      title: language.t("containers.stop.inProgress"),
+    })
+    try {
+      await stopContainer(http, id)
+      await refresh()
+      dismissToast(toastId)
+      showToast({
+        variant: "success",
+        title: language.t("containers.stopped"),
+      })
+    } catch (err) {
+      dismissToast(toastId)
+      showToast({
+        variant: "error",
+        title: language.t("containers.stop.failed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setStoppingIds((current) => current.filter((item) => item !== id))
+    }
   }
 
   async function handleRemove(id: string) {
@@ -324,6 +356,8 @@ export default function ContainersPage() {
     if (!http || ids.length === 0 || bulkPending()) return
 
     setBulkPending(true)
+    if (action === "start") setStartingIds((current) => [...new Set([...current, ...ids])])
+    if (action === "stop") setStoppingIds((current) => [...new Set([...current, ...ids])])
     try {
       for (const id of ids) {
         if (action === "start") await startContainer(http, id)
@@ -344,6 +378,8 @@ export default function ContainersPage() {
       })
     } finally {
       setBulkPending(false)
+      if (action === "start") setStartingIds((current) => current.filter((item) => !ids.includes(item)))
+      if (action === "stop") setStoppingIds((current) => current.filter((item) => !ids.includes(item)))
     }
   }
 
@@ -476,6 +512,8 @@ export default function ContainersPage() {
                         item={item}
                         workspace={workspaceForContainer(workspaces.data ?? [], item)}
                         selected={selectedIds().includes(item.id)}
+                        starting={startingIds().includes(item.id)}
+                        stopping={stoppingIds().includes(item.id)}
                         language={language}
                         onToggleSelected={() => toggleSelected(item.id)}
                         onOpenSession={() => showOpenSession(item)}
@@ -609,6 +647,8 @@ function ContainerCard(props: {
   item: ContainerInfo
   workspace?: ContainerWorkspace
   selected: boolean
+  starting: boolean
+  stopping: boolean
   language: ReturnType<typeof useLanguage>
   onToggleSelected: () => void
   onOpenSession: () => void
@@ -651,7 +691,15 @@ function ContainerCard(props: {
               "desktop-pill-stopped": !running(),
             }}
           >
-            {props.language.t(running() ? "containers.status.running" : "containers.status.stopped")}
+            {props.language.t(
+              props.stopping && running()
+                ? "containers.status.stopping"
+                : props.starting && !running()
+                  ? "containers.status.starting"
+                  : running()
+                    ? "containers.status.running"
+                    : "containers.status.stopped",
+            )}
           </span>
         </div>
       </div>
@@ -682,11 +730,11 @@ function ContainerCard(props: {
         <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
           {props.language.t("containers.inspect")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStart} disabled={running()}>
-          {props.language.t("containers.start")}
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onStart} disabled={running() || props.starting}>
+          {props.language.t(props.starting ? "containers.starting" : "containers.start")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running()}>
-          {props.language.t("containers.stop")}
+        <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running() || props.stopping}>
+          {props.language.t(props.stopping ? "containers.stopping" : "containers.stop")}
         </ButtonV2>
         <ButtonV2 variant="ghost" size="normal" onClick={props.onRemove}>
           {props.language.t("containers.remove")}

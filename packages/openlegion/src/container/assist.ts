@@ -12,8 +12,8 @@ const MAX_LOG_BYTES = 4_000
  */
 const RUNTIME_GUIDE = `How the sandbox runtime works:
 - Sandboxes are managed by the local OpenLegion runtime. They are docker/podman containers, or QEMU microVMs (runtime "microvm"); kind "desktop" is a graphical Linux VM exposed over VNC.
-- Operate on sandboxes with the sandbox_* tools: sandbox_list, sandbox_inspect, sandbox_logs, sandbox_exec, sandbox_screenshot, sandbox_start, sandbox_stop, sandbox_create, sandbox_delete. sandbox_exec runs a non-interactive sh command inside the sandbox (no TTY).
-- For desktop VMs, sandbox_screenshot shows the current screen — use it whenever the question involves what the user sees (login prompts, installers, error dialogs, a blank screen).
+- Operate on sandboxes with the sandbox_* tools: sandbox_list, sandbox_inspect, sandbox_logs, sandbox_exec, sandbox_screenshot, sandbox_input, sandbox_start, sandbox_stop, sandbox_create, sandbox_delete. sandbox_exec runs a non-interactive sh command inside the sandbox (no TTY).
+- For desktop VMs, sandbox_screenshot shows the current screen. sandbox_input sends keyboard and mouse actions and returns a screenshot of the result — use sandbox_screenshot first to find click coordinates, then sandbox_input to interact (type text, press keys, click buttons). Verify each step from the screenshot sandbox_input returns.
 - For desktop VMs, sandbox_logs returns boot/console output. If it shows a "(qemu)" prompt, the VM dropped into the QEMU monitor instead of booting Linux: the disk image is likely missing or corrupt, so recreate the desktop rather than debugging inside it.
 - Container workloads exit when their main command finishes; a sandbox that immediately stops usually needs a long-running command (for example sleep 3600).
 
