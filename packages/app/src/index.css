@@ -177,14 +177,6 @@
     max-height: min(92vh, 720px);
   }
 
-  /* The desktop tab sends the frame size to the VM as its resolution, so the
-     inspect dialog needs real estate for a usable desktop. */
-  [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
-    width: min(calc(100vw - 32px), 1200px);
-    height: min(92vh, 900px);
-    max-height: min(92vh, 900px);
-  }
-
   [data-component="dialog"]:has([data-slot="dialog-content"].container-create-dialog) [data-slot="dialog-body"],
   [data-component="dialog"]:has([data-slot="dialog-content"].container-onboarding-dialog) [data-slot="dialog-body"],
   [data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-body"] {
@@ -214,4 +206,15 @@
   .desktop-display-viewport > div {
     overscroll-behavior: contain;
   }
+}
+
+/* Intentionally UNLAYERED: the dialog default `width: 480px` in dialog-v2.css
+   is unlayered, and unlayered styles always beat @layer styles regardless of
+   specificity. The desktop tab letterboxes the VM's fixed framebuffer to fit
+   the frame, so the inspect dialog needs real estate for the scaled-up desktop
+   to be usable. */
+[data-component="dialog"]:has([data-slot="dialog-content"].container-inspect-dialog) [data-slot="dialog-container"] {
+  width: min(calc(100vw - 32px), 1600px);
+  height: min(95vh, 1100px);
+  max-height: min(95vh, 1100px);
 }

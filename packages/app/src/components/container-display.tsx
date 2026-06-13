@@ -73,12 +73,15 @@ export function ContainerDisplay(props: {
         client = new RFBClient(viewport, props.url, {
           credentials: props.password ? { password: props.password } : undefined,
         })
-        // Show the whole desktop: resizeSession matches the VM resolution to
-        // the frame for crisp 1:1 pixels, and scaleViewport scales to fit as a
-        // fallback when the server ignores the resize (or while it applies).
-        // clipViewport stays off so any leftover overflow scrolls.
+        // Show the whole desktop, letterboxed to fit. scaleViewport scales the
+        // VM's native framebuffer to fit the frame (preserving aspect), so the
+        // entire screen is always visible. resizeSession stays OFF: asking
+        // the VM to match the frame squishes the guest into a wide/short
+        // resolution, which clips tall content (e.g. an installer's button bar)
+        // inside the guest before noVNC ever scales it. clipViewport off so the
+        // whole framebuffer is scaled rather than cropped.
         client.scaleViewport = true
-        client.resizeSession = true
+        client.resizeSession = false
         client.focusOnClick = true
         client.clipViewport = false
         client.addEventListener("connect", () => {

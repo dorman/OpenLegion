@@ -21,6 +21,16 @@ import (
 	"github.com/dorman/openlegion/internal/microvm/types"
 )
 
+// Pin the guest display to a fixed resolution via the virtio-gpu EDID. Without
+// this the guest picks a default mode that can be too short for tall content
+// (e.g. an installer's button bar gets clipped). The viewer letterboxes to fit,
+// so a generous, tall mode is safe. 1440x900 comfortably exceeds the graphical
+// installer minimums while keeping a standard desktop aspect ratio.
+const (
+	desktopScreenWidth  = 1440
+	desktopScreenHeight = 900
+)
+
 type qemuRecord struct {
 	ID           string `json:"id"`
 	Image        string `json:"image"`
@@ -362,7 +372,7 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 		"-device", "virtio-blk-pci,drive=hd",
 		"-netdev", "user,id=net0",
 		"-device", "virtio-net-pci,netdev=net0",
-		"-device", "virtio-gpu-pci",
+		"-device", fmt.Sprintf("virtio-gpu-pci,edid=on,xres=%d,yres=%d", desktopScreenWidth, desktopScreenHeight),
 		"-device", "qemu-xhci,id=xhci",
 		"-device", "usb-kbd,bus=xhci.0",
 		"-device", "usb-tablet,bus=xhci.0",
