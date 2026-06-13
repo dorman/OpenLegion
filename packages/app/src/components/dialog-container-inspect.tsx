@@ -20,7 +20,7 @@ import {
 } from "@/utils/containers"
 import { inspectDefaultTab, isDesktopWorkload } from "@/utils/container-workload"
 import { listSandboxAuditEntries } from "@/utils/sandbox-audit"
-import { showToast } from "@/utils/toast"
+import { dismissToast, showToast } from "@/utils/toast"
 
 type InspectTab = "logs" | "shell" | "display" | "audit"
 
@@ -119,6 +119,10 @@ export function DialogContainerInspect(props: {
 
     setStarting(true)
     setShellError(undefined)
+    const toastId = showToast({
+      variant: "loading",
+      title: language.t("containers.start.inProgress"),
+    })
     try {
       await startContainer(http, props.container.id)
       await props.onStart?.()
@@ -141,6 +145,7 @@ export function DialogContainerInspect(props: {
         description: message,
       })
     } finally {
+      dismissToast(toastId)
       setStarting(false)
     }
   }
@@ -281,7 +286,7 @@ export function DialogContainerInspect(props: {
           </div>
           <Show when={!running()}>
             <ButtonV2 size="normal" onClick={() => void handleStart()} disabled={starting()}>
-              {language.t("containers.start")}
+              {language.t(starting() ? "containers.starting" : "containers.start")}
             </ButtonV2>
           </Show>
         </div>

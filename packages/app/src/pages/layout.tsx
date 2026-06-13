@@ -62,6 +62,7 @@ import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { useTheme, type ColorScheme } from "@openlegion-ai/ui/theme/context"
 import { useCommand, type CommandOption } from "@/context/command"
 import { ConstrainDragXAxis, getDraggableId } from "@/utils/solid-dnd"
+import { AppFooter } from "@/components/app-footer"
 import { DebugBar } from "@/components/debug-bar"
 import { DesktopShell } from "@/components/desktop-shell"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
@@ -2379,6 +2380,7 @@ export default function Layout(props: ParentProps) {
               <DesktopShell>{props.children}</DesktopShell>
             </Show>
           </main>
+          <AppFooter />
           {import.meta.env.DEV && <DebugBar />}
           <ToastRegion v2={newDesign()} />
         </div>
@@ -2533,6 +2535,7 @@ export default function Layout(props: ParentProps) {
           </div>
           {import.meta.env.DEV && <DebugBar />}
         </div>
+        <AppFooter />
         <ToastRegion v2={newDesign()} />
       </div>
     </Show>

@@ -314,6 +314,7 @@ export const dict = {
   "dialog.directory.search.placeholder": "Search folders",
   "dialog.directory.empty": "No folders found",
 
+  "app.footer.madeBy": "Made by",
   "app.server.unreachable": "Could not reach {{server}}",
   "app.server.retrying": "Retrying automatically...",
   "app.server.otherServers": "Other servers",
@@ -737,8 +738,14 @@ export const dict = {
   "containers.empty": "No sandboxes yet.",
   "containers.start": "Start",
   "containers.start.failed": "Failed to start container",
+  "containers.start.inProgress": "Starting sandbox…",
+  "containers.starting": "Starting…",
   "containers.started": "Container started",
   "containers.stop": "Stop",
+  "containers.stop.inProgress": "Stopping sandbox…",
+  "containers.stop.failed": "Failed to stop container",
+  "containers.stopped": "Container stopped",
+  "containers.stopping": "Stopping…",
   "containers.remove": "Remove",
   "containers.ensureDaemon": "Start sandbox daemon",
   "containers.ensureDaemon.starting": "Starting sandbox daemon…",
@@ -789,6 +796,8 @@ export const dict = {
   "containers.running.title": "Sandboxes",
   "containers.running.active": "{{count}} active",
   "containers.status.running": "running",
+  "containers.status.starting": "starting…",
+  "containers.status.stopping": "stopping…",
   "containers.status.stopped": "stopped",
   "containers.network.isolated": "network: isolated (hardened)",
   "containers.network.bridge": "network: bridge",
@@ -872,7 +881,8 @@ export const dict = {
   "containers.onboarding.step3.title": "3. Inspect or open an agent session",
   "containers.onboarding.step3.description":
     "Containers: Inspect for logs/shell, or Open session to bind a project and run an agent. Desktops: Inspect → Desktop for the live GUI.",
-  "containers.onboarding.step3.ready": "After your first sandbox is running, open Inspect to view logs, shell, or the live desktop.",
+  "containers.onboarding.step3.ready":
+    "After your first sandbox is running, open Inspect to view logs, shell, or the live desktop.",
   "containers.openSession.desktopUnsupported":
     "Agent sessions are not available for Linux desktop VMs. Create a container workload to run an agent inside a sandbox.",
   "containers.inspect.desktopShellHint":
@@ -916,17 +926,21 @@ export const dict = {
   "containers.warnings.badge": "Risky bind",
   "containers.warnings.etcPath": "Binding /etc exposes sensitive host system configuration to the sandbox.",
   "containers.warnings.varPath": "Binding /var can expose host logs, caches, and service state.",
-  "containers.warnings.homeRootBind": "Binding your entire home directory gives the sandbox broad access to personal files.",
+  "containers.warnings.homeRootBind":
+    "Binding your entire home directory gives the sandbox broad access to personal files.",
   "containers.warnings.privileged": "Privileged workloads can bypass sandbox isolation safeguards.",
   "containers.empty.title": "No sandboxes yet",
   "containers.empty.createSandbox.title": "Create a sandbox",
-  "containers.empty.createSandbox.description": "Start with a container for agent work or a Linux desktop VM for visual inspection.",
+  "containers.empty.createSandbox.description":
+    "Start with a container for agent work or a Linux desktop VM for visual inspection.",
   "containers.empty.createSandbox.action": "New sandbox",
   "containers.empty.startDaemon.title": "Start the sandbox daemon",
-  "containers.empty.startDaemon.description": "OpenLegion needs the local sandbox daemon before containers and desktop VMs can run.",
+  "containers.empty.startDaemon.description":
+    "OpenLegion needs the local sandbox daemon before containers and desktop VMs can run.",
   "containers.empty.startDaemon.action": "Start daemon",
   "containers.empty.openSession.title": "Open an agent session",
-  "containers.empty.openSession.description": "After a container sandbox is running, bind a project and start working with an agent.",
+  "containers.empty.openSession.description":
+    "After a container sandbox is running, bind a project and start working with an agent.",
   "containers.empty.openSession.action": "Go to agents",
   "home.empty.guided.createSandbox.title": "Create a sandbox",
   "home.empty.guided.createSandbox.description": "Set up an isolated container or desktop VM for local agent work.",
@@ -935,7 +949,8 @@ export const dict = {
   "home.empty.guided.startDaemon.description": "Make sure local sandbox runtimes are online before creating workloads.",
   "home.empty.guided.startDaemon.action": "Open sandboxes",
   "home.empty.guided.openSession.title": "Start a session",
-  "home.empty.guided.openSession.description": "Open a project and begin a new agent session once your environment is ready.",
+  "home.empty.guided.openSession.description":
+    "Open a project and begin a new agent session once your environment is ready.",
   "home.empty.guided.openSession.action": "New session",
   "home.agents.filter.all": "All",
   "home.agents.filter.sandbox": "Sandbox linked",
@@ -945,7 +960,8 @@ export const dict = {
   "home.agents.quickResume": "Resume session",
   "containers.askAgent": "Ask agent",
   "containers.compose.title": "Compose stack",
-  "containers.compose.description": "Deploy or stop a multi-service stack from a docker-compose.yml file on your machine.",
+  "containers.compose.description":
+    "Deploy or stop a multi-service stack from a docker-compose.yml file on your machine.",
   "containers.compose.file": "Compose file",
   "containers.compose.pickFile": "Browse…",
   "containers.compose.deploy": "Deploy stack",
@@ -1033,12 +1049,14 @@ export const dict = {
   "settings.general.row.showCustomAgents.title": "Custom agents",
   "settings.general.row.showCustomAgents.description": "Show the agent picker in the v2 desktop composer",
   "settings.general.row.showPlanAgent.title": "Plan agent",
-  "settings.general.row.showPlanAgent.description": "Show the read-only plan agent in the composer for design-before-build workflows",
+  "settings.general.row.showPlanAgent.description":
+    "Show the read-only plan agent in the composer for design-before-build workflows",
   "settings.permissions.row.preset.title": "Sandbox permission preset",
-  "settings.permissions.row.preset.description": "Apply a permission profile tuned for sandbox network, mount, and shell access",
+  "settings.permissions.row.preset.description":
+    "Apply a permission profile tuned for sandbox network, mount, and shell access",
   "settings.permissions.row.preset.default": "Project default",
-  "session.sandbox.banner.stopped": "Linked sandbox \"{label}\" is stopped.",
-  "session.sandbox.banner.missing": "Linked sandbox \"{label}\" is no longer available.",
+  "session.sandbox.banner.stopped": 'Linked sandbox "{label}" is stopped.',
+  "session.sandbox.banner.missing": 'Linked sandbox "{label}" is no longer available.',
   "session.sandbox.banner.restart": "Restart sandbox",
   "session.sandbox.banner.unlink": "Unlink",
   "session.sandbox.banner.restarted": "Sandbox restarted",

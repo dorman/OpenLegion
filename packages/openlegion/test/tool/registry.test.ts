@@ -139,6 +139,7 @@ describe("tool.registry", () => {
         "sandbox_logs",
         "sandbox_exec",
         "sandbox_screenshot",
+        "sandbox_input",
       ]) {
         expect(ids).toContain(id)
       }

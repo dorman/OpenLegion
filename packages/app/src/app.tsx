@@ -6,7 +6,7 @@ import { FileComponentProvider } from "@openlegion-ai/ui/context/file"
 import { MarkedProvider } from "@openlegion-ai/ui/context/marked"
 import { File } from "@openlegion-ai/ui/file"
 import { Font } from "@openlegion-ai/ui/font"
-import { Splash } from "@openlegion-ai/ui/logo"
+import { Mark, Splash } from "@openlegion-ai/ui/logo"
 import { ThemeProvider } from "@openlegion-ai/ui/theme/context"
 import { MetaProvider } from "@solidjs/meta"
 import { type BaseRouterProps, Navigate, Route, Router } from "@solidjs/router"
@@ -227,7 +227,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
     <Suspense
       fallback={
         <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <Splash class="size-28 object-contain opacity-80 animate-pulse" />
+          <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
         </div>
       }
     >
@@ -235,7 +235,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         when={checkMode() === "blocking" ? !startupHealthCheck.loading : startupHealthCheck.state !== "pending"}
         fallback={
           <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-            <Splash class="size-28 object-contain opacity-80 animate-pulse" />
+            <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
           </div>
         }
       >*/}
@@ -276,7 +276,7 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6 p-6">
       <div class="flex flex-col items-center max-w-md text-center">
-        <Splash class="size-24 object-contain mb-4" />
+        <Mark class="size-24 object-contain mb-4" />
         <p class="text-14-regular text-text-base">
           {unreachable()[0]}
           <span class="text-text-strong font-medium">{name()}</span>

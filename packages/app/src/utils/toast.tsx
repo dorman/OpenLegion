@@ -1,6 +1,6 @@
 import { Icon, type IconProps } from "@openlegion-ai/ui/icon"
-import { Toast, showToast as showLegacyToast, type ToastOptions, type ToastVariant } from "@openlegion-ai/ui/toast"
-import { ToastV2, showToastV2 } from "@openlegion-ai/ui/v2/toast-v2"
+import { Toast, showToast as showLegacyToast, toaster, type ToastOptions, type ToastVariant } from "@openlegion-ai/ui/toast"
+import { ToastV2, showToastV2, toasterV2 } from "@openlegion-ai/ui/v2/toast-v2"
 
 let v2 = false
 
@@ -11,6 +11,12 @@ export function setV2Toast(value: boolean) {
 export function ToastRegion(props: { v2: boolean }) {
   if (props.v2) return <ToastV2.Region />
   return <Toast.Region />
+}
+
+export function dismissToast(id: number | undefined) {
+  if (id === undefined) return
+  if (!v2) return toaster.dismiss(id)
+  return toasterV2.dismiss(id)
 }
 
 export function showToast(options: ToastOptions | string) {

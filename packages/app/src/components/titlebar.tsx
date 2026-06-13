@@ -892,7 +892,7 @@ function ChannelIndicator() {
               "desktop-dev-badge": desktopDev(),
             }}
           >
-            {channel.toUpperCase()}
+            {channel === "dev" ? "DEV BUILD" : channel.toUpperCase()}
           </div>
         </div>
       )}
