@@ -3,7 +3,7 @@ import { Schema } from "effect"
 export const Runtime = Schema.Literals(["docker", "podman", "microvm"])
 export type Runtime = typeof Runtime.Type
 
-export const WorkloadKind = Schema.Literals(["container", "desktop"])
+export const WorkloadKind = Schema.Literals(["container", "desktop", "kubernetes"])
 export type WorkloadKind = typeof WorkloadKind.Type
 
 export const CreateInput = Schema.Struct({
@@ -65,7 +65,7 @@ export type ShellOutput = typeof ShellOutput.Type
 
 export const DisplayOutput = Schema.Struct({
   url: Schema.String,
-  kind: Schema.Literals(["vnc-websocket"]),
+  kind: Schema.Literals(["vnc-websocket", "cdp"]),
   password: Schema.optional(Schema.String),
 }).annotate({ identifier: "ContainerDisplayOutput" })
 export type DisplayOutput = typeof DisplayOutput.Type

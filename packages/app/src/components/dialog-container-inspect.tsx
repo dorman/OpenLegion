@@ -3,6 +3,7 @@ import { Dialog, DialogFooter } from "@openlegion-ai/ui/v2/dialog-v2"
 import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { ContainerBrowser } from "@/components/container-browser"
 import { ContainerDisplay } from "@/components/container-display"
 import { ContainerTerminal } from "@/components/container-terminal"
 import { useLanguage } from "@/context/language"
@@ -385,12 +386,24 @@ export function DialogContainerInspect(props: {
                       : language.t("containers.inspect.fullscreen")}
                   </ButtonV2>
                 </div>
-                <ContainerDisplay
-                  url={session().url}
-                  password={session().password}
-                  active={tab() === "display"}
-                  fullscreen={displayFullscreen()}
-                />
+                <Show
+                  when={session().kind === "cdp"}
+                  fallback={
+                    <ContainerDisplay
+                      url={session().url}
+                      password={session().password}
+                      active={tab() === "display"}
+                      fullscreen={displayFullscreen()}
+                    />
+                  }
+                >
+                  <ContainerBrowser
+                    url={session().url}
+                    password={session().password}
+                    active={tab() === "display"}
+                    fullscreen={displayFullscreen()}
+                  />
+                </Show>
               </div>
             )}
           </Show>

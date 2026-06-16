@@ -1923,7 +1923,7 @@ export type ContainerInfo = {
   image: string
   name?: string
   status?: "running" | "stopped"
-  kind?: "container" | "desktop"
+  kind?: "container" | "desktop" | "kubernetes"
   display?: boolean
 }
 
@@ -1937,7 +1937,7 @@ export type ContainerError = {
 }
 
 export type ContainerCreateInput = {
-  kind?: "container" | "desktop"
+  kind?: "container" | "desktop" | "kubernetes"
   image: string
   name?: string
   memoryMb?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
@@ -1967,7 +1967,7 @@ export type ContainerShellOutput = {
 
 export type ContainerDisplayOutput = {
   url: string
-  kind: "vnc-websocket"
+  kind: "vnc-websocket" | "cdp"
   password?: string
 }
 

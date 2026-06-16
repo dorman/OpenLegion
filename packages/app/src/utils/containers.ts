@@ -5,7 +5,7 @@ export type ContainerRuntime = "docker" | "podman" | "microvm"
 
 export type ContainerStatus = "running" | "stopped"
 
-export type ContainerWorkloadKind = "container" | "desktop"
+export type ContainerWorkloadKind = "container" | "desktop" | "kubernetes"
 
 export type ContainerInfo = {
   id: string
@@ -120,7 +120,7 @@ export async function fetchContainerShell(server: ServerConnection.HttpBase, id:
 
 export type ContainerDisplayInfo = {
   url: string
-  kind: "vnc-websocket"
+  kind: "vnc-websocket" | "cdp"
   password?: string
 }
 

@@ -3,10 +3,12 @@ package display
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +24,11 @@ type Session struct {
 	TargetHost string
 	TargetPort string
 	Password   string
-	ExpiresAt  time.Time
+	// Kind selects how the target is bridged: "cdp" resolves the Chromium page
+	// debugger and tunnels WebSocket<->WebSocket; anything else (default) pumps
+	// raw bytes WebSocket<->TCP for VNC/RFB.
+	Kind      string
+	ExpiresAt time.Time
 }
 
 type Bridge struct {
@@ -55,6 +61,11 @@ func (b *Bridge) ServeWS(w http.ResponseWriter, r *http.Request, vmID, token str
 		return
 	}
 
+	if session.Kind == "cdp" {
+		serveCDP(w, r, session)
+		return
+	}
+
 	target, err := net.Dial("tcp", net.JoinHostPort(session.TargetHost, session.TargetPort))
 	if err != nil {
 		http.Error(w, "display backend unavailable", http.StatusBadGateway)
@@ -77,6 +88,82 @@ func (b *Bridge) ServeWS(w http.ResponseWriter, r *http.Request, vmID, token str
 	}()
 
 	<-errCh
+}
+
+// serveCDP resolves the Chromium page target behind the forwarded debug port and
+// tunnels the viewer's WebSocket straight to it, so the renderer speaks the
+// Chrome DevTools Protocol directly (Page.startScreencast + Input.dispatch*).
+func serveCDP(w http.ResponseWriter, r *http.Request, session Session) {
+	pageWS, err := resolveCDPTarget(session.TargetHost, session.TargetPort)
+	if err != nil {
+		http.Error(w, "cdp backend unavailable: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	// Dial Chromium's page debugger. Host is an IP literal so Chromium's
+	// DNS-rebinding guard is satisfied; launch flags include --remote-allow-origins.
+	upstream, _, err := websocket.DefaultDialer.Dial(pageWS, nil)
+	if err != nil {
+		http.Error(w, "cdp dial failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer upstream.Close()
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	errCh := make(chan error, 2)
+	go func() { errCh <- pumpWS(conn, upstream) }()
+	go func() { errCh <- pumpWS(upstream, conn) }()
+	<-errCh
+}
+
+// resolveCDPTarget asks the Chromium debug endpoint for a page target and
+// returns its WebSocket debugger URL, rewritten to the forwarded host:port
+// (the /json response advertises the guest's own 127.0.0.1:9222).
+func resolveCDPTarget(host, port string) (string, error) {
+	base := "http://" + net.JoinHostPort(host, port)
+	client := &http.Client{Timeout: 3 * time.Second}
+	res, err := client.Get(base + "/json")
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	var targets []struct {
+		Type                 string `json:"type"`
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&targets); err != nil {
+		return "", err
+	}
+	for _, t := range targets {
+		if t.Type == "page" && t.WebSocketDebuggerURL != "" {
+			u, err := url.Parse(t.WebSocketDebuggerURL)
+			if err != nil {
+				return "", err
+			}
+			u.Host = net.JoinHostPort(host, port)
+			return u.String(), nil
+		}
+	}
+	return "", fmt.Errorf("no page target on cdp endpoint")
+}
+
+// pumpWS forwards messages one way between two WebSocket connections.
+func pumpWS(src, dst *websocket.Conn) error {
+	for {
+		mt, payload, err := src.ReadMessage()
+		if err != nil {
+			return err
+		}
+		if err := dst.WriteMessage(mt, payload); err != nil {
+			return err
+		}
+	}
 }
 
 func (b *Bridge) lookup(vmID, token string) (Session, bool) {
