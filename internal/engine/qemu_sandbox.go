@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -337,9 +338,13 @@ func (e *QemuSandbox) Display(ctx context.Context, id string) (DisplayInfo, erro
 	if record.Status != "running" {
 		return DisplayInfo{}, fmt.Errorf("desktop vm is not running")
 	}
-	// Prefer the CDP browser endpoint (low-latency, agent-drivable). Fall back to
-	// the VNC desktop for older VMs created before CDP was provisioned.
-	if record.CDPPort > 0 {
+	// Prefer the CDP browser endpoint (low-latency, agent-drivable), but only
+	// when the guest is actually serving it. Every desktop VM gets a forwarded
+	// CDP port, yet CDP is only answered by the headless-Chromium browser image;
+	// installer ISOs and arbitrary desktop qcow2s have nothing listening there
+	// and must fall through to the VNC framebuffer. A live probe is what tells
+	// the two apart (and self-heals during the browser image's boot window).
+	if record.CDPPort > 0 && cdpEndpointReachable("127.0.0.1", strconv.Itoa(record.CDPPort)) {
 		return DisplayInfo{
 			TargetHost: "127.0.0.1",
 			TargetPort: strconv.Itoa(record.CDPPort),
@@ -700,6 +705,24 @@ func freeCDPPort() (int, error) {
 		return port, nil
 	}
 	return 0, fmt.Errorf("no free cdp port in range 9222-9321")
+}
+
+// cdpEndpointReachable reports whether a Chrome DevTools endpoint is actually
+// answering on host:port. QEMU's hostfwd makes the host port accept connections
+// even when nothing listens in the guest, so a bare TCP dial would always
+// succeed; we probe /json/version over HTTP instead. The timeout is short
+// because this is a loopback hop — a live Chromium answers in milliseconds, and
+// a missing one is refused by the guest just as quickly, so the common
+// non-browser (VNC) desktop path is not slowed down.
+func cdpEndpointReachable(host, port string) bool {
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	res, err := client.Get("http://" + net.JoinHostPort(host, port) + "/json/version")
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+	_, _ = io.Copy(io.Discard, res.Body)
+	return res.StatusCode == http.StatusOK
 }
 
 func vncPortAvailable(port int) bool {

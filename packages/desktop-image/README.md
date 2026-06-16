@@ -47,7 +47,9 @@ render the CDP browser instead of VNC.
 ## Notes / known risks
 
 - **First boot** runs the enabled services; give Chromium a few seconds before
-  the display connects.
+  the display connects. The display probes the CDP endpoint and falls back to
+  the VNC framebuffer until Chromium is up, so opening the display too early
+  shows the console — reopen it once the browser has booted to get the CDP view.
 - **Host-header validation:** the daemon bridge dials Chromium with a
   `127.0.0.1:<forwarded-port>` Host. Chromium allows loopback IP hosts, so this
   should pass; if a future Chromium tightens this, the fix is in
