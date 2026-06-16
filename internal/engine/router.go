@@ -11,12 +11,16 @@ import (
 type Router struct {
 	docker *DockerSandbox
 	qemu   *QemuSandbox
+	k8s    *KubernetesSandbox
+	kata   *KataSandbox
 }
 
 func NewRouter() *Router {
 	return &Router{
 		docker: NewDockerSandbox(),
 		qemu:   NewQemuSandbox(),
+		k8s:    NewKubernetesSandbox(),
+		kata:   NewKataSandbox(),
 	}
 }
 
@@ -31,6 +35,12 @@ func (r *Router) Available(ctx context.Context) error {
 func (r *Router) Create(ctx context.Context, req types.CreateVMRequest) (Result, error) {
 	if isDesktopKind(req.Kind) {
 		return r.qemu.Create(ctx, req)
+	}
+	if isKubernetesKind(req.Kind) {
+		return r.k8s.Create(ctx, req)
+	}
+	if isKataKind(req.Kind) {
+		return r.kata.Create(ctx, req)
 	}
 	return r.docker.Create(ctx, req)
 }
@@ -50,8 +60,18 @@ func (r *Router) List(ctx context.Context) ([]types.VMInfo, error) {
 	if err != nil {
 		return dockerItems, nil
 	}
+	items := append(dockerItems, qemuItems...)
 
-	return append(dockerItems, qemuItems...), nil
+	k8sItems, err := r.k8s.List(ctx)
+	if err == nil {
+		items = append(items, k8sItems...)
+	}
+
+	kataItems, err := r.kata.List(ctx)
+	if err != nil {
+		return items, nil
+	}
+	return append(items, kataItems...), nil
 }
 
 func (r *Router) Start(ctx context.Context, id string) error {
@@ -106,6 +126,12 @@ func (r *Router) resolve(id string) (Engine, error) {
 	if strings.HasPrefix(id, "desktop-") {
 		return r.qemu, nil
 	}
+	if strings.HasPrefix(id, "k8s-") {
+		return r.k8s, nil
+	}
+	if strings.HasPrefix(id, "kata-") {
+		return r.kata, nil
+	}
 	if _, err := r.qemu.findRecord(id); err == nil {
 		return r.qemu, nil
 	}
@@ -118,6 +144,24 @@ func (r *Router) resolve(id string) (Engine, error) {
 func isDesktopKind(kind string) bool {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "desktop", "qemu", "vm":
+		return true
+	default:
+		return false
+	}
+}
+
+func isKubernetesKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "kubernetes", "k8s", "kube":
+		return true
+	default:
+		return false
+	}
+}
+
+func isKataKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "kata", "research", "microvm":
 		return true
 	default:
 		return false

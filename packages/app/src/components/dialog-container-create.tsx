@@ -211,7 +211,8 @@ export function DialogContainerCreate(props: {
         memoryMb: store.kind === "desktop" ? memoryMb : undefined,
         cpuCores,
         diskGb: store.kind === "desktop" ? diskGb : undefined,
-        command: store.kind === "container" && command.length > 0 ? command : undefined,
+        command:
+          (store.kind === "container" || store.kind === "kubernetes") && command.length > 0 ? command : undefined,
         ports: ports.length > 0 ? ports : undefined,
         volumes:
           store.kind === "container" && store.volumeHost.trim() && store.volumeContainer.trim()
@@ -257,18 +258,23 @@ export function DialogContainerCreate(props: {
               class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
               value={store.kind}
               onChange={(event) => {
-                const kind = event.currentTarget.value as "container" | "desktop"
+                const kind = event.currentTarget.value as "container" | "desktop" | "kubernetes"
                 setStore("kind", kind)
                 if (kind === "desktop") setStore({ image: "", preset: "custom" })
-                if (kind === "container" && !store.image.trim()) setStore("image", "alpine:latest")
+                if ((kind === "container" || kind === "kubernetes") && !store.image.trim())
+                  setStore("image", "alpine:latest")
               }}
             >
               <option value="container">{language.t("containers.create.kind.container")}</option>
               <option value="desktop">{language.t("containers.create.kind.desktop")}</option>
+              <option value="kubernetes">{language.t("containers.create.kind.kubernetes")}</option>
             </select>
           </label>
           <Show when={store.kind === "desktop"}>
             <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.desktopHint")}</p>
+          </Show>
+          <Show when={store.kind === "kubernetes"}>
+            <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.kubernetesHint")}</p>
           </Show>
         </FormSection>
 
@@ -393,6 +399,28 @@ export function DialogContainerCreate(props: {
           </FormSection>
         </Show>
 
+        <Show when={store.kind === "kubernetes"}>
+          <FormSection title={language.t("containers.create.section.runtime")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.image")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.image}
+                onInput={(event) => setStore("image", event.currentTarget.value)}
+              />
+            </label>
+
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.command")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.command}
+                onInput={(event) => setStore("command", event.currentTarget.value)}
+              />
+            </label>
+          </FormSection>
+        </Show>
+
         <Show when={store.kind === "container"}>
           <FormSection title={language.t("containers.create.section.runtime")}>
             <label class="flex flex-col gap-1 text-sm">
@@ -502,7 +530,7 @@ export function DialogContainerCreate(props: {
           disabled={
             pending() ||
             downloading() ||
-            (store.kind === "container" && !store.image.trim()) ||
+            ((store.kind === "container" || store.kind === "kubernetes") && !store.image.trim()) ||
             (store.kind === "desktop" && store.preset === "custom" && !store.image.trim())
           }
         >
