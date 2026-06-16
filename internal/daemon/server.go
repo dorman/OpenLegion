@@ -224,11 +224,17 @@ func (s *Server) handleDisplay(w http.ResponseWriter, r *http.Request) {
 		TargetHost: info.TargetHost,
 		TargetPort: info.TargetPort,
 		Password:   info.Password,
+		Kind:       info.Kind,
 	})
+
+	kind := info.Kind
+	if kind == "" {
+		kind = "vnc-websocket"
+	}
 
 	writeJSON(w, http.StatusOK, types.DisplayResponse{
 		URL:      display.WebSocketURL(r, id, token),
-		Kind:     "vnc-websocket",
+		Kind:     kind,
 		Password: info.Password,
 	})
 }

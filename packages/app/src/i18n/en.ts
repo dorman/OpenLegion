@@ -830,9 +830,12 @@ export const dict = {
   "containers.create.kind": "Workload type",
   "containers.create.kind.container": "Container",
   "containers.create.kind.desktop": "Linux desktop (QEMU)",
+  "containers.create.kind.kubernetes": "Kubernetes (kind)",
   "containers.create.memory": "Memory (MB)",
   "containers.create.desktopHint":
     "Linux desktops are for visual inspection over VNC. Use a container workload when you want an agent session with in-sandbox tools.",
+  "containers.create.kubernetesHint":
+    "Runs on a local kind cluster (provisioned on first use) as a namespace + pod. Shares the host kernel, so it's for dev and cloud-native work — use a Linux desktop VM for malware analysis.",
   "containers.create.preset": "Installer preset",
   "containers.create.preset.custom": "Custom disk or ISO",
   "containers.create.preset.ubuntu2404Arm64": "Ubuntu 24.04 LTS server (arm64)",

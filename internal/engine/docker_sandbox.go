@@ -148,6 +148,7 @@ func (e *DockerSandbox) Display(ctx context.Context, id string) (DisplayInfo, er
 	return DisplayInfo{
 		TargetHost: host,
 		TargetPort: port,
+		Kind:       "vnc-websocket",
 	}, nil
 }
 

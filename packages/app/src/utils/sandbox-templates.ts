@@ -1,5 +1,5 @@
 export type SandboxTemplateFormState = {
-  kind: "container" | "desktop"
+  kind: "container" | "desktop" | "kubernetes"
   preset: string
   image: string
   name: string

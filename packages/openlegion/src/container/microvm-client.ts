@@ -10,7 +10,7 @@ const VmInfo = Schema.Struct({
   image: Schema.String,
   name: Schema.optional(Schema.String),
   status: Schema.optional(Schema.Literals(["running", "stopped"])),
-  kind: Schema.optional(Schema.Literals(["container", "desktop"])),
+  kind: Schema.optional(Schema.Literals(["container", "desktop", "kubernetes"])),
   display: Schema.optional(Schema.Boolean),
 })
 
@@ -27,7 +27,7 @@ const ShellResponse = Schema.Struct({
 
 const DisplayResponse = Schema.Struct({
   url: Schema.String,
-  kind: Schema.Literals(["vnc-websocket"]),
+  kind: Schema.Literals(["vnc-websocket", "cdp"]),
   password: Schema.optional(Schema.String),
 })
 
@@ -44,7 +44,7 @@ export interface Interface {
   readonly remove: (id: string) => Effect.Effect<void, string>
   readonly logs: (id: string, tail: number) => Effect.Effect<{ logs: string }, string>
   readonly shell: (id: string) => Effect.Effect<{ command: string; runtime: "docker" | "podman" | "microvm" }, string>
-  readonly display: (id: string) => Effect.Effect<{ url: string; kind: "vnc-websocket"; password?: string }, string>
+  readonly display: (id: string) => Effect.Effect<{ url: string; kind: "vnc-websocket" | "cdp"; password?: string }, string>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container/MicroVMClient") {}

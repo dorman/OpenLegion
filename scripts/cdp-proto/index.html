@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CDP browser prototype</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #111; color: #ddd; font: 13px ui-monospace, monospace; }
+      #bar { display: flex; gap: 8px; padding: 8px; align-items: center; background: #1b1b1b; }
+      #url { flex: 1; padding: 6px 8px; background: #000; color: #0f0; border: 1px solid #333; border-radius: 4px; }
+      button { padding: 6px 12px; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; cursor: pointer; }
+      #stage { position: relative; display: flex; justify-content: center; align-items: center; height: calc(100% - 46px); }
+      /* Letterbox: scale the fixed 1440x900 frame to fit, preserve aspect. */
+      #screen { max-width: 100%; max-height: 100%; aspect-ratio: 1440 / 900; outline: none; cursor: none; background: #000; image-rendering: auto; }
+      #cursor { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border: 2px solid #fff; border-radius: 50%; pointer-events: none; mix-blend-mode: difference; display: none; }
+      #hud { position: absolute; top: 8px; left: 8px; padding: 6px 10px; background: rgba(0,0,0,.7); border: 1px solid #333; border-radius: 4px; white-space: pre; line-height: 1.5; pointer-events: none; }
+      .big { color: #0f0; font-size: 15px; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <span>URL</span>
+      <input id="url" value="https://example.com" spellcheck="false" />
+      <button id="go">Go ↵</button>
+    </div>
+    <div id="stage">
+      <canvas id="screen" width="1440" height="900" tabindex="0"></canvas>
+      <div id="cursor"></div>
+      <div id="hud"></div>
+    </div>
+
+    <script>
+      const FRAME_W = 1440, FRAME_H = 900
+      const canvas = document.getElementById("screen")
+      const ctx = canvas.getContext("2d")
+      const cursor = document.getElementById("cursor")
+      const hud = document.getElementById("hud")
+      const ws = new WebSocket(`ws://${location.host}/ws`)
+      ws.binaryType = "arraybuffer"
+
+      // --- latency HUD: stamp on input, measure to next frame ---------------
+      let pendingStamp = 0        // performance.now() of last input that should cause a paint
+      let lastClickLatency = 0
+      let frameTimes = []         // recent frame arrival times for fps/interval
+      const img = new Image()
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, FRAME_W, FRAME_H)
+        const now = performance.now()
+        if (pendingStamp) { lastClickLatency = now - pendingStamp; pendingStamp = 0 }
+        frameTimes.push(now)
+        if (frameTimes.length > 30) frameTimes.shift()
+        renderHud()
+      }
+
+      function renderHud() {
+        let fps = 0, interval = 0
+        if (frameTimes.length > 1) {
+          const span = frameTimes[frameTimes.length - 1] - frameTimes[0]
+          fps = ((frameTimes.length - 1) / span) * 1000
+          interval = span / (frameTimes.length - 1)
+        }
+        hud.textContent =
+          `input→paint  ${lastClickLatency ? lastClickLatency.toFixed(0).padStart(3) + " ms" : "  — "}\n` +
+          `frame interval ${interval.toFixed(0).padStart(3)} ms\n` +
+          `fps          ${fps.toFixed(0).padStart(3)}`
+      }
+
+      ws.onmessage = (ev) => {
+        const m = JSON.parse(ev.data)
+        if (m.t === "frame") img.src = "data:image/jpeg;base64," + m.data
+      }
+
+      // --- coordinate mapping: CSS px on canvas -> device px in the frame ----
+      function toFrame(e) {
+        const r = canvas.getBoundingClientRect()
+        const x = ((e.clientX - r.left) / r.width) * FRAME_W
+        const y = ((e.clientY - r.top) / r.height) * FRAME_H
+        return { x: Math.max(0, Math.min(FRAME_W, x)), y: Math.max(0, Math.min(FRAME_H, y)) }
+      }
+
+      const BTN = ["left", "middle", "right"]
+      let buttonsMask = 0
+
+      canvas.addEventListener("mousemove", (e) => {
+        const p = toFrame(e)
+        // Local cursor follows the hand instantly — zero round-trip, by design.
+        cursor.style.display = "block"
+        cursor.style.left = e.clientX - canvas.getBoundingClientRect().left + canvas.offsetLeft + "px"
+        cursor.style.top = e.clientY - canvas.getBoundingClientRect().top + canvas.offsetTop + "px"
+        send({ t: "mouse", sub: "mouseMoved", x: p.x, y: p.y, buttons: buttonsMask })
+      })
+      canvas.addEventListener("mousedown", (e) => {
+        e.preventDefault(); canvas.focus()
+        const p = toFrame(e)
+        buttonsMask |= 1 << e.button
+        pendingStamp = performance.now()
+        send({ t: "mouse", sub: "mousePressed", x: p.x, y: p.y, button: BTN[e.button] ?? "left", buttons: buttonsMask })
+      })
+      canvas.addEventListener("mouseup", (e) => {
+        const p = toFrame(e)
+        buttonsMask &= ~(1 << e.button)
+        send({ t: "mouse", sub: "mouseReleased", x: p.x, y: p.y, button: BTN[e.button] ?? "left", buttons: buttonsMask })
+      })
+      canvas.addEventListener("contextmenu", (e) => e.preventDefault())
+      canvas.addEventListener("wheel", (e) => {
+        e.preventDefault()
+        const p = toFrame(e)
+        pendingStamp = performance.now()
+        send({ t: "mouse", sub: "mouseWheel", x: p.x, y: p.y, deltaX: e.deltaX, deltaY: e.deltaY })
+      }, { passive: false })
+
+      canvas.addEventListener("keydown", (e) => {
+        e.preventDefault()
+        pendingStamp = performance.now()
+        const text = e.key.length === 1 ? e.key : ""
+        send({ t: "key", sub: "keyDown", key: e.key, code: e.code, text, keyCode: e.keyCode })
+      })
+      canvas.addEventListener("keyup", (e) => {
+        e.preventDefault()
+        send({ t: "key", sub: "keyUp", key: e.key, code: e.code, keyCode: e.keyCode })
+      })
+
+      function send(o) { if (ws.readyState === 1) ws.send(JSON.stringify(o)) }
+
+      function navigate() {
+        let u = document.getElementById("url").value.trim()
+        if (!/^https?:\/\//.test(u)) u = "https://" + u
+        pendingStamp = performance.now()
+        send({ t: "navigate", url: u })
+        canvas.focus()
+      }
+      document.getElementById("go").addEventListener("click", navigate)
+      document.getElementById("url").addEventListener("keydown", (e) => { if (e.key === "Enter") navigate() })
+
+      ws.onopen = () => { canvas.focus(); renderHud() }
+    </script>
+  </body>
+</html>

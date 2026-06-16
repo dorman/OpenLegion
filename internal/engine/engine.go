@@ -10,6 +10,11 @@ type DisplayInfo struct {
 	TargetHost string
 	TargetPort string
 	Password   string
+	// Kind is the wire protocol the client should speak to TargetHost:TargetPort,
+	// e.g. "vnc-websocket" (raw RFB tunneled over a WebSocket) or "cdp" (a
+	// Chrome DevTools Protocol endpoint streamed via Page.startScreencast).
+	// Empty is treated as "vnc-websocket" for backward compatibility.
+	Kind string
 }
 
 type Engine interface {

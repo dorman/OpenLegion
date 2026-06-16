@@ -1,0 +1,109 @@
+#cloud-config
+# Build-time provisioning for the OpenLegion CDP desktop image.
+#
+# This runs ONCE during the bake (see ../build.sh), then the VM powers off and
+# the resulting qcow2 is the shippable image. At real boot inside OpenLegion no
+# cloud-init datasource is attached, so nothing re-runs — the systemd units
+# below (already enabled) bring up headless Chromium + the debug-port forwarder.
+
+package_update: true
+package_upgrade: false
+packages:
+  - chromium            # Debian ships a real arm64 deb (Ubuntu's is snap-only)
+  - socat               # exposes the loopback-only debug port to the guest NIC
+  - ca-certificates
+  - curl                # used by the boot self-test
+  - iproute2            # `ss` for the boot self-test
+  - fonts-liberation
+  - fonts-noto-core
+  - fonts-noto-color-emoji
+
+write_files:
+  # Launch wrapper. Chromium refuses to bind its debug port to a non-loopback
+  # address, so it listens on 127.0.0.1:9223 and socat (below) bridges the
+  # guest-reachable 0.0.0.0:9222 to it. --remote-allow-origins=* lets the daemon
+  # bridge connect; --no-sandbox is required for headless root in a minimal VM.
+  - path: /usr/local/bin/chromium-cdp
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      exec /usr/bin/chromium \
+        --headless=new \
+        --remote-debugging-port=9223 \
+        --remote-debugging-address=127.0.0.1 \
+        --remote-allow-origins=* \
+        --window-size=1440,900 \
+        --force-device-scale-factor=1 \
+        --no-sandbox \
+        --no-first-run \
+        --no-default-browser-check \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --hide-scrollbars \
+        --user-data-dir=/var/lib/chromium-cdp \
+        about:blank
+
+  - path: /etc/systemd/system/chromium-cdp.service
+    content: |
+      [Unit]
+      Description=Headless Chromium with CDP screencast endpoint
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/chromium-cdp
+      Restart=always
+      RestartSec=2
+      # Chromium needs a writable home/profile.
+      Environment=HOME=/var/lib/chromium-cdp
+      # Capture Chromium's own stderr for debugging crash loops.
+      StandardOutput=append:/var/log/chromium-cdp.log
+      StandardError=append:/var/log/chromium-cdp.log
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/chromium-cdp-forward.service
+    content: |
+      [Unit]
+      Description=Expose Chromium debug port to the guest NIC for QEMU hostfwd
+      After=chromium-cdp.service
+      BindsTo=chromium-cdp.service
+
+      [Service]
+      # Guest port 9222 (the QEMU hostfwd target) -> Chromium's loopback 9223.
+      ExecStart=/usr/bin/socat TCP-LISTEN:9222,fork,reuseaddr,bind=0.0.0.0 TCP:127.0.0.1:9223
+      Restart=always
+      RestartSec=2
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Boot self-test: ~25s after boot, dump service status + listening sockets +
+  # a direct CDP probe to the serial console (ttyAMA0). Only meaningful on a
+  # normal boot (not the bake, which powers off first) — lets us see why the
+  # CDP endpoint is or isn't up without needing guest login credentials.
+  - path: /etc/systemd/system/cdp-selftest.service
+    content: |
+      [Unit]
+      Description=Dump CDP diagnostics to the serial console
+      After=chromium-cdp.service chromium-cdp-forward.service
+
+      [Service]
+      Type=oneshot
+      ExecStartPre=/bin/sleep 25
+      ExecStart=/bin/sh -c 'exec >/dev/ttyAMA0 2>&1; echo "===CDP-SELFTEST==="; systemctl --no-pager --full status chromium-cdp.service chromium-cdp-forward.service || true; echo "--- listening sockets ---"; ss -ltnp || true; echo "--- direct probe 127.0.0.1:9223 ---"; curl -s --max-time 3 http://127.0.0.1:9223/json/version || echo "(no response from chromium)"; echo; echo "--- chromium log tail ---"; tail -n 25 /var/log/chromium-cdp.log 2>/dev/null || true; echo "===END-SELFTEST==="'
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - mkdir -p /var/lib/chromium-cdp
+  - systemctl daemon-reload
+  - systemctl enable chromium-cdp.service chromium-cdp-forward.service cdp-selftest.service
+
+# End the bake: power off so build.sh knows provisioning finished.
+power_state:
+  mode: poweroff
+  timeout: 600
+  condition: true

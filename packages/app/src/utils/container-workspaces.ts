@@ -80,7 +80,7 @@ export type SessionSandboxContext = {
   name?: string
   image?: string
   runtime?: ContainerRuntime
-  kind?: "container" | "desktop"
+  kind?: "container" | "desktop" | "kubernetes"
 }
 
 export function sessionSandboxFromMetadata(metadata?: Record<string, unknown>) {
@@ -98,7 +98,9 @@ export function sessionSandboxFromMetadata(metadata?: Record<string, unknown>) {
     ...(record.runtime === "docker" || record.runtime === "podman" || record.runtime === "microvm"
       ? { runtime: record.runtime }
       : {}),
-    ...(record.kind === "container" || record.kind === "desktop" ? { kind: record.kind } : {}),
+    ...(record.kind === "container" || record.kind === "desktop" || record.kind === "kubernetes"
+      ? { kind: record.kind }
+      : {}),
   } satisfies SessionSandboxContext
 }
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,9 @@ import (
 const (
 	desktopScreenWidth  = 1440
 	desktopScreenHeight = 900
+	// guestCDPPort is the in-guest port headless Chromium listens on for the
+	// Chrome DevTools Protocol; the host reaches it via a QEMU hostfwd.
+	guestCDPPort = 9222
 )
 
 type qemuRecord struct {
@@ -38,6 +42,7 @@ type qemuRecord struct {
 	Status       string `json:"status"`
 	MemoryMB     int    `json:"memoryMb"`
 	VNCPort      int    `json:"vncPort"`
+	CDPPort      int    `json:"cdpPort,omitempty"`
 	SerialSocket string `json:"serialSocket,omitempty"`
 	PID          int    `json:"pid,omitempty"`
 }
@@ -112,6 +117,12 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		return Result{}, err
 	}
 
+	cdpPort, err := freeCDPPort()
+	if err != nil {
+		_ = os.RemoveAll(vmDir)
+		return Result{}, err
+	}
+
 	serialSocket := serialSocketPath(vmDir)
 	pid, err := startQemu(ctx, qemuStartConfig{
 		vmDir:        vmDir,
@@ -120,6 +131,7 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		memoryMB:     memoryMB,
 		cpuCores:     cpuCores,
 		vncPort:      vncPort,
+		cdpPort:      cdpPort,
 		serialSocket: serialSocket,
 		pidFile:      filepath.Join(vmDir, "qemu.pid"),
 		logFile:      filepath.Join(vmDir, "qemu.log"),
@@ -136,6 +148,7 @@ func (e *QemuSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		Status:       "running",
 		MemoryMB:     memoryMB,
 		VNCPort:      vncPort,
+		CDPPort:      cdpPort,
 		SerialSocket: serialSocket,
 		PID:          pid,
 	}
@@ -217,6 +230,14 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 		}
 	}
 
+	cdpPort := record.CDPPort
+	if cdpPort <= 0 || !vncPortAvailable(cdpPort) {
+		cdpPort, err = freeCDPPort()
+		if err != nil {
+			return err
+		}
+	}
+
 	serialSocket := serialSocketPath(vmDir)
 	pid, err := startQemu(ctx, qemuStartConfig{
 		vmDir:        vmDir,
@@ -224,6 +245,7 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 		memoryMB:     memoryMB,
 		cpuCores:     defaultQemuCpuCores(),
 		vncPort:      vncPort,
+		cdpPort:      cdpPort,
 		serialSocket: serialSocket,
 		pidFile:      filepath.Join(vmDir, "qemu.pid"),
 		logFile:      filepath.Join(vmDir, "qemu.log"),
@@ -235,6 +257,7 @@ func (e *QemuSandbox) Start(ctx context.Context, id string) error {
 	record.Status = "running"
 	record.PID = pid
 	record.VNCPort = vncPort
+	record.CDPPort = cdpPort
 	record.MemoryMB = memoryMB
 	record.SerialSocket = serialSocket
 	return writeQemuRecord(vmDir, record)
@@ -312,12 +335,29 @@ func (e *QemuSandbox) Display(ctx context.Context, id string) (DisplayInfo, erro
 		return DisplayInfo{}, err
 	}
 	record = refreshQemuStatus(record)
-	if record.Status != "running" || record.VNCPort <= 0 {
+	if record.Status != "running" {
+		return DisplayInfo{}, fmt.Errorf("desktop vm is not running")
+	}
+	// Prefer the CDP browser endpoint (low-latency, agent-drivable), but only
+	// when the guest is actually serving it. Every desktop VM gets a forwarded
+	// CDP port, yet CDP is only answered by the headless-Chromium browser image;
+	// installer ISOs and arbitrary desktop qcow2s have nothing listening there
+	// and must fall through to the VNC framebuffer. A live probe is what tells
+	// the two apart (and self-heals during the browser image's boot window).
+	if record.CDPPort > 0 && cdpEndpointReachable("127.0.0.1", strconv.Itoa(record.CDPPort)) {
+		return DisplayInfo{
+			TargetHost: "127.0.0.1",
+			TargetPort: strconv.Itoa(record.CDPPort),
+			Kind:       "cdp",
+		}, nil
+	}
+	if record.VNCPort <= 0 {
 		return DisplayInfo{}, fmt.Errorf("desktop vm is not running")
 	}
 	return DisplayInfo{
 		TargetHost: "127.0.0.1",
 		TargetPort: strconv.Itoa(record.VNCPort),
+		Kind:       "vnc-websocket",
 	}, nil
 }
 
@@ -348,6 +388,7 @@ type qemuStartConfig struct {
 	memoryMB     int
 	cpuCores     int
 	vncPort      int
+	cdpPort      int
 	serialSocket string
 	pidFile      string
 	logFile      string
@@ -366,11 +407,19 @@ func startQemu(ctx context.Context, cfg qemuStartConfig) (int, error) {
 	if cfg.cpuCores > 0 {
 		args = append(args, "-smp", strconv.Itoa(cfg.cpuCores))
 	}
+	// Forward a host port to the guest's headless-Chromium debug port (9222) so
+	// the CDP display can reach it. QEMU user-mode networking otherwise hides the
+	// guest behind NAT. VNC stays on its own host-side QEMU socket as the
+	// full-desktop fallback; CDP is the fast browser path.
+	netdev := "user,id=net0"
+	if cfg.cdpPort > 0 {
+		netdev += fmt.Sprintf(",hostfwd=tcp:127.0.0.1:%d-:%d", cfg.cdpPort, guestCDPPort)
+	}
 	args = append(args,
 		"-vga", "none",
 		"-drive", "if=none,file=" + cfg.disk + ",format=qcow2,id=hd",
 		"-device", "virtio-blk-pci,drive=hd",
-		"-netdev", "user,id=net0",
+		"-netdev", netdev,
 		"-device", "virtio-net-pci,netdev=net0",
 		"-device", fmt.Sprintf("virtio-gpu-pci,edid=on,xres=%d,yres=%d", desktopScreenWidth, desktopScreenHeight),
 		"-device", "qemu-xhci,id=xhci",
@@ -644,6 +693,36 @@ func freeVNCPort() (int, error) {
 		return port, nil
 	}
 	return 0, fmt.Errorf("no free vnc port in range 5900-5999")
+}
+
+// freeCDPPort picks a free host port to forward to the guest's Chromium debug
+// port. Kept in a distinct range from VNC (5900-5999) to avoid collisions.
+func freeCDPPort() (int, error) {
+	for port := 9222; port < 9322; port++ {
+		if !vncPortAvailable(port) {
+			continue
+		}
+		return port, nil
+	}
+	return 0, fmt.Errorf("no free cdp port in range 9222-9321")
+}
+
+// cdpEndpointReachable reports whether a Chrome DevTools endpoint is actually
+// answering on host:port. QEMU's hostfwd makes the host port accept connections
+// even when nothing listens in the guest, so a bare TCP dial would always
+// succeed; we probe /json/version over HTTP instead. The timeout is short
+// because this is a loopback hop — a live Chromium answers in milliseconds, and
+// a missing one is refused by the guest just as quickly, so the common
+// non-browser (VNC) desktop path is not slowed down.
+func cdpEndpointReachable(host, port string) bool {
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	res, err := client.Get("http://" + net.JoinHostPort(host, port) + "/json/version")
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+	_, _ = io.Copy(io.Discard, res.Body)
+	return res.StatusCode == http.StatusOK
 }
 
 func vncPortAvailable(port int) bool {

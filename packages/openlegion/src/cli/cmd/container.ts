@@ -80,7 +80,7 @@ export const ContainerCreateCommand = effectCmd({
       .option("kind", {
         describe: "workload kind",
         type: "string",
-        choices: ["container", "desktop"],
+        choices: ["container", "desktop", "kubernetes"],
         default: "container",
       })
       .option("preset", {
