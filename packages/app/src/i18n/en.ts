@@ -836,6 +836,19 @@ export const dict = {
     "Linux desktops are for visual inspection over VNC. Use a container workload when you want an agent session with in-sandbox tools.",
   "containers.create.kubernetesHint":
     "Runs on a local kind cluster (provisioned on first use) as a namespace + pod. Shares the host kernel, so it's for dev and cloud-native work — use a Linux desktop VM for malware analysis.",
+  "containers.create.desktopGuide.title": "Set up a Linux VM research host",
+  "containers.create.desktopGuide.intro":
+    "Linux VM desktops aren't created inside OpenLegion. They run as hardware-isolated Kata micro-VMs on a dedicated Linux tower on your network, on a no-egress network for safe malware analysis. Set the host up once, then point this app at its daemon.",
+  "containers.create.desktopGuide.step1":
+    "On a dedicated Linux box (Debian/Ubuntu, x86_64) with hardware virtualization (KVM), clone the OpenLegion repo.",
+  "containers.create.desktopGuide.step2":
+    "Run the host-agent scripts to check the environment and install Docker + Kata + the no-egress network.",
+  "containers.create.desktopGuide.step3":
+    "Build the reverse-engineering desktop images and start the sandbox daemon bound to your LAN.",
+  "containers.create.desktopGuide.step4":
+    "Point this app at the host in Settings → Servers → Sandbox daemon (the daemon URL plus its bearer token), or via the OPENLEGION_MICROVM_URL environment variable.",
+  "containers.create.desktopGuide.openHostGuide": "Open host setup guide",
+  "containers.create.desktopGuide.openDaemonReadme": "Daemon docs",
   "containers.create.preset": "Installer preset",
   "containers.create.preset.custom": "Custom disk or ISO",
   "containers.create.preset.ubuntu2404Arm64": "Ubuntu 24.04 LTS server (arm64)",
