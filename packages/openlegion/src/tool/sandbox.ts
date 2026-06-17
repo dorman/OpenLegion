@@ -2,6 +2,7 @@ import { AppProcess } from "@openlegion-ai/core/process"
 import { Effect, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { Container } from "@/container"
+import { captureCdpScreenshot, performCdpActions } from "@/container/cdp"
 import { captureVncScreenshot, performVncActions, type VncInputAction } from "@/container/vnc"
 import * as Tool from "./tool"
 
@@ -316,13 +317,16 @@ export const SandboxScreenshotTool = Tool.define(
 
     return {
       description:
-        "Capture a screenshot of a desktop sandbox's screen and attach it as an image. Only works for sandboxes with a display (kind \"desktop\"). Use this to see what is currently shown on the VM's screen — login prompts, installers, error dialogs, or whether the desktop booted at all.",
+        "Capture a screenshot of a display-capable sandbox's screen and attach it as an image. Works for any sandbox that reports a display — a VNC desktop VM or a CDP browser. Use this to see what is currently shown — login prompts, installers, error dialogs, the loaded web page, or whether the desktop booted at all.",
       parameters: IdParameters,
       execute: (params: IdParameters) =>
         Effect.gen(function* () {
           const display = yield* container.display(params.id)
           const shot = yield* Effect.tryPromise({
-            try: () => captureVncScreenshot({ url: display.url, password: display.password }),
+            try: () =>
+              display.kind === "cdp"
+                ? captureCdpScreenshot({ url: display.url })
+                : captureVncScreenshot({ url: display.url, password: display.password }),
             catch: (err) => (err instanceof Error ? err : new Error(String(err))),
           })
           return {
@@ -414,7 +418,7 @@ export const SandboxInputTool = Tool.define(
 
     return {
       description:
-        'Send keyboard and mouse input to a desktop sandbox\'s screen, then return a screenshot of the result. Only works for sandboxes with a display (kind "desktop"). Actions run in order: type text, press keys or combos (e.g. "ctrl+c", "enter"), click/double-click/move/scroll at pixel coordinates, or wait for the UI to react. Take a sandbox_screenshot first to find coordinates, and check the returned screenshot to verify the effect before continuing.',
+        'Send keyboard and mouse input to a display-capable sandbox\'s screen, then return a screenshot of the result. Works for any sandbox that reports a display — a VNC desktop VM or a CDP browser. Actions run in order: type text, press keys or combos (e.g. "ctrl+c", "enter"), click/double-click/move/scroll at pixel coordinates, or wait for the UI to react. Take a sandbox_screenshot first to find coordinates, and check the returned screenshot to verify the effect before continuing.',
       parameters: InputParameters,
       execute: (params: InputParameters, ctx: Tool.Context) =>
         Effect.gen(function* () {
@@ -437,7 +441,10 @@ export const SandboxInputTool = Tool.define(
 
           const display = yield* container.display(params.id)
           const shot = yield* Effect.tryPromise({
-            try: () => performVncActions({ url: display.url, password: display.password, actions: parsed }),
+            try: () =>
+              display.kind === "cdp"
+                ? performCdpActions({ url: display.url, actions: parsed })
+                : performVncActions({ url: display.url, password: display.password, actions: parsed }),
             catch: (err) => (err instanceof Error ? err : new Error(String(err))),
           })
           return {
