@@ -1,13 +1,13 @@
 # OpenLegion
 [![CircleCI](https://dl.circleci.com/status-badge/img/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/dev.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/circleci/4HpVvw2oM8fo29s68vV2LJ/7XT7kXBPD4uR5GD5zFRxDT/tree/dev)
-[![Known Vulnerabilities](https://snyk.io/test/github/{dorman}/{openlegion}/badge.svg)](https://snyk.io/test/github/{dorman}/{openlegion})
+[![Known Vulnerabilities](https://snyk.io/test/github/dorman/OpenLegion/badge.svg)](https://snyk.io/test/github/dorman/OpenLegion)
 ![MIT License](https://img.shields.io/badge/LICENSE-MIT-%234183C4.svg?style=for-the-badge)
 ![TypeScript](https://img.shields.io/badge/TYPESCRIPT-%233178C6.svg?style=for-the-badge&logo=typescript&logoColor=white)
 ![Electron](https://img.shields.io/badge/ELECTRON-%2347848F.svg?style=for-the-badge&logo=electron&logoColor=white)
 
-**Local desktop platform for running sandboxes—Docker containers and Linux desktop VMs—with permissioned AI agents.**
+**Local desktop platform for running sandboxes—Docker containers, Kubernetes workloads, Linux desktop VMs, and hardware-isolated research VMs—with permissioned AI agents.**
 
-OpenLegion gives **DevOps engineers** and **security teams** a single place on their own machine to spin up isolated workloads, inspect them (logs, shell, or live desktop), and get guided help from sandboxed agents. No cloud control plane: your images, credentials, sessions, and runtime stay local.
+OpenLegion gives **DevOps engineers**, **security teams**, and **malware analysts / reverse engineers** a single place—on their own machine or a dedicated lab host—to spin up isolated workloads, inspect them (logs, shell, or live desktop), and get guided help from sandboxed agents. No cloud control plane: your images, credentials, sessions, and runtime stay local.
 
 OpenLegion is a fork of [OpenCode](https://github.com/anomalyco/opencode) that diverges toward **local sandbox management + security-aware agents**. It is not affiliated with Docker Inc. or OpenCode. Third-party projects with “opencode” in the name are also unrelated.
 
@@ -23,7 +23,7 @@ Everything runs **on your machine**. There is no hosted control plane; data, cre
 
 ![OpenLegion sandboxes page](./docs/screenshots/containers-page.png)
 
-**Desktop VM display** — inspect a sandbox, then open a live Linux desktop over VNC in the app (no separate viewer required).
+**Desktop VM display** — inspect a sandbox, then open a live Linux desktop in the app—over VNC, or the low-latency CDP browser stream for the headless-Chromium image (no separate viewer required).
 
 ![OpenLegion desktop VM display](./docs/screenshots/desktop-vm-display.png)
 
@@ -35,8 +35,9 @@ Screenshots are maintained manually — see [docs/screenshots/README.md](./docs/
 
 | Audience             | What you get                                                                                                                                        |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **DevOps engineers** | A desktop app to run many sandboxes side by side, with agents that help author Dockerfiles, debug runtime output, and work inside mapped workspaces. |
+| **DevOps engineers** | A desktop app to run many sandboxes side by side—containers and Kubernetes (`kind`) workloads—with agents that help author Dockerfiles, debug runtime output, and work inside mapped workspaces. |
 | **Security teams**   | Workflows that bias toward least privilege, explicit approvals, isolated networks, and reviewable changes before workloads go live on a lab host.   |
+| **Malware analysts / reverse engineers** | A reverse-engineering desktop (XFCE + Ghidra and RE tooling) that runs as a hardware-isolated Kata micro-VM on a no-egress network, stood up on a dedicated Linux research host via the [host-agent scripts](./host-agent/). |
 
 OpenLegion is **not** a SaaS product. It is a **local-only** management and agent platform you install and run yourself.
 
@@ -46,25 +47,31 @@ OpenLegion is **not** a SaaS product. It is a **local-only** management and agen
 
 ```mermaid
 flowchart LR
-  subgraph local ["Your machine (local only)"]
+  subgraph local ["Your machine / lab host (local only)"]
     Desktop["OpenLegion Desktop"]
     Agent["Permissioned agents"]
     Daemon["Sandbox daemon"]
     Docker["Docker Engine"]
-    QEMU["QEMU desktops"]
+    Kube["Kubernetes (kind)"]
+    QEMU["QEMU desktops (VNC / CDP)"]
+    Kata["Kata research micro-VMs"]
     Desktop --> Agent
     Desktop --> Daemon
     Daemon --> Docker
+    Daemon --> Kube
     Daemon --> QEMU
+    Daemon --> Kata
     Agent --> Docker
   end
 ```
 
+The daemon picks an engine per sandbox: Docker for containers, `kind` for Kubernetes workloads, QEMU for desktop VMs, and Kata for hardware-isolated research VMs.
+
 1. **Desktop-first** — The Electron app (`bun run dev:desktop`) is the primary surface: **Sandboxes**, **Agents**, and **Settings** in one shell.
-2. **Two workload types** — Run **container** sandboxes (images, ports, bind mounts) or **Linux desktop** sandboxes (curated distro ISOs or custom qcow2 via QEMU) from the same UI.
-3. **Isolated runtimes** — The `openlegion-microvm` daemon can place Docker workloads on per-sandbox networks and host QEMU VMs with persisted disks under `~/.openlegion/`.
-4. **Inspect everything** — Logs, embedded shell (containers), and in-app VNC desktop view (QEMU workloads) without leaving the app.
-5. **Agents inside sandboxes** — Link a host project directory into a container sandbox and run an agent session whose file and shell tools execute **inside** the workload, gated by OpenLegion’s permission model.
+2. **Multiple workload types** — From the same UI, run **container** sandboxes (images, ports, bind mounts), **Kubernetes** workloads (a per-sandbox namespace on a local `kind` cluster), or **Linux desktop** sandboxes (curated distro ISOs or custom qcow2 via QEMU). A fourth path—**hardware-isolated research VMs** (Kata micro-VMs)—is provisioned on a dedicated Linux host via the [host-agent scripts](./host-agent/).
+3. **Isolated runtimes** — The `openlegion-microvm` daemon places Docker workloads on per-sandbox networks, runs Kubernetes workloads as isolated namespaces, hosts QEMU VMs with persisted disks under `~/.openlegion/`, and (on a research host) launches Kata micro-VMs with their own guest kernel on a no-egress network.
+4. **Inspect everything** — Logs, embedded shell (containers and Kubernetes pods), a per-sandbox audit log, and an in-app desktop view—VNC for QEMU/research desktops, or a low-latency CDP browser stream for the headless-Chromium image.
+5. **Agents inside sandboxes** — Link a host project directory into a container sandbox and run an agent session whose file and shell tools execute **inside** the workload, gated by OpenLegion’s permission model. Agents can also **see and drive desktops**: `sandbox_screenshot` and `sandbox_input` capture the screen and send keyboard/mouse over VNC or CDP.
 6. **Security by design** — Default-deny tooling, explicit approval for risky operations, and local-only storage of secrets and session history.
 
 ---
@@ -79,12 +86,13 @@ This repo is a **fork of [OpenCode](https://github.com/anomalyco/opencode)**. Th
 | --- | --- | --- |
 | **Desktop app** | `bun run dev:desktop` | Electron UI; desktop builds open on **Sandboxes** by default |
 | **Sandboxes UI** | Desktop → **Sandboxes** | Onboarding, runtime pills, create dialog (workload / installer / runtime / general sections), inspect, agent sessions |
-| **Sandbox daemon** | `go run ./cmd/openlegion-microvm` | Isolated Docker networks + QEMU desktop VMs ([daemon README](./cmd/openlegion-microvm/README.md)) |
+| **Sandbox daemon** | `go run ./cmd/openlegion-microvm` | Routes per sandbox to its engine: isolated Docker networks, Kubernetes (`kind`), QEMU desktop VMs, and Kata research micro-VMs ([daemon README](./cmd/openlegion-microvm/README.md)) |
+| **Research host** | [`host-agent/`](./host-agent/) | Scripts to turn a dedicated Linux box into a Kata-isolated, no-egress malware-analysis host (`preflight` → `setup-kata` → `launch`/`verify`/`destroy`) |
 | **Desktop auto-start** | Desktop app launch | Starts the sandbox daemon when possible; **Start sandbox daemon** if it is offline |
 | **Container runtime** | `packages/openlegion/src/container/` | Auto-detects sandbox daemon, Docker, or Podman (`OPENLEGION_CONTAINER_RUNTIME`) |
 | **Container HTTP API** | `GET/POST /global/containers` | List, create, start, stop, and remove sandboxes via the local sidecar |
 | **Container workspaces** | `GET/PUT /global/container-workspaces` | Persist bind mounts and session links per sandbox |
-| **Container CLI** | `openlegion container list\|create\|stop\|remove` | Manage workloads from the terminal |
+| **Container CLI** | `openlegion container list\|create\|start\|stop\|remove\|logs\|shell\|compose-up\|compose-down` | Manage workloads from the terminal |
 | **CLI / TUI** | `bun run dev` | Terminal agent (upstream OpenCode behavior) |
 | **Web UI** | `bun run dev:web` | Same app shell in the browser for development |
 | **Agent runtime** | `packages/openlegion` | Sessions, tools, providers, MCP, plugins |
@@ -99,22 +107,25 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 | --- | --- |
 | **Create container sandboxes** | Desktop dialog or CLI—image, name, command, ports, bind mounts |
 | **Create desktop sandboxes** | `kind: desktop` with a curated installer ISO (Ubuntu, Debian, Fedora, Rocky, AlmaLinux — filtered by host arm64/amd64; see [desktop presets](./packages/app/src/utils/desktop-presets.ts)) or a custom qcow2/ISO; installer images cache under `~/.openlegion/images`, VM disks under `~/.openlegion/qemu-vms` |
-| **Isolated networks** | Sandbox daemon places Docker workloads on dedicated networks (`network: isolated` in the UI) |
-| **Start stopped workloads** | Restart stopped containers and desktop VMs from the UI or `POST /global/containers/:id/start` |
-| **Logs, shell & desktop** | Inspect dialog with **Logs**, **Shell**, and **Desktop** tabs; live VNC for QEMU workloads |
+| **Create Kubernetes sandboxes** | `kind: kubernetes` runs the image as a Deployment in its own namespace on a local `kind` cluster (provisioned on first use); shares the host kernel, aimed at dev / cloud-native work |
+| **Research / RE desktops** | Kata micro-VMs (own guest kernel + KVM boundary) on a no-egress network, using prebuilt RE desktop images ([`re-desktop`](./packages/sandbox-images/re-desktop/) + [`ghidra`](./packages/sandbox-images/ghidra/)); launched on a dedicated research host via the [host-agent scripts](./host-agent/) |
+| **Isolated networks** | Sandbox daemon places Docker workloads on dedicated networks (`network: isolated` in the UI); research VMs run on a no-egress network so samples cannot call home |
+| **Start stopped workloads** | Restart stopped containers, Kubernetes workloads, and desktop VMs from the UI or `POST /global/containers/:id/start` |
+| **Logs, shell, desktop & audit** | Inspect dialog with **Logs**, **Shell**, **Desktop**, and **Audit** tabs; the desktop view uses VNC for QEMU/research desktops or a CDP browser stream for the headless-Chromium image |
+| **Agent computer-use** | `sandbox_screenshot` and `sandbox_input` let an agent see the screen and send keyboard/mouse over VNC or CDP |
 | **Runtime status** | Docker, sandbox daemon, and QEMU availability shown in onboarding and on the sandboxes page |
 | **Open agent session** | Bind a host project into a container sandbox and start/resume an agent with `openlegion.container` metadata |
 | **In-sandbox file tools** | When a session has container metadata, `read`, `write`, and `edit` run inside the workload via `docker exec` |
 | **In-sandbox shell** | Shell tool wraps commands in `docker exec` for linked sessions |
-| **Workload badges** | Container vs desktop sandboxes shown with distinct pill styling in the UI |
+| **Workload badges** | Container, Kubernetes, and desktop sandboxes shown with distinct pill styling in the UI |
 | **Container workspaces** | Stored in `~/.openlegion/data/container-workspaces.json` |
 
 ### Desktop UI
 
 - **Sandboxes page** — card layout with workload type and running/stopped pills, isolated-network label, and actions (open session, inspect, start, stop, remove)
 - **Onboarding** — guided setup for daemon readiness, first sandbox creation, and inspect/session workflow
-- **Create sandbox dialog** — sectioned form for workload type, desktop installer presets, runtime options, and general settings
-- **Inspect sandbox** — modal with **Logs**, **Shell**, and **Desktop** tabs; live VNC for QEMU desktop sandboxes
+- **Create sandbox dialog** — sectioned form for workload type (container, Kubernetes, or desktop), desktop installer presets, runtime options, and general settings
+- **Inspect sandbox** — modal with **Logs**, **Shell**, **Desktop**, and **Audit** tabs; the Desktop tab streams VNC or, for the headless-Chromium image, CDP
 - **Agents page** — recent agent sessions (`/agents`)
 - **Settings** — in-app settings dialog from the sidebar
 - **Dev builds** — channel badge and app version in the titlebar
@@ -122,11 +133,16 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 
 ### Roadmap
 
+- [x] **Multiple engines** — Docker, Kubernetes (`kind`), QEMU desktops, and Kata research micro-VMs behind one daemon
+- [x] **CDP browser display** — low-latency Chrome DevTools stream as an alternative to VNC for the headless-Chromium desktop image
+- [x] **Agent computer-use** — `sandbox_screenshot` / `sandbox_input` over VNC and CDP
 - [x] **Compose project management** — basic deploy/stop from a compose file on the Sandboxes page
 - [x] **Multi-sandbox workspaces** — tabbed panel when multiple sandboxes are running
 - [x] **Project sandboxes** — linked project paths shown in the desktop sidebar
-- [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run (basic hardening hints in create dialog today)
 - [x] **Security-team views** — audit tab in inspect dialog for local sandbox permission events
+- [ ] **Secure image workflows** — guided Dockerfile/Compose authoring, baseline hardening checks, explain-before-run (basic hardening hints in create dialog today)
+- [ ] **In-app research desktops** — surface Kata research VMs and remote-daemon hosts directly in the desktop app (today they are driven via the daemon API and `host-agent/` scripts)
+- [ ] **Authenticated remote daemon** — the control API is unauthenticated, so running the daemon on a separate LAN host is for trusted networks only
 
 The [`packages/containers`](./packages/containers/) directory is **CI build images** for GitHub Actions only—not the end-user runtime.
 
@@ -137,9 +153,9 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 |                   | Docker Desktop           | OpenLegion (today)                                         |
 | ----------------- | ------------------------ | ---------------------------------------------------------- |
 | **Runs where**    | Local                    | **Local only**                                             |
-| **Primary goal**  | Run containers           | Run **sandboxes** (containers + desktop VMs) **with agents** |
+| **Primary goal**  | Run containers           | Run **sandboxes** (containers, Kubernetes, desktop & research VMs) **with agents** |
 | **AI assistance** | Limited / separate tools | **Built-in**, permissioned, sandbox-scoped agents          |
-| **Audience**      | General developers       | **DevOps + security** teams                                |
+| **Audience**      | General developers       | **DevOps, security & RE** teams                            |
 
 ---
 
@@ -149,6 +165,8 @@ The [`packages/containers`](./packages/containers/) directory is **CI build imag
 - [Docker](https://docs.docker.com/get-docker/) (or Podman) for container sandboxes — on macOS, [Colima](https://github.com/abiosoft/colima) is a common local Docker backend
 - [QEMU](https://www.qemu.org/) (`brew install qemu`) for desktop sandboxes on macOS
 - [Go](https://go.dev) **1.22+** (to build/run the sandbox daemon locally)
+- [`kind`](https://kind.sigs.k8s.io/) and [`kubectl`](https://kubernetes.io/docs/tasks/tools/) — only for Kubernetes sandboxes
+- A dedicated Linux host with hardware virtualization (KVM / VT-x / AMD-V) — only for the Kata research path; run [`host-agent/preflight.sh`](./host-agent/preflight.sh) to check capability
 - macOS, Linux, or Windows (desktop development is most tested on **macOS** today; icon regeneration in `predev` uses macOS `sips`/`iconutil` — Linux/Windows dev builds use committed icons under `packages/desktop/icons/`)
 
 ---
@@ -176,6 +194,9 @@ brew install qemu     # for desktop sandboxes
 
 # Sandbox CLI (with local server or daemon running)
 bun run dev -- container list
+
+# Optional: stand up a Kata-isolated malware-analysis host (run on a dedicated Linux box)
+sudo ./host-agent/preflight.sh && sudo ./host-agent/setup-kata.sh && sudo ./host-agent/verify.sh
 ```
 
 Future CLI install (when published): `npm i -g openlegion-ai`.
@@ -202,16 +223,19 @@ When a session is linked to a container sandbox (`openlegion.container` metadata
 
 ```
 cmd/
-  openlegion-microvm/   # Go sandbox daemon (isolated Docker networks + QEMU desktops)
-internal/               # Daemon engine, Docker client, QEMU sandbox, VNC display bridge
+  openlegion-microvm/   # Go sandbox daemon (engine router for Docker / kind / QEMU / Kata)
+internal/               # Daemon engines (Docker, Kubernetes, QEMU, Kata), kube client, VNC + CDP display bridge
+host-agent/             # Scripts to stand up a Kata-isolated, no-egress research host
 packages/
-  openlegion/           # CLI, TUI, local HTTP server, agent + tool runtime
+  openlegion/           # CLI, TUI, local HTTP server, agent + tool runtime (incl. VNC/CDP senses)
   core/                 # Shared logic (permissions, DB, providers, …)
   app/                  # SolidJS UI (sandboxes page, desktop shell, dialogs)
   desktop/              # Electron management shell + sandbox runtime IPC
   ui/                   # Components and brand assets
   plugin/               # Plugin SDK
   sdk/                  # JS client for the local API
+  sandbox-images/       # Reverse-engineering desktop images (re-desktop, ghidra)
+  desktop-image/        # Baked CDP browser desktop (headless Chromium) build
   containers/           # CI images only (not the product runtime)
 ```
 
@@ -232,11 +256,15 @@ Environment variables: `OPENLEGION_*` prefix. Sandbox-related examples:
 | --- | --- |
 | `OPENLEGION_CONTAINER_RUNTIME` | Prefer `microvm`, `docker`, or `podman` |
 | `OPENLEGION_MICROVM_URL` | Sandbox daemon URL (default `http://127.0.0.1:7420`) |
-| `OPENLEGION_MICROVM_LISTEN` | Daemon listen address |
+| `OPENLEGION_MICROVM_LISTEN` | Daemon listen address (default loopback; `0.0.0.0:7420` exposes it on the LAN — see the unauthenticated-control-plane note in the roadmap) |
 | `OPENLEGION_SANDBOX_ROOT` | Sandbox metadata directory (default `~/.openlegion/sandboxes`) |
-| `OPENLEGION_QEMU_IMAGE` | Path to Ubuntu arm64 ISO or qcow2 for `kind: desktop` |
+| `OPENLEGION_QEMU_IMAGE` | Path to an installer ISO or qcow2 for `kind: desktop` (e.g. the baked CDP browser image from `packages/desktop-image/`) |
 | `OPENLEGION_QEMU_ROOT` | Desktop VM disks (default `~/.openlegion/qemu-vms`) |
 | `OPENLEGION_QEMU_MEMORY_MB` | RAM for desktop sandboxes (default `2048`) |
+| `OPENLEGION_KIND_BIN` / `OPENLEGION_KUBECTL_BIN` | `kind` / `kubectl` binary paths for Kubernetes sandboxes |
+| `OPENLEGION_KATA_RUNTIME` | Docker runtime name for Kata research VMs (default `kata`) |
+| `OPENLEGION_KATA_NETWORK` | No-egress network for research VMs (default `openlegion-noegress`) |
+| `OPENLEGION_KATA_IMAGE` | Default RE desktop image (default `openlegion/ghidra:12.1.2`) |
 
 ---
 
