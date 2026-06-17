@@ -795,6 +795,8 @@ export const dict = {
   "containers.table.project": "Project",
   "containers.running.title": "Sandboxes",
   "containers.running.active": "{{count}} active",
+  "containers.host.local": "Local host",
+  "containers.host.remote": "Connected to {{host}}",
   "containers.status.running": "running",
   "containers.status.starting": "starting…",
   "containers.status.stopping": "stopping…",
