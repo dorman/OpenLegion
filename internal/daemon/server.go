@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ type Server struct {
 	engine  engine.Engine
 	display *display.Bridge
 	listen  string
+	token   string
 }
 
 func NewServer(st *store.Store, eng engine.Engine) *Server {
@@ -26,6 +28,7 @@ func NewServer(st *store.Store, eng engine.Engine) *Server {
 		engine:  eng,
 		display: display.NewBridge(),
 		listen:  env("OPENLEGION_MICROVM_LISTEN", "127.0.0.1:7420"),
+		token:   strings.TrimSpace(env("OPENLEGION_MICROVM_TOKEN", "")),
 	}
 }
 
@@ -41,7 +44,37 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /vms/{id}/shell", s.handleShell)
 	mux.HandleFunc("GET /vms/{id}/display", s.handleDisplay)
 	mux.HandleFunc("GET /vms/{id}/display/ws", s.handleDisplayWS)
-	return mux
+	return s.withAuth(mux)
+}
+
+// withAuth requires a bearer token on the control API when OPENLEGION_MICROVM_TOKEN
+// is set, so the daemon can be safely exposed on a LAN. /health stays open (it is
+// a non-sensitive liveness probe) and the display WebSocket is exempt because it
+// carries its own per-session token in the query string — browser WebSocket
+// clients cannot set an Authorization header. With no token configured the daemon
+// is unauthenticated, as before (loopback default).
+func (s *Server) withAuth(next http.Handler) http.Handler {
+	if s.token == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authExempt(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		const prefix = "Bearer "
+		header := r.Header.Get("Authorization")
+		presented := strings.TrimPrefix(header, prefix)
+		if !strings.HasPrefix(header, prefix) || subtle.ConstantTimeCompare([]byte(presented), []byte(s.token)) != 1 {
+			writeError(w, http.StatusUnauthorized, "missing or invalid bearer token")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func authExempt(path string) bool {
+	return path == "/health" || strings.HasSuffix(path, "/display/ws")
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

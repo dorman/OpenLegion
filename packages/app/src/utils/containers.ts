@@ -35,6 +35,7 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  microvmRemote: boolean
   arch: "arm64" | "x64"
 }
 

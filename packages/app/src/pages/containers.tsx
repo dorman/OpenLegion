@@ -122,6 +122,8 @@ export default function ContainersPage() {
   }))
 
   const daemonReady = createMemo(() => runtime.data?.microvm === true)
+  // A remote daemon's lifecycle is managed on its host, not from this app.
+  const remoteHost = createMemo(() => runtime.data?.microvmRemote === true)
 
   const filteredContainers = createMemo(() =>
     (containers.data ?? []).filter((item) => matchesFilters(item, statusFilter(), kindFilter())),
@@ -439,7 +441,7 @@ export default function ContainersPage() {
               <ButtonV2 variant="ghost" onClick={() => showOnboardingDialog()}>
                 {language.t("containers.onboarding.open")}
               </ButtonV2>
-              <Show when={platform.ensureMicrovmDaemon !== undefined}>
+              <Show when={platform.ensureMicrovmDaemon !== undefined && !remoteHost()}>
                 <ButtonV2 variant="neutral" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
                   {ensuringDaemon()
                     ? language.t("containers.ensureDaemon.starting")

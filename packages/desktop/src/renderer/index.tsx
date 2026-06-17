@@ -288,6 +288,10 @@ const createPlatform = (): Platform => {
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
 
+    getSandboxHost: () => window.api.getSandboxHost(),
+
+    setSandboxHost: (config) => window.api.setSandboxHost(config),
+
     ensureDesktopImage: async (presetId, opts) => {
       const stop = opts?.onProgress ? window.api.onDesktopImageDownloadProgress(opts.onProgress) : undefined
       const abort = opts?.signal

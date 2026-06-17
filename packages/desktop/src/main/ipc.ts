@@ -8,6 +8,7 @@ import type {
   EnsureMicrovmDaemonResult,
   EnsureDesktopImageResult,
   FatalRendererError,
+  SandboxHostConfig,
   ServerReadyData,
   TitlebarTheme,
   WindowConfig,
@@ -51,6 +52,8 @@ type Deps = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  getSandboxHost: () => SandboxHostConfig
+  setSandboxHost: (config: SandboxHostConfig) => void
   ensureDesktopImage: (event: IpcMainInvokeEvent, presetId: string) => Promise<EnsureDesktopImageResult>
   cancelDesktopImageDownload: () => Promise<void> | void
   containerPtyCreate: (
@@ -93,6 +96,10 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
   ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
+  ipcMain.handle("get-sandbox-host", () => deps.getSandboxHost())
+  ipcMain.handle("set-sandbox-host", (_event: IpcMainInvokeEvent, config: SandboxHostConfig) =>
+    deps.setSandboxHost(config),
+  )
   ipcMain.handle("ensure-desktop-image", (event: IpcMainInvokeEvent, presetId: string) =>
     deps.ensureDesktopImage(event, presetId),
   )
