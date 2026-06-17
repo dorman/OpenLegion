@@ -38,6 +38,10 @@ type KataSandbox struct {
 const (
 	kataLabelID   = "openlegion.kata.id"
 	kataLabelName = "openlegion.kata.name"
+	// kataRFBPort is the raw VNC/RFB port x11vnc serves inside the RE desktop
+	// image (see packages/sandbox-images/re-desktop/start.sh). The daemon bridges
+	// it as a standard "vnc-websocket" display.
+	kataRFBPort = 5900
 )
 
 func NewKataSandbox() *KataSandbox {
@@ -95,7 +99,11 @@ func (e *KataSandbox) Create(ctx context.Context, req types.CreateVMRequest) (Re
 		"--pids-limit", "512",
 		"--memory", memory,
 		"--cpus", cpus,
-		"--publish", "127.0.0.1::6080",
+		// Publish the raw RFB port (5900) — not the in-image noVNC web port — so
+		// the daemon display bridge can tunnel it like any other VNC desktop. The
+		// host side binds loopback because the daemon dials it locally (it runs on
+		// this same research host); the app reaches it through the daemon's bridge.
+		"--publish", "127.0.0.1::" + strconv.Itoa(kataRFBPort),
 		"--label", kataLabelID + "=" + id,
 		"--label", kataLabelName + "=" + name,
 		image,
@@ -161,26 +169,27 @@ func (e *KataSandbox) ShellCommand(ctx context.Context, id string) (string, erro
 	return fmt.Sprintf("%s exec -it %s sh", e.docker, id), nil
 }
 
-// Display returns the published noVNC web endpoint (host:port). The session
-// serves its own noVNC client, so this kind is "novnc-web" — the UI opens
-// http://host:port/vnc.html directly (LAN-local).
+// Display returns the published RFB endpoint so the daemon bridges it as a
+// standard VNC display (kind "vnc-websocket"), exactly like a QEMU desktop. The
+// host is loopback-on-the-research-host, which is correct because the daemon
+// dials it locally and fronts it to the app over its own WebSocket.
 func (e *KataSandbox) Display(ctx context.Context, id string) (DisplayInfo, error) {
 	if _, err := e.findRecord(ctx, id); err != nil {
 		return DisplayInfo{}, err
 	}
-	out, err := e.run(ctx, "port", id, "6080/tcp")
+	out, err := e.run(ctx, "port", id, strconv.Itoa(kataRFBPort)+"/tcp")
 	if err != nil {
 		return DisplayInfo{}, err
 	}
 	line := strings.TrimSpace(strings.Split(out, "\n")[0])
 	host, port, ok := strings.Cut(line, ":")
 	if !ok || port == "" {
-		return DisplayInfo{}, fmt.Errorf("noVNC port not published for %q", id)
+		return DisplayInfo{}, fmt.Errorf("RFB port not published for %q", id)
 	}
 	if host == "0.0.0.0" || host == "::" {
 		host = "127.0.0.1"
 	}
-	return DisplayInfo{TargetHost: host, TargetPort: port, Kind: "novnc-web"}, nil
+	return DisplayInfo{TargetHost: host, TargetPort: port, Kind: "vnc-websocket"}, nil
 }
 
 type kataRecord struct {

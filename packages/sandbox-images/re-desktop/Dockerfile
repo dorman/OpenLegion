@@ -52,6 +52,8 @@ USER analyst
 ENV HOME=/home/analyst
 WORKDIR /home/analyst
 
-EXPOSE 6080
+# 5900 = raw RFB (x11vnc), which the OpenLegion daemon bridges as a VNC display;
+# 6080 = self-served noVNC web client, for direct browser access on the host.
+EXPOSE 5900 6080
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/start.sh"]
