@@ -30,6 +30,37 @@ sudo ./verify.sh           # PROVE it isolates — don't proceed unless this pas
 ./launch-session.sh        # spin up a session, prints the noVNC URL
 ```
 
+## Full setup: research host + daemon + the desktop app
+
+`launch-session.sh` is the manual, CLI-only path. To drive sandboxes from the
+OpenLegion desktop app on another machine (e.g. your Mac), run the daemon on this
+tower and point the app at it:
+
+```sh
+# 1. Prerequisites: a dedicated Linux box (Debian/Ubuntu, x86_64) with hardware
+#    virtualization (KVM). preflight.sh checks this.
+git clone https://github.com/dorman/OpenLegion.git && cd OpenLegion
+
+# 2. Install + verify the Kata isolation runtime (Docker, Kata, no-egress net).
+sudo ./host-agent/preflight.sh
+sudo ./host-agent/setup-kata.sh
+sudo ./host-agent/verify.sh
+
+# 3. Build the reverse-engineering desktop images the daemon launches.
+docker build -t openlegion/re-desktop:latest packages/sandbox-images/re-desktop
+docker build -t openlegion/ghidra:12.1.2     packages/sandbox-images/ghidra
+
+# 4. Run the daemon, bound to the LAN. Set a token so it isn't open to the network.
+OPENLEGION_MICROVM_LISTEN=0.0.0.0:7420 \
+OPENLEGION_MICROVM_TOKEN=$(openssl rand -hex 32) \
+  go build -o openlegion-microvm ./cmd/openlegion-microvm && ./openlegion-microvm
+```
+
+Then point the desktop app at this host by setting `OPENLEGION_MICROVM_URL`
+(e.g. `http://tower.lan:7420`) — and the matching `OPENLEGION_MICROVM_TOKEN` —
+in the app's environment. See the [daemon README](../cmd/openlegion-microvm/README.md)
+for the API and environment variables.
+
 ## Design notes / honest caveats
 
 - **The agent runs privileged; the sandboxes do not.** The agent needs root /

@@ -1,22 +1,19 @@
 import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
 import { Dialog, DialogFooter } from "@openlegion-ai/ui/v2/dialog-v2"
-import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { createStore } from "solid-js/store"
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
-import { usePlatform, type DesktopImageDownloadProgress } from "@/context/platform"
-import { presetById, presetsForArch } from "@/utils/desktop-presets"
+import { usePlatform } from "@/context/platform"
 import type { ContainerCreateInput } from "@/utils/containers"
 import { warningsForCreateInput } from "@/utils/sandbox-config-warnings"
 import { SANDBOX_TEMPLATES, type SandboxTemplateFormState } from "@/utils/sandbox-templates"
 
-function formatElapsed(seconds: number) {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
-}
+// Linux VM desktops are no longer created in-app; they run as Kata micro-VMs on a
+// dedicated research host. These point at the setup guide in the repo.
+const HOST_AGENT_GUIDE_URL = "https://github.com/dorman/OpenLegion/tree/dev/host-agent"
+const DAEMON_README_URL = "https://github.com/dorman/OpenLegion/tree/dev/cmd/openlegion-microvm"
 
 function FormSection(props: { title: string; children: JSX.Element }) {
   return (
@@ -50,23 +47,9 @@ export function DialogContainerCreate(props: {
   const dialog = useDialog()
   const [error, setError] = createSignal<string | undefined>()
   const [pending, setPending] = createSignal(false)
-  const [downloading, setDownloading] = createSignal(false)
-  const [downloadProgress, setDownloadProgress] = createSignal<DesktopImageDownloadProgress | undefined>()
-  const [downloadElapsedSec, setDownloadElapsedSec] = createSignal(0)
-  const [downloadFailed, setDownloadFailed] = createSignal(false)
   const [store, setStore] = createStore(defaultFormState())
-  let downloadAbort: AbortController | undefined
 
   const arch = createMemo((): "arm64" | "x64" => props.arch ?? "arm64")
-
-  const desktopPresets = createMemo(() => presetsForArch(arch()))
-
-  const selectedPreset = createMemo(() => presetById(store.preset))
-
-  const selectedPresetLabel = createMemo(() => {
-    const preset = selectedPreset()
-    return preset ? language.t(preset.labelKey) : ""
-  })
 
   const configWarnings = createMemo(() =>
     store.kind === "container"
@@ -74,38 +57,11 @@ export function DialogContainerCreate(props: {
       : [],
   )
 
-  onCleanup(() => {
-    downloadAbort?.abort()
-    void platform.cancelDesktopImageDownload?.()
-  })
-
-  createEffect(() => {
-    if (!downloading()) {
-      setDownloadElapsedSec(0)
-      return
-    }
-    const started = Date.now()
-    const timer = setInterval(() => {
-      setDownloadElapsedSec(Math.floor((Date.now() - started) / 1000))
-    }, 1000)
-    onCleanup(() => clearInterval(timer))
-  })
-
   function applyTemplate(templateId: string) {
     const template = SANDBOX_TEMPLATES.find((item) => item.id === templateId)
     if (!template) return
     setStore({ ...defaultFormState(), ...template.apply(arch()) })
     setError(undefined)
-    setDownloadFailed(false)
-  }
-
-  async function pickDiskImage() {
-    const file = await platform.openFilePickerDialog?.({
-      title: language.t("containers.create.pickDiskImage"),
-      accept: ["iso", "qcow2"],
-    })
-    if (!file || Array.isArray(file)) return
-    setStore({ preset: "custom", image: file })
   }
 
   async function pickVolume() {
@@ -115,66 +71,6 @@ export function DialogContainerCreate(props: {
     if (!host || Array.isArray(host)) return
     setStore("volumeHost", host)
   }
-
-  function cancelDownload() {
-    downloadAbort?.abort()
-    void platform.cancelDesktopImageDownload?.()
-    setDownloading(false)
-    setDownloadProgress(undefined)
-    setDownloadFailed(true)
-    setError(language.t("containers.create.preset.downloadCancelled"))
-  }
-
-  async function resolveDesktopImage() {
-    if (store.preset === "custom") return store.image.trim()
-    const ensure = platform.ensureDesktopImage
-    if (!ensure) throw new Error(language.t("containers.create.preset.downloadUnavailable"))
-
-    downloadAbort?.abort()
-    downloadAbort = new AbortController()
-    setDownloading(true)
-    setDownloadFailed(false)
-    setDownloadProgress(undefined)
-    setError(undefined)
-
-    try {
-      const result = await ensure(store.preset, {
-        onProgress: (progress) => setDownloadProgress(progress),
-        signal: downloadAbort.signal,
-      })
-      if (result.cancelled) {
-        throw new Error(language.t("containers.create.preset.downloadCancelled"))
-      }
-      if (!result.ok || !result.path) {
-        throw new Error(result.error ?? language.t("containers.create.preset.downloadFailed"))
-      }
-      return result.path
-    } catch (err) {
-      setDownloadFailed(true)
-      throw err
-    } finally {
-      setDownloading(false)
-      setDownloadProgress(undefined)
-      downloadAbort = undefined
-    }
-  }
-
-  const downloadStatusMessage = createMemo(() => {
-    const distro = selectedPresetLabel()
-    const progress = downloadProgress()
-    if (!progress) return language.t("containers.create.preset.downloadingChecking", { distro })
-
-    switch (progress.phase) {
-      case "cached":
-        return language.t("containers.create.preset.downloadingCached", { distro })
-      case "downloading":
-        return language.t("containers.create.preset.downloading", { distro })
-      case "finishing":
-        return language.t("containers.create.preset.downloadingFinishing", { distro })
-      default:
-        return language.t("containers.create.preset.downloadingChecking", { distro })
-    }
-  })
 
   function parseResource(value: string) {
     const parsed = Number(value)
@@ -198,19 +94,15 @@ export function DialogContainerCreate(props: {
           return [{ host, container }]
         })
 
-      const memoryMb = parseResource(store.memoryMb)
       const cpuCores = parseResource(store.cpuCores)
-      const diskGb = parseResource(store.diskGb)
-      const image = store.kind === "desktop" ? await resolveDesktopImage() : store.image.trim()
+      const image = store.image.trim()
       if (!image) throw new Error(language.t("containers.create.imageRequired"))
 
       await props.onCreate({
         kind: store.kind,
         image,
         name: store.name.trim() || undefined,
-        memoryMb: store.kind === "desktop" ? memoryMb : undefined,
         cpuCores,
-        diskGb: store.kind === "desktop" ? diskGb : undefined,
         command:
           (store.kind === "container" || store.kind === "kubernetes") && command.length > 0 ? command : undefined,
         ports: ports.length > 0 ? ports : undefined,
@@ -270,132 +162,33 @@ export function DialogContainerCreate(props: {
               <option value="kubernetes">{language.t("containers.create.kind.kubernetes")}</option>
             </select>
           </label>
-          <Show when={store.kind === "desktop"}>
-            <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.desktopHint")}</p>
-          </Show>
           <Show when={store.kind === "kubernetes"}>
             <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.kubernetesHint")}</p>
           </Show>
         </FormSection>
 
         <Show when={store.kind === "desktop"}>
-          <FormSection title={language.t("containers.create.section.installer")}>
-            <label class="flex flex-col gap-1 text-sm">
-              <span class="text-v2-text-text-muted">{language.t("containers.create.preset")}</span>
-              <select
-                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                value={store.preset}
-                onChange={(event) => {
-                  const preset = event.currentTarget.value
-                  setStore({ preset, image: preset === "custom" ? store.image : "" })
-                }}
-              >
-                <For each={desktopPresets()}>
-                  {(preset) => <option value={preset.id}>{language.t(preset.labelKey)}</option>}
-                </For>
-              </select>
-            </label>
-
-            <Show when={store.preset === "custom"}>
-              <label class="flex flex-col gap-1 text-sm">
-                <span class="text-v2-text-text-muted">{language.t("containers.create.diskImage")}</span>
-                <div class="flex gap-2">
-                  <input
-                    class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                    placeholder="/Users/you/Downloads/ubuntu.iso"
-                    value={store.image}
-                    onInput={(event) => setStore("image", event.currentTarget.value)}
-                  />
-                  <ButtonV2 variant="neutral" onClick={() => void pickDiskImage()}>
-                    {language.t("containers.create.pickDiskImage")}
-                  </ButtonV2>
-                </div>
-                <span class="text-xs text-v2-text-text-muted">{language.t("containers.create.diskImageHint")}</span>
-              </label>
-            </Show>
-
-            <Show when={store.preset !== "custom" && !downloading()}>
-              <p class="text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.create.preset.downloadHint")}</p>
-              <p class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 text-xs leading-relaxed text-v2-text-text-muted">
-                {language.t("containers.create.preset.downloadNotice", { distro: selectedPresetLabel() })}
-              </p>
-            </Show>
-
-            <Show when={downloading() || downloadFailed()}>
-              <div
-                class="flex flex-col gap-3 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-3"
-                role="status"
-                aria-live="polite"
-              >
-                <Show
-                  when={downloading()}
-                  fallback={
-                    <p class="text-sm text-v2-text-text-muted">{language.t("containers.create.preset.downloadFailed")}</p>
-                  }
-                >
-                  <div class="flex items-start gap-2 text-sm text-v2-text-text-base">
-                    <Spinner class="mt-0.5 shrink-0" />
-                    <div class="flex min-w-0 flex-col gap-1">
-                      <p class="font-medium">{downloadStatusMessage()}</p>
-                      <Show when={(downloadProgress()?.downloadedMb ?? 0) > 0}>
-                        <p class="text-xs text-v2-text-text-muted">
-                          {language.t("containers.create.preset.downloadingProgress", {
-                            downloaded: downloadProgress()?.downloadedMb ?? 0,
-                          })}
-                        </p>
-                      </Show>
-                      <p class="text-xs text-v2-text-text-muted">
-                        {language.t("containers.create.preset.downloadingElapsed", {
-                          elapsed: formatElapsed(downloadElapsedSec()),
-                        })}
-                      </p>
-                      <p class="text-xs leading-relaxed text-v2-text-text-muted">
-                        {language.t("containers.create.preset.downloadingReassurance")}
-                      </p>
-                    </div>
-                  </div>
-                </Show>
-                <div class="flex flex-wrap gap-2">
-                  <Show when={downloading()}>
-                    <ButtonV2 variant="neutral" size="normal" onClick={() => cancelDownload()}>
-                      {language.t("containers.create.preset.downloadCancel")}
-                    </ButtonV2>
-                  </Show>
-                  <Show when={downloadFailed() && store.preset !== "custom"}>
-                    <ButtonV2 size="normal" onClick={() => void submit()} disabled={pending()}>
-                      {language.t("containers.create.preset.downloadRetry")}
-                    </ButtonV2>
-                  </Show>
-                </div>
-              </div>
-            </Show>
-          </FormSection>
-
-          <FormSection title={language.t("containers.create.section.resources")}>
-            <label class="flex flex-col gap-1 text-sm">
-              <span class="text-v2-text-text-muted">{language.t("containers.create.memory")}</span>
-              <input
-                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                value={store.memoryMb}
-                onInput={(event) => setStore("memoryMb", event.currentTarget.value)}
-              />
-            </label>
-            <label class="flex flex-col gap-1 text-sm">
-              <span class="text-v2-text-text-muted">{language.t("containers.create.cpuCores")}</span>
-              <input
-                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                value={store.cpuCores}
-                onInput={(event) => setStore("cpuCores", event.currentTarget.value)}
-              />
-            </label>
-            <label class="flex flex-col gap-1 text-sm">
-              <span class="text-v2-text-text-muted">{language.t("containers.create.diskGb")}</span>
-              <input
-                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-                value={store.diskGb}
-                onInput={(event) => setStore("diskGb", event.currentTarget.value)}
-              />
-            </label>
+          <FormSection title={language.t("containers.create.desktopGuide.title")}>
+            <p class="text-sm leading-relaxed text-v2-text-text-base">
+              {language.t("containers.create.desktopGuide.intro")}
+            </p>
+            <ol class="flex flex-col gap-2 text-sm text-v2-text-text-muted">
+              <li>1. {language.t("containers.create.desktopGuide.step1")}</li>
+              <li>2. {language.t("containers.create.desktopGuide.step2")}</li>
+              <li>3. {language.t("containers.create.desktopGuide.step3")}</li>
+              <li>4. {language.t("containers.create.desktopGuide.step4")}</li>
+            </ol>
+            <pre class="overflow-x-auto rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 font-mono text-xs leading-relaxed text-v2-text-text-base">{`sudo ./host-agent/preflight.sh
+sudo ./host-agent/setup-kata.sh
+sudo ./host-agent/verify.sh`}</pre>
+            <div class="flex flex-wrap gap-2">
+              <ButtonV2 variant="neutral" onClick={() => platform.openLink(HOST_AGENT_GUIDE_URL)}>
+                {language.t("containers.create.desktopGuide.openHostGuide")}
+              </ButtonV2>
+              <ButtonV2 variant="neutral" onClick={() => platform.openLink(DAEMON_README_URL)}>
+                {language.t("containers.create.desktopGuide.openDaemonReadme")}
+              </ButtonV2>
+            </div>
           </FormSection>
         </Show>
 
@@ -505,16 +298,18 @@ export function DialogContainerCreate(props: {
           </div>
         </Show>
 
-        <FormSection title={language.t("containers.create.section.general")}>
-          <label class="flex flex-col gap-1 text-sm">
-            <span class="text-v2-text-text-muted">{language.t("containers.create.name")}</span>
-            <input
-              class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
-              value={store.name}
-              onInput={(event) => setStore("name", event.currentTarget.value)}
-            />
-          </label>
-        </FormSection>
+        <Show when={store.kind !== "desktop"}>
+          <FormSection title={language.t("containers.create.section.general")}>
+            <label class="flex flex-col gap-1 text-sm">
+              <span class="text-v2-text-text-muted">{language.t("containers.create.name")}</span>
+              <input
+                class="rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2"
+                value={store.name}
+                onInput={(event) => setStore("name", event.currentTarget.value)}
+              />
+            </label>
+          </FormSection>
+        </Show>
 
         <Show when={error()}>
           <p class="text-sm text-v2-text-text-danger">{error()}</p>
@@ -522,22 +317,26 @@ export function DialogContainerCreate(props: {
       </div>
 
       <DialogFooter>
-        <ButtonV2 variant="ghost" onClick={() => dialog.close()} disabled={pending() || downloading()}>
+        <ButtonV2 variant="ghost" onClick={() => dialog.close()} disabled={pending()}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2
-          onClick={() => void submit()}
-          disabled={
-            pending() ||
-            downloading() ||
-            ((store.kind === "container" || store.kind === "kubernetes") && !store.image.trim()) ||
-            (store.kind === "desktop" && store.preset === "custom" && !store.image.trim())
+        {/* Linux VMs are set up on a research host, not created here, so the
+            primary action opens the guide instead of submitting. */}
+        <Show
+          when={store.kind === "desktop"}
+          fallback={
+            <ButtonV2
+              onClick={() => void submit()}
+              disabled={pending() || !store.image.trim()}
+            >
+              {language.t("containers.create.submit")}
+            </ButtonV2>
           }
         >
-          {downloading()
-            ? language.t("containers.create.preset.downloadingSubmit")
-            : language.t("containers.create.submit")}
-        </ButtonV2>
+          <ButtonV2 onClick={() => platform.openLink(HOST_AGENT_GUIDE_URL)}>
+            {language.t("containers.create.desktopGuide.openHostGuide")}
+          </ButtonV2>
+        </Show>
       </DialogFooter>
     </Dialog>
   )
