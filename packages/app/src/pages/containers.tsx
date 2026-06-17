@@ -426,7 +426,7 @@ export default function ContainersPage() {
 
   return (
     <div class="flex min-h-0 flex-1 flex-col bg-v2-background-bg-deep">
-      <div class="mx-auto flex w-full max-w-5xl flex-1 items-stretch gap-6 px-8 py-10">
+      <div class="mx-auto flex w-full max-w-7xl flex-1 items-stretch gap-6 px-8 py-10">
         <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
           <header class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex min-w-0 items-center gap-3">
@@ -508,25 +508,29 @@ export default function ContainersPage() {
                     </div>
                   }
                 >
-                  <For each={filteredContainers()}>
-                    {(item) => (
-                      <ContainerCard
-                        item={item}
-                        workspace={workspaceForContainer(workspaces.data ?? [], item)}
-                        selected={selectedIds().includes(item.id)}
-                        starting={startingIds().includes(item.id)}
-                        stopping={stoppingIds().includes(item.id)}
-                        language={language}
-                        onToggleSelected={() => toggleSelected(item.id)}
-                        onOpenSession={() => showOpenSession(item)}
-                        onAskAgent={() => void handleAskAgent(item)}
-                        onInspect={() => showInspect(item)}
-                        onStart={() => void handleStart(item.id)}
-                        onStop={() => void handleStop(item.id)}
-                        onRemove={() => void handleRemove(item.id)}
-                      />
-                    )}
-                  </For>
+                  {/* Responsive card grid: one column on narrow windows, up to
+                      three across once there's room beside the sidebar. */}
+                  <div class="grid min-h-0 grid-cols-1 content-start gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+                    <For each={filteredContainers()}>
+                      {(item) => (
+                        <ContainerCard
+                          item={item}
+                          workspace={workspaceForContainer(workspaces.data ?? [], item)}
+                          selected={selectedIds().includes(item.id)}
+                          starting={startingIds().includes(item.id)}
+                          stopping={stoppingIds().includes(item.id)}
+                          language={language}
+                          onToggleSelected={() => toggleSelected(item.id)}
+                          onOpenSession={() => showOpenSession(item)}
+                          onAskAgent={() => void handleAskAgent(item)}
+                          onInspect={() => showInspect(item)}
+                          onStart={() => void handleStart(item.id)}
+                          onStop={() => void handleStop(item.id)}
+                          onRemove={() => void handleRemove(item.id)}
+                        />
+                      )}
+                    </For>
+                  </div>
                 </Show>
               </Show>
             </Show>
