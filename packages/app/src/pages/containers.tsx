@@ -124,6 +124,16 @@ export default function ContainersPage() {
   const daemonReady = createMemo(() => runtime.data?.microvm === true)
   // A remote daemon's lifecycle is managed on its host, not from this app.
   const remoteHost = createMemo(() => runtime.data?.microvmRemote === true)
+  // host:port of the daemon these sandboxes live on (for the header indicator).
+  const daemonHost = createMemo(() => {
+    const url = runtime.data?.microvmUrl
+    if (!url) return undefined
+    try {
+      return new URL(url).host
+    } catch {
+      return url
+    }
+  })
 
   const filteredContainers = createMemo(() =>
     (containers.data ?? []).filter((item) => matchesFilters(item, statusFilter(), kindFilter())),
@@ -434,6 +444,22 @@ export default function ContainersPage() {
               <Show when={activeCount() > 0}>
                 <span class="desktop-pill desktop-pill-success">
                   {language.t("containers.running.active", { count: activeCount() })}
+                </span>
+              </Show>
+              {/* Where these sandboxes live: the local daemon or a connected
+                  research host (the micro-VM daemon URL the app is pointed at). */}
+              <Show when={runtime.data}>
+                <span
+                  classList={{
+                    "desktop-pill": true,
+                    "desktop-pill-success": remoteHost() && daemonReady(),
+                    "desktop-pill-stopped": remoteHost() && !daemonReady(),
+                  }}
+                  title={runtime.data?.microvmUrl}
+                >
+                  {remoteHost()
+                    ? language.t("containers.host.remote", { host: daemonHost() ?? "" })
+                    : language.t("containers.host.local")}
                 </span>
               </Show>
             </div>
