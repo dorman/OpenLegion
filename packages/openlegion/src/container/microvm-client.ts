@@ -1,9 +1,16 @@
 import { withTransientReadRetry } from "@/util/effect-http-client"
 import { Context, Effect, Layer, Schema } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { resolveSandboxHost } from "./host"
 import { CreateInput, type Info } from "./schema"
 
-const defaultBaseUrl = () => process.env.OPENLEGION_MICROVM_URL ?? "http://127.0.0.1:7420"
+/** Resolve the daemon base URL and a pipeable that attaches the bearer token. */
+function host() {
+  const { url, token } = resolveSandboxHost()
+  const auth = (request: HttpClientRequest.HttpClientRequest) =>
+    token ? request.pipe(HttpClientRequest.setHeader("Authorization", `Bearer ${token}`)) : request
+  return { url, auth }
+}
 
 const VmInfo = Schema.Struct({
   id: Schema.String,
@@ -71,10 +78,11 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const client = withTransientReadRetry(yield* HttpClient.HttpClient)
     const http = HttpClient.filterStatusOk(client)
-    const baseUrl = defaultBaseUrl().replace(/\/$/, "")
 
     const health = Effect.fnUntraced(function* () {
-      return yield* HttpClientRequest.get(`${baseUrl}/health`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.get(`${url}/health`).pipe(
+        auth,
         http.execute,
         Effect.as(true),
         Effect.catch(() => Effect.succeed(false)),
@@ -82,8 +90,10 @@ export const layer = Layer.effect(
     })
 
     const create = Effect.fnUntraced(function* (input: typeof CreateInput.Type) {
+      const { url, auth } = host()
       return yield* Effect.gen(function* () {
-        const request = yield* HttpClientRequest.post(`${baseUrl}/vms`).pipe(
+        const request = yield* HttpClientRequest.post(`${url}/vms`).pipe(
+          auth,
           HttpClientRequest.acceptJson,
           HttpClientRequest.schemaBodyJson(CreateInput)(input),
         )
@@ -99,7 +109,9 @@ export const layer = Layer.effect(
     })
 
     const list = Effect.fnUntraced(function* () {
-      return yield* HttpClientRequest.get(`${baseUrl}/vms`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.get(`${url}/vms`).pipe(
+        auth,
         HttpClientRequest.acceptJson,
         http.execute,
         Effect.flatMap(HttpClientResponse.schemaBodyJson(VmList)),
@@ -109,7 +121,9 @@ export const layer = Layer.effect(
     })
 
     const start = Effect.fnUntraced(function* (id: string) {
-      return yield* HttpClientRequest.post(`${baseUrl}/vms/${encodeURIComponent(id)}/start`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.post(`${url}/vms/${encodeURIComponent(id)}/start`).pipe(
+        auth,
         http.execute,
         Effect.asVoid,
         Effect.mapError((error) => errorMessage(error, "Failed to start microvm")),
@@ -117,7 +131,9 @@ export const layer = Layer.effect(
     })
 
     const stop = Effect.fnUntraced(function* (id: string) {
-      return yield* HttpClientRequest.post(`${baseUrl}/vms/${encodeURIComponent(id)}/stop`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.post(`${url}/vms/${encodeURIComponent(id)}/stop`).pipe(
+        auth,
         http.execute,
         Effect.asVoid,
         Effect.mapError((error) => errorMessage(error, "Failed to stop microvm")),
@@ -125,7 +141,9 @@ export const layer = Layer.effect(
     })
 
     const remove = Effect.fnUntraced(function* (id: string) {
-      return yield* HttpClientRequest.delete(`${baseUrl}/vms/${encodeURIComponent(id)}`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.delete(`${url}/vms/${encodeURIComponent(id)}`).pipe(
+        auth,
         http.execute,
         Effect.asVoid,
         Effect.mapError((error) => errorMessage(error, "Failed to remove microvm")),
@@ -133,8 +151,10 @@ export const layer = Layer.effect(
     })
 
     const logs = Effect.fnUntraced(function* (id: string, tail: number) {
+      const { url, auth } = host()
       const query = tail > 0 ? `?tail=${encodeURIComponent(String(tail))}` : ""
-      return yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/logs${query}`).pipe(
+      return yield* HttpClientRequest.get(`${url}/vms/${encodeURIComponent(id)}/logs${query}`).pipe(
+        auth,
         HttpClientRequest.acceptJson,
         http.execute,
         Effect.flatMap(HttpClientResponse.schemaBodyJson(LogsResponse)),
@@ -143,7 +163,9 @@ export const layer = Layer.effect(
     })
 
     const shell = Effect.fnUntraced(function* (id: string) {
-      return yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/shell`).pipe(
+      const { url, auth } = host()
+      return yield* HttpClientRequest.get(`${url}/vms/${encodeURIComponent(id)}/shell`).pipe(
+        auth,
         HttpClientRequest.acceptJson,
         http.execute,
         Effect.flatMap(HttpClientResponse.schemaBodyJson(ShellResponse)),
@@ -156,8 +178,10 @@ export const layer = Layer.effect(
     })
 
     const display = Effect.fnUntraced(function* (id: string) {
+      const { url, auth } = host()
       return yield* Effect.gen(function* () {
-        const response = yield* HttpClientRequest.get(`${baseUrl}/vms/${encodeURIComponent(id)}/display`).pipe(
+        const response = yield* HttpClientRequest.get(`${url}/vms/${encodeURIComponent(id)}/display`).pipe(
+          auth,
           HttpClientRequest.acceptJson,
           client.execute,
         )

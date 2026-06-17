@@ -1002,6 +1002,14 @@ export const dict = {
 
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Server",
+  "settings.sandboxHost.title": "Sandbox daemon",
+  "settings.sandboxHost.description":
+    "Point the app at a local or remote sandbox daemon. Leave the URL blank to use the local default (http://127.0.0.1:7420). For a remote research host, set a bearer token that matches the daemon's OPENLEGION_MICROVM_TOKEN.",
+  "settings.sandboxHost.url": "Daemon URL",
+  "settings.sandboxHost.token": "Bearer token",
+  "settings.sandboxHost.tokenPlaceholder": "Required only for a remote daemon",
+  "settings.sandboxHost.save": "Save",
+  "settings.sandboxHost.saved": "Saved",
   "settings.tab.general": "General",
   "settings.tab.shortcuts": "Shortcuts",
   "settings.desktop.section.wsl": "WSL",

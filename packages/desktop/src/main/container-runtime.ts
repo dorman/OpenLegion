@@ -1,4 +1,5 @@
 import { access, appendFile, mkdir } from "node:fs/promises"
+import { readFileSync } from "node:fs"
 import { execFile } from "node:child_process"
 import { spawn } from "node:child_process"
 import { homedir } from "node:os"
@@ -12,6 +13,7 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  microvmRemote: boolean
   arch: "arm64" | "x64"
 }
 
@@ -19,13 +21,42 @@ const requiredMicrovmFeatures = ["logs", "shell", "display", "desktop-v2"]
 
 let daemon: ReturnType<typeof spawn> | undefined
 
-function microvmUrl() {
-  return process.env.OPENLEGION_MICROVM_URL ?? "http://127.0.0.1:7420"
+// Mirrors resolveSandboxHost() in packages/openlegion: env vars win, then
+// ~/.openlegion/sandbox-host.json (written by the Settings UI), then loopback.
+// A remote host is one the app cannot start/stop locally.
+function sandboxHost(): { url: string; token?: string; remote: boolean } {
+  const envUrl = process.env.OPENLEGION_MICROVM_URL?.trim()
+  const envToken = process.env.OPENLEGION_MICROVM_TOKEN?.trim()
+  let fileUrl: string | undefined
+  let fileToken: string | undefined
+  try {
+    const parsed = JSON.parse(readFileSync(join(homedir(), ".openlegion", "sandbox-host.json"), "utf8")) as {
+      url?: unknown
+      token?: unknown
+    }
+    if (typeof parsed.url === "string" && parsed.url.trim()) fileUrl = parsed.url.trim()
+    if (typeof parsed.token === "string" && parsed.token.trim()) fileToken = parsed.token.trim()
+  } catch {
+    // No config file — fall back to env vars / defaults.
+  }
+  const url = (envUrl || fileUrl || "http://127.0.0.1:7420").replace(/\/+$/, "")
+  const token = envToken || fileToken
+  return { url, token, remote: !isLoopbackUrl(url) }
 }
 
-async function microvmHealth(url: string) {
+function isLoopbackUrl(url: string): boolean {
   try {
-    const response = await fetch(`${url.replace(/\/$/, "")}/health`, { signal: AbortSignal.timeout(1500) })
+    const host = new URL(url).hostname
+    return host === "127.0.0.1" || host === "localhost" || host === "::1"
+  } catch {
+    return true
+  }
+}
+
+async function microvmHealth(url: string, token?: string) {
+  try {
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+    const response = await fetch(`${url.replace(/\/$/, "")}/health`, { headers, signal: AbortSignal.timeout(1500) })
     if (!response.ok) return { ok: false as const }
     const json = (await response.json()) as { ok?: boolean; features?: string[] }
     const features = json.features ?? []
@@ -73,13 +104,14 @@ function daemonEnv() {
 }
 
 export async function containerRuntimeStatus(): Promise<ContainerRuntimeStatus> {
-  const url = microvmUrl()
-  const [docker, qemu, health] = await Promise.all([dockerAvailable(), qemuAvailable(), microvmHealth(url)])
+  const { url, token, remote } = sandboxHost()
+  const [docker, qemu, health] = await Promise.all([dockerAvailable(), qemuAvailable(), microvmHealth(url, token)])
   return {
     docker,
     qemu,
     microvm: health.ok === true && health.supported,
     microvmUrl: url,
+    microvmRemote: remote,
     arch: process.arch === "arm64" ? "arm64" : "x64",
   }
 }
@@ -137,13 +169,24 @@ async function restartStaleDaemon(url: string) {
 }
 
 export async function ensureMicrovmDaemon() {
-  const url = microvmUrl()
-  const health = await microvmHealth(url)
+  const { url, token, remote } = sandboxHost()
+  const health = await microvmHealth(url, token)
   if (health.ok && health.supported) return { ok: true as const, url }
+
+  // A remote daemon's lifecycle is not ours to manage — never spawn a local one
+  // to stand in for an unreachable host.
+  if (remote) {
+    return {
+      ok: false as const,
+      url,
+      error: `remote sandbox daemon at ${url} is not reachable — start the daemon on that host`,
+    }
+  }
+
   if (health.ok && !health.supported) await restartStaleDaemon(url)
 
   if (daemon && !daemon.killed) {
-    const current = await microvmHealth(url)
+    const current = await microvmHealth(url, token)
     if (current.ok && current.supported) return { ok: true as const, url }
     await restartStaleDaemon(url)
   }
@@ -154,9 +197,11 @@ export async function ensureMicrovmDaemon() {
   const root = await repoRoot()
   const logPath = join(homedir(), ".openlegion", "logs", "microvm-daemon.log")
   await mkdir(dirname(logPath), { recursive: true })
+  // Pass the configured token through so a locally-spawned daemon enforces the
+  // same bearer token the client will present.
   daemon = spawn(command.cmd, command.args, {
     cwd: root,
-    env: daemonEnv(),
+    env: { ...daemonEnv(), ...(token ? { OPENLEGION_MICROVM_TOKEN: token } : {}) },
     stdio: ["ignore", "ignore", "pipe"],
     detached: false,
   })
@@ -170,7 +215,7 @@ export async function ensureMicrovmDaemon() {
 
   for (let attempt = 0; attempt < 80; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 250))
-    const next = await microvmHealth(url)
+    const next = await microvmHealth(url, token)
     if (next.ok && next.supported) return { ok: true as const, url }
     if (daemon.exitCode !== null) break
   }
@@ -183,5 +228,8 @@ export async function ensureMicrovmDaemon() {
 
 export async function stopMicrovmDaemon() {
   await stopTrackedDaemon()
-  await killPort(new URL(microvmUrl()).port || "7420")
+  const { url, remote } = sandboxHost()
+  // Only a locally-run daemon has a port we can free; never touch a remote host.
+  if (remote) return
+  await killPort(new URL(url).port || "7420")
 }

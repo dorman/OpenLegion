@@ -134,6 +134,7 @@ const platform: Platform = {
           microvm: true,
           qemu: true,
           microvmUrl: "http://127.0.0.1:8765",
+          microvmRemote: false,
           arch: "arm64" as const,
         }),
         storage: (scope = "openlegion") => ({

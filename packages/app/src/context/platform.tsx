@@ -17,8 +17,11 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  microvmRemote: boolean
   arch: "arm64" | "x64"
 }
+
+export type SandboxHostConfig = { url: string; token: string }
 
 export type EnsureDesktopImageResult = {
   ok: boolean
@@ -160,6 +163,12 @@ export type Platform = {
 
   /** Start the local sandbox daemon when possible (desktop only) */
   ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
+
+  /** Read the persisted sandbox-daemon connection (desktop only) */
+  getSandboxHost?(): Promise<SandboxHostConfig>
+
+  /** Persist the sandbox-daemon connection — url + bearer token (desktop only) */
+  setSandboxHost?(config: SandboxHostConfig): Promise<void>
 
   /** Download or resolve a preset desktop VM image (desktop only) */
   ensureDesktopImage?(

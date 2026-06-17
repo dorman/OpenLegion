@@ -42,6 +42,7 @@ import {
   setDockIcon,
 } from "./windows"
 import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
+import { getSandboxHostConfig, setSandboxHostConfig } from "./sandbox-host"
 import { ensureDesktopImage, cancelDesktopImageDownload } from "./desktop-images"
 import {
   closeAllContainerPtys,
@@ -293,6 +294,8 @@ const main = Effect.gen(function* () {
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
+    getSandboxHost: () => getSandboxHostConfig(),
+    setSandboxHost: (config) => setSandboxHostConfig(config),
     ensureDesktopImage: (event, presetId) => ensureDesktopImage(presetId, event.sender),
   cancelDesktopImageDownload: () => {
     cancelDesktopImageDownload()

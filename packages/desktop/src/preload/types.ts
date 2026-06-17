@@ -13,8 +13,11 @@ export type ContainerRuntimeStatus = {
   microvm: boolean
   qemu: boolean
   microvmUrl: string
+  microvmRemote: boolean
   arch: "arm64" | "x64"
 }
+
+export type SandboxHostConfig = { url: string; token: string }
 
 export type EnsureDesktopImageResult = {
   ok: boolean
@@ -117,6 +120,8 @@ export type ElectronAPI = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  getSandboxHost: () => Promise<SandboxHostConfig>
+  setSandboxHost: (config: SandboxHostConfig) => Promise<void>
   ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>
   cancelDesktopImageDownload: () => Promise<void>
   onDesktopImageDownloadProgress: (cb: (progress: DesktopImageDownloadProgress) => void) => () => void
