@@ -21,6 +21,7 @@ import { DateTime } from "luxon"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { DialogSelectServer } from "@/components/dialog-select-server"
+import { AgentWorkflowHub } from "@/components/agent-workflow-hub"
 import { GuidedEmptyCards } from "@/components/guided-empty-cards"
 import { ServerConnection, useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
@@ -336,6 +337,11 @@ function HomeDesign() {
           }}
           aria-label={language.t("sidebar.project.recentSessions")}
         >
+          <Show when={desktopShell()}>
+            <div class="pb-6">
+              <AgentWorkflowHub />
+            </div>
+          </Show>
           <HomeSessionSearch
             value={state.search}
             placeholder={language.t("home.sessions.search.placeholder")}
