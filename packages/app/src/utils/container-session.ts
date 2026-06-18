@@ -159,21 +159,27 @@ export async function askAgentAboutSandbox(input: AskAgentInput) {
 
 export type SandboxRuntime = "docker" | "kubernetes" | "linux-vm"
 
-// Opening prompt seeded per runtime — creation is agent-guided (no forms): the
-// agent uses the sandbox_* tools (and, for the VM, the host-agent docs) to walk
-// the user through it. See packages/openlegion tool registry.
-const SANDBOX_SETUP_PROMPTS: Record<SandboxRuntime, string> = {
+// The Agents workflow hub offers the three creation runtimes plus three general
+// helper flows. Each opens an agent chat seeded with the goal below; the agent
+// drives it with the sandbox_* tools (and host-agent docs for the VM).
+export type AgentWorkflow = SandboxRuntime | "read-docs" | "debug-net" | "clone-repo"
+
+const AGENT_WORKFLOW_PROMPTS: Record<AgentWorkflow, string> = {
   docker:
     "I want to create a new Docker container sandbox. Help me choose an image and network settings, then create and start it for me using the sandbox tools.",
   kubernetes:
     "I want to create a new Kubernetes sandbox. Help me choose an image, then create it as a workload on the local kind cluster using the sandbox tools.",
   "linux-vm":
     "I want to set up a Linux VM research sandbox on a separate Linux host (a sacrificial tower). Walk me through installing the OpenLegion daemon and Kata on that host with the host-agent scripts, then connecting this app to its daemon.",
+  "read-docs": "Help me find and understand something in the OpenLegion docs and repo. Ask me what I'm looking for.",
+  "debug-net":
+    "Help me debug a network problem in one of my sandboxes. List my sandboxes, then check the affected one's interfaces, routing, and DNS to find where the chain breaks.",
+  "clone-repo":
+    "Help me clone a git repository into a sandbox and get it set up to work on. Ask me for the repo URL and which sandbox to use.",
 }
 
-type StartSandboxSetupInput = {
+type SeedSessionDeps = {
   conn: ServerConnection.Any
-  runtime: SandboxRuntime
   platform: Platform
   global: ReturnType<typeof useGlobal>
   layout: ReturnType<typeof useLayout>
@@ -183,27 +189,36 @@ type StartSandboxSetupInput = {
 }
 
 /**
- * Start an agent chat to create a sandbox of the chosen runtime. This is the
- * "New sandbox" entry point: instead of a form, it opens a host agent session
- * seeded with a runtime-specific goal so the agent guides the user through
- * setup. Mirrors askAgentAboutSandbox but is not tied to an existing sandbox.
+ * Open a fresh host agent session seeded with an opening prompt, then navigate
+ * to it. Shared by the New Sandbox chooser and the Agents workflow hub. Mirrors
+ * askAgentAboutSandbox but is not tied to an existing sandbox.
  */
-export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
-  const serverCtx = input.global.createServerCtx(input.conn)
+async function seedHostSession(deps: SeedSessionDeps, prompt: string) {
+  const serverCtx = deps.global.createServerCtx(deps.conn)
   let directory: string | undefined = serverCtx.projects.last() ?? serverCtx.projects.list()[0]?.worktree
-  if (!directory) directory = await input.pickDirectory()
+  if (!directory) directory = await deps.pickDirectory()
   if (!directory) return undefined
 
   serverCtx.projects.open(directory)
   serverCtx.projects.touch(directory)
-  input.layout.projects.open(directory)
+  deps.layout.projects.open(directory)
 
-  const client = input.createClient({ directory, throwOnError: true })
+  const client = deps.createClient({ directory, throwOnError: true })
   const created = await client.session.create({ directory })
   const session = created.data
   if (!session?.id) throw new Error("Failed to create session")
 
-  await seedPromptDraft(input.platform, directory, session.id, SANDBOX_SETUP_PROMPTS[input.runtime])
-  input.navigate(`/${base64Encode(directory)}/session/${session.id}`)
+  await seedPromptDraft(deps.platform, directory, session.id, prompt)
+  deps.navigate(`/${base64Encode(directory)}/session/${session.id}`)
   return session
+}
+
+/** "New sandbox" entry point: pick a runtime, an agent chat guides creation. */
+export async function startSandboxSetupSession(input: SeedSessionDeps & { runtime: SandboxRuntime }) {
+  return seedHostSession(input, AGENT_WORKFLOW_PROMPTS[input.runtime])
+}
+
+/** Agents workflow hub: launch a preset flow as a seeded agent chat. */
+export async function startAgentWorkflow(input: SeedSessionDeps & { workflow: AgentWorkflow }) {
+  return seedHostSession(input, AGENT_WORKFLOW_PROMPTS[input.workflow])
 }
