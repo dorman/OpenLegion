@@ -28,6 +28,7 @@
   --desktop-agent-accent: var(--v2-orange-500);
   --desktop-workload-container: var(--v2-green-500);
   --desktop-workload-desktop: var(--v2-blue-400);
+  --desktop-workload-kubernetes: var(--v2-orange-500);
   --desktop-card-border: color-mix(in srgb, var(--v2-alpha-light-10) 100%, transparent);
 
   --font-family-text: "JetBrainsMono Nerd Font Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -110,6 +111,12 @@
   color: var(--desktop-workload-desktop);
   border: 1px solid color-mix(in srgb, var(--desktop-workload-desktop) 35%, transparent);
   background: color-mix(in srgb, var(--desktop-workload-desktop) 8%, transparent);
+}
+
+[data-platform="desktop"] .desktop-pill-kubernetes {
+  color: var(--desktop-workload-kubernetes);
+  border: 1px solid color-mix(in srgb, var(--desktop-workload-kubernetes) 35%, transparent);
+  background: color-mix(in srgb, var(--desktop-workload-kubernetes) 8%, transparent);
 }
 
 [data-platform="desktop"] .desktop-agent-accent {

@@ -156,3 +156,54 @@ export async function askAgentAboutSandbox(input: AskAgentInput) {
   input.navigate(`/${base64Encode(directory)}/session/${session.id}`)
   return session
 }
+
+export type SandboxRuntime = "docker" | "kubernetes" | "linux-vm"
+
+// Opening prompt seeded per runtime — creation is agent-guided (no forms): the
+// agent uses the sandbox_* tools (and, for the VM, the host-agent docs) to walk
+// the user through it. See packages/openlegion tool registry.
+const SANDBOX_SETUP_PROMPTS: Record<SandboxRuntime, string> = {
+  docker:
+    "I want to create a new Docker container sandbox. Help me choose an image and network settings, then create and start it for me using the sandbox tools.",
+  kubernetes:
+    "I want to create a new Kubernetes sandbox. Help me choose an image, then create it as a workload on the local kind cluster using the sandbox tools.",
+  "linux-vm":
+    "I want to set up a Linux VM research sandbox on a separate Linux host (a sacrificial tower). Walk me through installing the OpenLegion daemon and Kata on that host with the host-agent scripts, then connecting this app to its daemon.",
+}
+
+type StartSandboxSetupInput = {
+  conn: ServerConnection.Any
+  runtime: SandboxRuntime
+  platform: Platform
+  global: ReturnType<typeof useGlobal>
+  layout: ReturnType<typeof useLayout>
+  createClient: ReturnType<typeof useServerSDK>["createClient"]
+  navigate: (path: string) => void
+  pickDirectory: () => Promise<string | undefined>
+}
+
+/**
+ * Start an agent chat to create a sandbox of the chosen runtime. This is the
+ * "New sandbox" entry point: instead of a form, it opens a host agent session
+ * seeded with a runtime-specific goal so the agent guides the user through
+ * setup. Mirrors askAgentAboutSandbox but is not tied to an existing sandbox.
+ */
+export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
+  const serverCtx = input.global.createServerCtx(input.conn)
+  let directory: string | undefined = serverCtx.projects.last() ?? serverCtx.projects.list()[0]?.worktree
+  if (!directory) directory = await input.pickDirectory()
+  if (!directory) return undefined
+
+  serverCtx.projects.open(directory)
+  serverCtx.projects.touch(directory)
+  input.layout.projects.open(directory)
+
+  const client = input.createClient({ directory, throwOnError: true })
+  const created = await client.session.create({ directory })
+  const session = created.data
+  if (!session?.id) throw new Error("Failed to create session")
+
+  await seedPromptDraft(input.platform, directory, session.id, SANDBOX_SETUP_PROMPTS[input.runtime])
+  input.navigate(`/${base64Encode(directory)}/session/${session.id}`)
+  return session
+}
