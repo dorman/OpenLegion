@@ -188,12 +188,16 @@ type SeedSessionDeps = {
   pickDirectory: () => Promise<string | undefined>
 }
 
+// Mirrors SESSION_WORKFLOW_KEY in the openlegion package (container/session.ts):
+// the server reads this metadata and injects step-by-step guidance for the flow.
+const SESSION_WORKFLOW_KEY = "openlegion.workflow"
+
 /**
- * Open a fresh host agent session seeded with an opening prompt, then navigate
- * to it. Shared by the New Sandbox chooser and the Agents workflow hub. Mirrors
- * askAgentAboutSandbox but is not tied to an existing sandbox.
+ * Open a fresh host agent session for a workflow: tag it with the workflow (so
+ * the server injects guidance), seed the opening prompt, then navigate to it.
+ * Shared by the New Sandbox chooser and the Agents workflow hub.
  */
-async function seedHostSession(deps: SeedSessionDeps, prompt: string) {
+async function seedHostSession(deps: SeedSessionDeps, workflow: AgentWorkflow) {
   const serverCtx = deps.global.createServerCtx(deps.conn)
   let directory: string | undefined = serverCtx.projects.last() ?? serverCtx.projects.list()[0]?.worktree
   if (!directory) directory = await deps.pickDirectory()
@@ -204,21 +208,21 @@ async function seedHostSession(deps: SeedSessionDeps, prompt: string) {
   deps.layout.projects.open(directory)
 
   const client = deps.createClient({ directory, throwOnError: true })
-  const created = await client.session.create({ directory })
+  const created = await client.session.create({ directory, metadata: { [SESSION_WORKFLOW_KEY]: workflow } })
   const session = created.data
   if (!session?.id) throw new Error("Failed to create session")
 
-  await seedPromptDraft(deps.platform, directory, session.id, prompt)
+  await seedPromptDraft(deps.platform, directory, session.id, AGENT_WORKFLOW_PROMPTS[workflow])
   deps.navigate(`/${base64Encode(directory)}/session/${session.id}`)
   return session
 }
 
 /** "New sandbox" entry point: pick a runtime, an agent chat guides creation. */
 export async function startSandboxSetupSession(input: SeedSessionDeps & { runtime: SandboxRuntime }) {
-  return seedHostSession(input, AGENT_WORKFLOW_PROMPTS[input.runtime])
+  return seedHostSession(input, input.runtime)
 }
 
 /** Agents workflow hub: launch a preset flow as a seeded agent chat. */
 export async function startAgentWorkflow(input: SeedSessionDeps & { workflow: AgentWorkflow }) {
-  return seedHostSession(input, AGENT_WORKFLOW_PROMPTS[input.workflow])
+  return seedHostSession(input, input.workflow)
 }

@@ -40,8 +40,8 @@ import { ShellID } from "@/tool/shell/id"
 import { FSUtil } from "@openlegion-ai/core/fs-util"
 import { Truncate } from "@/tool/truncate"
 import { Container } from "@/container"
-import { sandboxSystemPrompt } from "@/container/assist"
-import { sessionSandbox } from "@/container/session"
+import { sandboxSystemPrompt, workflowSystemPrompt } from "@/container/assist"
+import { sessionSandbox, sessionWorkflow } from "@/container/session"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
 import { Process } from "@/util/process"
@@ -1254,6 +1254,7 @@ export const layer = Layer.effect(
         let step = 0
         const session = yield* sessions.get(sessionID).pipe(Effect.orDie)
         const sandbox = sessionSandbox(session.metadata)
+        const workflow = sessionWorkflow(session.metadata)
 
         while (true) {
           yield* status.set(sessionID, { type: "busy" })
@@ -1447,7 +1448,14 @@ export const layer = Layer.effect(
               MessageV2.toModelMessagesEffect(msgs, model),
               sandbox ? sandboxSystemPrompt(containers, sandbox) : Effect.succeed(undefined),
             ])
-            const system = [...env, ...instructions, ...(sandboxCtx ? [sandboxCtx] : []), ...(skills ? [skills] : [])]
+            const workflowCtx = workflow ? workflowSystemPrompt(workflow) : undefined
+            const system = [
+              ...env,
+              ...instructions,
+              ...(sandboxCtx ? [sandboxCtx] : []),
+              ...(workflowCtx ? [workflowCtx] : []),
+              ...(skills ? [skills] : []),
+            ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({

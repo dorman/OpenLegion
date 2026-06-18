@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import type * as Container from "."
-import type { SessionSandbox } from "./session"
+import type { SessionSandbox, SessionWorkflow } from "./session"
 
 const LOG_TAIL_LINES = 30
 const MAX_LOG_BYTES = 4_000
@@ -79,4 +79,35 @@ export function sandboxSystemPrompt(
 
     return ["<sandbox-context>", ...sections, "</sandbox-context>"].join("\n")
   })
+}
+
+// Step-by-step guidance per workflow, injected when a session was started from
+// the New Sandbox chooser or the Agents workflow hub (SESSION_WORKFLOW_KEY).
+// Keeps the agent driving each flow consistently with the sandbox_* tools.
+const WORKFLOW_GUIDES: Record<SessionWorkflow, string> = {
+  docker: `The user is creating a Docker container sandbox. Guide them:
+1. Ask what the sandbox is for and suggest an image (default alpine:latest); confirm the image.
+2. Ask whether it needs an isolated (hardened) network or the default bridge.
+3. Create it with sandbox_create (kind "container"). Containers exit when their main command finishes, so give a long-running command (e.g. sleep 3600) unless they specify one.
+4. Confirm it is running with sandbox_list, then tell them they can Open session or inspect it.`,
+  kubernetes: `The user is creating a Kubernetes sandbox (a workload on the local kind cluster). Guide them:
+1. Confirm the image (default alpine:latest) and what they want to run.
+2. Create it with sandbox_create (kind "kubernetes"); the first create provisions the kind cluster and can take ~30-60s.
+3. Confirm the pod is running with sandbox_list / sandbox_logs before handing back.`,
+  "linux-vm": `The user wants a Linux VM research sandbox. These do NOT run in this app — they run as hardware-isolated Kata micro-VMs on a separate Linux host. Do NOT try to create one locally with sandbox_create. Instead walk them through, referencing host-agent/README.md and cmd/openlegion-microvm/README.md:
+1. Prerequisites: a dedicated Linux box (Debian/Ubuntu, x86_64) with KVM. Run host-agent/preflight.sh.
+2. Install + verify isolation: host-agent/setup-kata.sh then host-agent/verify.sh (don't proceed unless verify passes).
+3. Build the RE desktop images and run the daemon bound to the LAN with a token (OPENLEGION_MICROVM_LISTEN/OPENLEGION_MICROVM_TOKEN).
+4. Point this app at the host in Settings → Servers → Sandbox daemon (URL + token). Then the VM appears in Sandboxes.`,
+  "read-docs": `The user wants help understanding the OpenLegion docs and repo. Ask what they're looking for, then use the read/grep/glob tools to find the answer in README.md, host-agent/, cmd/openlegion-microvm/, and packages/. Cite the files you used.`,
+  "debug-net": `The user has a sandbox network problem. Work the layers in order with sandbox_exec:
+1. sandbox_list to find the affected sandbox.
+2. Inside it: ip a (interfaces/addresses), ip route (default route), cat /etc/resolv.conf (DNS).
+3. Test in order: ping the gateway, ping 1.1.1.1, then a DNS lookup. Where the chain first fails tells you the layer (interface/DHCP, routing/NAT, or DNS). Note: research VMs are intentionally on a no-egress network.`,
+  "clone-repo": `The user wants to clone a git repo into a sandbox. Ask for the repo URL and which sandbox (or create a container first). Then use sandbox_exec to git clone it into the workspace and report what's inside so they can start working.`,
+}
+
+/** System-prompt block for a guided workflow session. */
+export function workflowSystemPrompt(workflow: SessionWorkflow): string {
+  return ["<workflow-context>", WORKFLOW_GUIDES[workflow], "</workflow-context>"].join("\n")
 }
