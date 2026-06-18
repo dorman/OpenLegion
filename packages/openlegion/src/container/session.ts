@@ -28,6 +28,23 @@ export function sessionSandbox(metadata?: Record<string, unknown>) {
   return Option.getOrUndefined(decodeSandbox(metadata[SESSION_SANDBOX_KEY]))
 }
 
+/**
+ * Marks a session as a guided workflow (started from the New Sandbox chooser or
+ * the Agents workflow hub). The prompt loop injects step-by-step guidance for
+ * the chosen flow so the agent drives it consistently.
+ */
+export const SESSION_WORKFLOW_KEY = "openlegion.workflow"
+
+export const SESSION_WORKFLOWS = ["docker", "kubernetes", "linux-vm", "read-docs", "debug-net", "clone-repo"] as const
+export type SessionWorkflow = (typeof SESSION_WORKFLOWS)[number]
+
+export function sessionWorkflow(metadata?: Record<string, unknown>): SessionWorkflow | undefined {
+  const value = metadata?.[SESSION_WORKFLOW_KEY]
+  return typeof value === "string" && (SESSION_WORKFLOWS as readonly string[]).includes(value)
+    ? (value as SessionWorkflow)
+    : undefined
+}
+
 export const SessionContainer = Schema.Struct({
   id: Schema.String,
   runtime: Runtime,
