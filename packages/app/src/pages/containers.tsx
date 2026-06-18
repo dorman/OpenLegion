@@ -4,7 +4,7 @@ import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { useQuery, useQueryClient } from "@tanstack/solid-query"
 import { Navigate, useNavigate } from "@solidjs/router"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { DialogContainerCreate } from "@/components/dialog-container-create"
+import { DialogChooseRuntime } from "@/components/dialog-choose-runtime"
 import { DialogContainerInspect } from "@/components/dialog-container-inspect"
 import { DialogContainerOpenSession } from "@/components/dialog-container-open-session"
 import {
@@ -21,20 +21,22 @@ import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
-import { askAgentAboutSandbox, openContainerSession } from "@/utils/container-session"
+import {
+  askAgentAboutSandbox,
+  openContainerSession,
+  startSandboxSetupSession,
+  type SandboxRuntime,
+} from "@/utils/container-session"
 import {
   listContainerWorkspaces,
-  upsertContainerWorkspace,
   workspaceForContainer,
   type ContainerWorkspace,
 } from "@/utils/container-workspaces"
 import {
-  createContainer,
   listContainers,
   removeContainer,
   startContainer,
   stopContainer,
-  type ContainerCreateInput,
   type ContainerInfo,
 } from "@/utils/containers"
 import {
@@ -155,9 +157,30 @@ export default function ContainersPage() {
   })
 
   function showCreateDialog() {
-    const arch = runtime.data?.arch
-    if (!arch) return
-    dialog.show(() => <DialogContainerCreate onCreate={handleCreate} arch={arch} />)
+    dialog.show(() => <DialogChooseRuntime onChoose={(runtime) => void handleChooseRuntime(runtime)} />)
+  }
+
+  // New sandbox creation is agent-guided: picking a runtime opens an agent chat
+  // seeded with that runtime's setup goal, rather than a form.
+  async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
+    const conn = server.current
+    if (!conn) throw new Error(language.t("containers.error.noServer"))
+    return startSandboxSetupSession({
+      conn,
+      runtime: runtimeKind,
+      platform,
+      global,
+      layout,
+      createClient: serverSDK.createClient,
+      navigate,
+      pickDirectory: async () => {
+        const host = await platform.openDirectoryPickerDialog?.({
+          title: language.t("containers.openSession.pickProject"),
+        })
+        if (!host || Array.isArray(host)) return undefined
+        return host
+      },
+    })
   }
 
   if (platform.platform !== "desktop") {
@@ -205,21 +228,6 @@ export default function ContainersPage() {
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["containers"] })
-  }
-
-  async function handleCreate(input: ContainerCreateInput) {
-    const http = server.current?.http
-    if (!http) throw new Error(language.t("containers.error.noServer"))
-    const created = await createContainer(http, input)
-    const volume = input.volumes?.[0]
-    await upsertContainerWorkspace(http, created.id, {
-      image: created.image,
-      name: created.name,
-      runtime: created.runtime,
-      hostMount: volume?.host,
-      containerMount: volume?.container,
-    })
-    await refresh()
   }
 
   async function handleOpenSession(container: ContainerInfo, projectDirectory: string) {
