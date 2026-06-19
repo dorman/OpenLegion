@@ -64,7 +64,20 @@ function SuspenseLog(props: { name: string; children: JSX.Element }) {
 
 const HomeRoute = lazy(() => import("@/pages/home"))
 const ContainersRoute = lazy(() => import("@/pages/containers"))
-const Session = lazy(() => import("@/pages/session"))
+const Session = lazy(() =>
+  import("@/pages/session").catch(
+    () =>
+      new Promise<typeof import("@/pages/session")>((resolve, reject) =>
+        setTimeout(() => import("@/pages/session").then(resolve, reject), 1000),
+      ),
+  ),
+)
+
+// Warm up the session chunk immediately so Vite compiles it in the background
+// before the user first navigates to a session. Without this, the on-demand
+// compile races with navigation and "Failed to fetch dynamically imported
+// module" crashes the renderer on first use.
+void Session.preload()
 
 const SessionRoute = Object.assign(
   () => (
