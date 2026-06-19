@@ -163,24 +163,36 @@ export default function ContainersPage() {
   // New sandbox creation is agent-guided: picking a runtime opens an agent chat
   // seeded with that runtime's setup goal, rather than a form.
   async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
+    console.log("[OL:containers] handleChooseRuntime start", runtimeKind)
     const conn = server.current
     if (!conn) throw new Error(language.t("containers.error.noServer"))
-    return startSandboxSetupSession({
-      conn,
-      runtime: runtimeKind,
-      platform,
-      global,
-      layout,
-      createClient: serverSDK.createClient,
-      navigate,
-      pickDirectory: async () => {
-        const host = await platform.openDirectoryPickerDialog?.({
-          title: language.t("containers.openSession.pickProject"),
-        })
-        if (!host || Array.isArray(host)) return undefined
-        return host
-      },
-    })
+    try {
+      const result = await startSandboxSetupSession({
+        conn,
+        runtime: runtimeKind,
+        platform,
+        global,
+        layout,
+        createClient: serverSDK.createClient,
+        navigate: (path) => {
+          console.log("[OL:containers] navigate called with", path)
+          navigate(path)
+        },
+        pickDirectory: async () => {
+          console.log("[OL:containers] opening directory picker")
+          const host = await platform.openDirectoryPickerDialog?.({
+            title: language.t("containers.openSession.pickProject"),
+          })
+          if (!host || Array.isArray(host)) return undefined
+          return host
+        },
+      })
+      console.log("[OL:containers] handleChooseRuntime done", result?.id)
+      return result
+    } catch (err) {
+      console.error("[OL:containers] handleChooseRuntime error", err)
+      throw err
+    }
   }
 
   if (platform.platform !== "desktop") {
