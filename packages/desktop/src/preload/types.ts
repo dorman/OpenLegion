@@ -57,6 +57,7 @@ export type FatalRendererError = {
 }
 
 export type ElectronAPI = {
+  getHomeDirectory: () => Promise<string>
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
   awaitInitialization: () => Promise<ServerReadyData>

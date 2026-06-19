@@ -165,7 +165,10 @@ export default function ContainersPage() {
   async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
     console.log("[OL:containers] handleChooseRuntime start", runtimeKind)
     const conn = server.current
-    if (!conn) throw new Error(language.t("containers.error.noServer"))
+    if (!conn) {
+      showToast({ variant: "error", title: language.t("containers.error.noServer") })
+      return
+    }
     try {
       const result = await startSandboxSetupSession({
         conn,
@@ -178,20 +181,16 @@ export default function ContainersPage() {
           console.log("[OL:containers] navigate called with", path)
           navigate(path)
         },
-        pickDirectory: async () => {
-          console.log("[OL:containers] opening directory picker")
-          const host = await platform.openDirectoryPickerDialog?.({
-            title: language.t("containers.openSession.pickProject"),
-          })
-          if (!host || Array.isArray(host)) return undefined
-          return host
-        },
       })
       console.log("[OL:containers] handleChooseRuntime done", result?.id)
       return result
     } catch (err) {
       console.error("[OL:containers] handleChooseRuntime error", err)
-      throw err
+      showToast({
+        variant: "error",
+        title: "Failed to start setup session",
+        description: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 

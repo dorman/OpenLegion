@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { homedir } from "node:os"
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } from "electron"
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import type { DesktopMenuAction } from "@openlegion-ai/app/desktop-menu"
@@ -94,6 +95,7 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("record-fatal-renderer-error", (_event: IpcMainInvokeEvent, error: FatalRendererError) =>
     deps.recordFatalRendererError(error),
   )
+  ipcMain.handle("get-home-directory", () => homedir())
   ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
   ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
   ipcMain.handle("get-sandbox-host", () => deps.getSandboxHost())
