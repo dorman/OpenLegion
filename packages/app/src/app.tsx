@@ -156,10 +156,22 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      {/*<Suspense fallback={<Loading />}>*/}
-      {props.appChildren}
-      {props.children}
-      {/*</Suspense>*/}
+      {/* Scoped boundary for lazy route chunks. Without it, navigating to a
+          not-yet-loaded route (e.g. opening a session from Sandboxes) bubbles to
+          ConnectionGate's full-screen startup Splash, so the app looks like it
+          reloaded from scratch. With it (and the router's navigation transition)
+          the previous view is retained during the load, and any fallback is a
+          quiet mark rather than the pulsing startup logo. */}
+      <Suspense
+        fallback={
+          <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+            <Mark class="w-9 opacity-40" />
+          </div>
+        }
+      >
+        {props.appChildren}
+        {props.children}
+      </Suspense>
     </AppShellProviders>
   )
 }
