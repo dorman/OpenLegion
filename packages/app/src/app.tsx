@@ -23,6 +23,7 @@ import {
   type JSX,
   lazy,
   onCleanup,
+  onMount,
   type ParentProps,
   Show,
   Suspense,
@@ -50,9 +51,33 @@ import Layout from "@/pages/layout"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 
+// Mounts only when its parent Suspense activates — logs which boundary triggered.
+function SuspenseLog(props: { name: string; children: JSX.Element }) {
+  onMount(() => {
+    console.warn(`[OL:suspense] "${props.name}" fallback mounted`, new Error().stack?.split("\n").slice(1, 4).join(" | "))
+  })
+  onCleanup(() => {
+    console.log(`[OL:suspense] "${props.name}" fallback unmounted (route ready)`)
+  })
+  return props.children
+}
+
 const HomeRoute = lazy(() => import("@/pages/home"))
 const ContainersRoute = lazy(() => import("@/pages/containers"))
-const Session = lazy(() => import("@/pages/session"))
+const Session = lazy(() =>
+  import("@/pages/session").catch(
+    () =>
+      new Promise<typeof import("@/pages/session")>((resolve, reject) =>
+        setTimeout(() => import("@/pages/session").then(resolve, reject), 1000),
+      ),
+  ),
+)
+
+// Warm up the session chunk immediately so Vite compiles it in the background
+// before the user first navigates to a session. Without this, the on-demand
+// compile races with navigation and "Failed to fetch dynamically imported
+// module" crashes the renderer on first use.
+void Session.preload()
 
 const SessionRoute = Object.assign(
   () => (
@@ -156,10 +181,18 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      {/*<Suspense fallback={<Loading />}>*/}
-      {props.appChildren}
-      {props.children}
-      {/*</Suspense>*/}
+      <Suspense
+        fallback={
+          <SuspenseLog name="RouterRoot">
+            <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+              <Mark class="w-9 opacity-40" />
+            </div>
+          </SuspenseLog>
+        }
+      >
+        {props.appChildren}
+        {props.children}
+      </Suspense>
     </AppShellProviders>
   )
 }
@@ -223,12 +256,23 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         ),
   )
 
+  createEffect(() => {
+    console.log("[OL:connection-gate] health check state:", {
+      loading: startupHealthCheck.loading,
+      state: startupHealthCheck.state,
+      latest: startupHealthCheck.latest,
+      checkMode: checkMode(),
+    })
+  })
+
   return (
     <Suspense
       fallback={
-        <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
-        </div>
+        <SuspenseLog name="ConnectionGate">
+          <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
+            <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
+          </div>
+        </SuspenseLog>
       }
     >
       {/*<Show

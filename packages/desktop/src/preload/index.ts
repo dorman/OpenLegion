@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron"
 import type { ElectronAPI } from "./types"
 
 const api: ElectronAPI = {
+  getHomeDirectory: () => ipcRenderer.invoke("get-home-directory"),
   killSidecar: () => ipcRenderer.invoke("kill-sidecar"),
   installCli: () => ipcRenderer.invoke("install-cli"),
   awaitInitialization: () => ipcRenderer.invoke("await-initialization"),

@@ -284,6 +284,8 @@ const createPlatform = (): Platform => {
       return window.api.checkAppExists(appName)
     },
 
+    getHomeDirectory: () => window.api.getHomeDirectory(),
+
     containerRuntimeStatus: () => window.api.containerRuntimeStatus(),
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),

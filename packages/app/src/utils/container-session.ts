@@ -179,20 +179,21 @@ type StartSandboxSetupInput = {
   layout: ReturnType<typeof useLayout>
   createClient: ReturnType<typeof useServerSDK>["createClient"]
   navigate: (path: string) => void
-  pickDirectory: () => Promise<string | undefined>
 }
 
 /**
  * Start an agent chat to create a sandbox of the chosen runtime. This is the
  * "New sandbox" entry point: instead of a form, it opens a host agent session
  * seeded with a runtime-specific goal so the agent guides the user through
- * setup. Mirrors askAgentAboutSandbox but is not tied to an existing sandbox.
+ * setup. No project directory picker is shown — the session is not tied to a
+ * specific codebase; the last-used project is reused if available, otherwise
+ * the user's home directory is used as a neutral default.
  */
 export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
   const serverCtx = input.global.createServerCtx(input.conn)
   let directory: string | undefined = serverCtx.projects.last() ?? serverCtx.projects.list()[0]?.worktree
-  if (!directory) directory = await input.pickDirectory()
-  if (!directory) return undefined
+  if (!directory) directory = await input.platform.getHomeDirectory?.()
+  if (!directory) throw new Error("Could not determine a project directory for the session")
 
   serverCtx.projects.open(directory)
   serverCtx.projects.touch(directory)

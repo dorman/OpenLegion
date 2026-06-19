@@ -163,24 +163,35 @@ export default function ContainersPage() {
   // New sandbox creation is agent-guided: picking a runtime opens an agent chat
   // seeded with that runtime's setup goal, rather than a form.
   async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
+    console.log("[OL:containers] handleChooseRuntime start", runtimeKind)
     const conn = server.current
-    if (!conn) throw new Error(language.t("containers.error.noServer"))
-    return startSandboxSetupSession({
-      conn,
-      runtime: runtimeKind,
-      platform,
-      global,
-      layout,
-      createClient: serverSDK.createClient,
-      navigate,
-      pickDirectory: async () => {
-        const host = await platform.openDirectoryPickerDialog?.({
-          title: language.t("containers.openSession.pickProject"),
-        })
-        if (!host || Array.isArray(host)) return undefined
-        return host
-      },
-    })
+    if (!conn) {
+      showToast({ variant: "error", title: language.t("containers.error.noServer") })
+      return
+    }
+    try {
+      const result = await startSandboxSetupSession({
+        conn,
+        runtime: runtimeKind,
+        platform,
+        global,
+        layout,
+        createClient: serverSDK.createClient,
+        navigate: (path) => {
+          console.log("[OL:containers] navigate called with", path)
+          navigate(path)
+        },
+      })
+      console.log("[OL:containers] handleChooseRuntime done", result?.id)
+      return result
+    } catch (err) {
+      console.error("[OL:containers] handleChooseRuntime error", err)
+      showToast({
+        variant: "error",
+        title: "Failed to start setup session",
+        description: err instanceof Error ? err.message : String(err),
+      })
+    }
   }
 
   if (platform.platform !== "desktop") {
@@ -476,13 +487,13 @@ export default function ContainersPage() {
                 {language.t("containers.onboarding.open")}
               </ButtonV2>
               <Show when={platform.ensureMicrovmDaemon !== undefined && !remoteHost()}>
-                <ButtonV2 variant="neutral" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
+                <ButtonV2 variant="ghost" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
                   {ensuringDaemon()
                     ? language.t("containers.ensureDaemon.starting")
                     : language.t("containers.ensureDaemon")}
                 </ButtonV2>
               </Show>
-              <ButtonV2 onClick={() => showCreateDialog()} disabled={!canCreate()}>
+              <ButtonV2 variant="accent" onClick={() => showCreateDialog()} disabled={!canCreate()}>
                 {language.t("containers.new")}
               </ButtonV2>
             </div>
@@ -759,24 +770,24 @@ function ContainerCard(props: {
         </p>
       </Show>
       <div class="mt-2 flex flex-wrap gap-2">
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession} disabled={!inSandboxAgent()}>
+        <ButtonV2 variant="ghost-accent" size="normal" onClick={props.onOpenSession} disabled={!inSandboxAgent()}>
           {props.language.t("containers.openSession")}
         </ButtonV2>
         <Show when={hostAgent()}>
-          <ButtonV2 variant="ghost" size="normal" onClick={props.onAskAgent} disabled={!running()}>
+          <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onAskAgent} disabled={!running()}>
             {props.language.t("containers.askAgent")}
           </ButtonV2>
         </Show>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
+        <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onInspect}>
           {props.language.t("containers.inspect")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStart} disabled={running() || props.starting}>
+        <ButtonV2 variant="ghost-accent" size="normal" onClick={props.onStart} disabled={running() || props.starting}>
           {props.language.t(props.starting ? "containers.starting" : "containers.start")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running() || props.stopping}>
+        <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onStop} disabled={!running() || props.stopping}>
           {props.language.t(props.stopping ? "containers.stopping" : "containers.stop")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onRemove}>
+        <ButtonV2 variant="ghost-danger" size="normal" onClick={props.onRemove}>
           {props.language.t("containers.remove")}
         </ButtonV2>
       </div>

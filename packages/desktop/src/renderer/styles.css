@@ -35,6 +35,9 @@
   --v2-state-fg-success: var(--v2-green-500);
   --v2-state-border-success: color-mix(in srgb, var(--v2-green-500) 35%, transparent);
 
+  --v2-background-bg-button-accent: var(--v2-green-500);
+  --v2-text-text-on-accent: #080c0a;
+
   --desktop-nav-active-bg: color-mix(in srgb, var(--v2-green-500) 12%, #0e1510);
   --desktop-nav-active-fg: var(--v2-green-500);
   --desktop-agent-accent: var(--v2-orange-500);
