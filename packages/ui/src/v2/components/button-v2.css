@@ -145,6 +145,65 @@
   cursor: not-allowed;
 }
 
+/* Accent — filled primary CTA (emerald on desktop, contrast elsewhere) */
+[data-component="button-v2"][data-variant="accent"] {
+  background-color: var(--v2-background-bg-button-accent, var(--v2-background-bg-contrast));
+  color: var(--v2-text-text-on-accent, var(--v2-text-text-contrast));
+  font-weight: 600;
+}
+
+[data-component="button-v2"][data-variant="accent"]:is(:hover, [data-state="hover"]):not(:disabled) {
+  background-color: var(--v2-background-bg-button-accent-hover, var(--v2-background-bg-contrast));
+  opacity: 0.9;
+}
+
+[data-component="button-v2"][data-variant="accent"]:is(:active, [data-state="pressed"]):not(:disabled) {
+  opacity: 0.8;
+}
+
+[data-component="button-v2"][data-variant="accent"]:is(:disabled, [data-state="disabled"]) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Ghost accent — transparent bg, accent-colored text for primary inline actions */
+[data-component="button-v2"][data-variant="ghost-accent"] {
+  background-color: transparent;
+  color: var(--v2-text-text-accent, var(--v2-text-text-base));
+}
+
+[data-component="button-v2"][data-variant="ghost-accent"]:is(:hover, [data-state="hover"]):not(:disabled) {
+  background-color: color-mix(in srgb, var(--v2-text-text-accent, currentColor) 10%, transparent);
+}
+
+[data-component="button-v2"][data-variant="ghost-accent"]:is(:active, [data-state="pressed"]):not(:disabled) {
+  background-color: color-mix(in srgb, var(--v2-text-text-accent, currentColor) 18%, transparent);
+}
+
+[data-component="button-v2"][data-variant="ghost-accent"]:is(:disabled, [data-state="disabled"]) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ghost danger — transparent bg, danger-colored text for destructive inline actions */
+[data-component="button-v2"][data-variant="ghost-danger"] {
+  background-color: transparent;
+  color: var(--v2-text-text-danger, var(--v2-text-text-base));
+}
+
+[data-component="button-v2"][data-variant="ghost-danger"]:is(:hover, [data-state="hover"]):not(:disabled) {
+  background-color: color-mix(in srgb, var(--v2-text-text-danger, currentColor) 10%, transparent);
+}
+
+[data-component="button-v2"][data-variant="ghost-danger"]:is(:active, [data-state="pressed"]):not(:disabled) {
+  background-color: color-mix(in srgb, var(--v2-text-text-danger, currentColor) 18%, transparent);
+}
+
+[data-component="button-v2"][data-variant="ghost-danger"]:is(:disabled, [data-state="disabled"]) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Ghost muted */
 [data-component="button-v2"][data-variant="ghost-muted"] {
   background-color: transparent;

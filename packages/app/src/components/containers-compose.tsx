@@ -107,6 +107,7 @@ export function ContainersComposePanel(props: { onChanged?: () => Promise<void> 
       </label>
       <div class="flex flex-wrap gap-2">
         <ButtonV2
+          variant="ghost"
           size="normal"
           disabled={!file().trim() || pending() !== undefined}
           onClick={() => void run("deploy")}
@@ -114,7 +115,7 @@ export function ContainersComposePanel(props: { onChanged?: () => Promise<void> 
           {pending() === "deploy" ? language.t("containers.compose.deploying") : language.t("containers.compose.deploy")}
         </ButtonV2>
         <ButtonV2
-          variant="neutral"
+          variant="ghost-danger"
           size="normal"
           disabled={!file().trim() || pending() !== undefined}
           onClick={() => void run("stop")}

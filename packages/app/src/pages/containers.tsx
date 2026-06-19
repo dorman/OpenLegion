@@ -488,13 +488,13 @@ export default function ContainersPage() {
                 {language.t("containers.onboarding.open")}
               </ButtonV2>
               <Show when={platform.ensureMicrovmDaemon !== undefined && !remoteHost()}>
-                <ButtonV2 variant="neutral" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
+                <ButtonV2 variant="ghost" onClick={() => void ensureDaemon()} disabled={ensuringDaemon()}>
                   {ensuringDaemon()
                     ? language.t("containers.ensureDaemon.starting")
                     : language.t("containers.ensureDaemon")}
                 </ButtonV2>
               </Show>
-              <ButtonV2 onClick={() => showCreateDialog()} disabled={!canCreate()}>
+              <ButtonV2 variant="accent" onClick={() => showCreateDialog()} disabled={!canCreate()}>
                 {language.t("containers.new")}
               </ButtonV2>
             </div>
@@ -771,24 +771,24 @@ function ContainerCard(props: {
         </p>
       </Show>
       <div class="mt-2 flex flex-wrap gap-2">
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onOpenSession} disabled={!inSandboxAgent()}>
+        <ButtonV2 variant="ghost-accent" size="normal" onClick={props.onOpenSession} disabled={!inSandboxAgent()}>
           {props.language.t("containers.openSession")}
         </ButtonV2>
         <Show when={hostAgent()}>
-          <ButtonV2 variant="ghost" size="normal" onClick={props.onAskAgent} disabled={!running()}>
+          <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onAskAgent} disabled={!running()}>
             {props.language.t("containers.askAgent")}
           </ButtonV2>
         </Show>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onInspect}>
+        <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onInspect}>
           {props.language.t("containers.inspect")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStart} disabled={running() || props.starting}>
+        <ButtonV2 variant="ghost-accent" size="normal" onClick={props.onStart} disabled={running() || props.starting}>
           {props.language.t(props.starting ? "containers.starting" : "containers.start")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onStop} disabled={!running() || props.stopping}>
+        <ButtonV2 variant="ghost-muted" size="normal" onClick={props.onStop} disabled={!running() || props.stopping}>
           {props.language.t(props.stopping ? "containers.stopping" : "containers.stop")}
         </ButtonV2>
-        <ButtonV2 variant="ghost" size="normal" onClick={props.onRemove}>
+        <ButtonV2 variant="ghost-danger" size="normal" onClick={props.onRemove}>
           {props.language.t("containers.remove")}
         </ButtonV2>
       </div>
