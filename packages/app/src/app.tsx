@@ -23,6 +23,7 @@ import {
   type JSX,
   lazy,
   onCleanup,
+  onMount,
   type ParentProps,
   Show,
   Suspense,
@@ -49,6 +50,17 @@ import DirectoryLayout from "@/pages/directory-layout"
 import Layout from "@/pages/layout"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
+
+// Mounts only when its parent Suspense activates — logs which boundary triggered.
+function SuspenseLog(props: { name: string; children: JSX.Element }) {
+  onMount(() => {
+    console.warn(`[OL:suspense] "${props.name}" fallback mounted`, new Error().stack?.split("\n").slice(1, 4).join(" | "))
+  })
+  onCleanup(() => {
+    console.log(`[OL:suspense] "${props.name}" fallback unmounted (route ready)`)
+  })
+  return props.children
+}
 
 const HomeRoute = lazy(() => import("@/pages/home"))
 const ContainersRoute = lazy(() => import("@/pages/containers"))
@@ -156,17 +168,13 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      {/* Scoped boundary for lazy route chunks. Without it, navigating to a
-          not-yet-loaded route (e.g. opening a session from Sandboxes) bubbles to
-          ConnectionGate's full-screen startup Splash, so the app looks like it
-          reloaded from scratch. With it (and the router's navigation transition)
-          the previous view is retained during the load, and any fallback is a
-          quiet mark rather than the pulsing startup logo. */}
       <Suspense
         fallback={
-          <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
-            <Mark class="w-9 opacity-40" />
-          </div>
+          <SuspenseLog name="RouterRoot">
+            <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
+              <Mark class="w-9 opacity-40" />
+            </div>
+          </SuspenseLog>
         }
       >
         {props.appChildren}
@@ -235,12 +243,23 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         ),
   )
 
+  createEffect(() => {
+    console.log("[OL:connection-gate] health check state:", {
+      loading: startupHealthCheck.loading,
+      state: startupHealthCheck.state,
+      latest: startupHealthCheck.latest,
+      checkMode: checkMode(),
+    })
+  })
+
   return (
     <Suspense
       fallback={
-        <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
-        </div>
+        <SuspenseLog name="ConnectionGate">
+          <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
+            <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
+          </div>
+        </SuspenseLog>
       }
     >
       {/*<Show
