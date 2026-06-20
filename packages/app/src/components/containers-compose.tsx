@@ -87,7 +87,7 @@ export function ContainersComposePanel(props: { onChanged?: () => Promise<void> 
 
   return (
  <section class="flex flex-col gap-3 rounded-md border border-v2 border border-base bg-v2-background-bg-base p-4">
-	<h2><center>Choose one of the Quick Launch Recipes below to get started.</center></h2>
+	<h2 class="text-center">Choose one of the Quick Launch Recipes below to get started.</h2>
       <div>
         <div class="text-sm text-v2-text-text-base">{language.t("quick_launch_recipes.title")}</div>
         <p class="m1 text-xs leading-relaxed text-v2-text-text-muted">{language.t("quick_launch_recipes.title")}</p>
