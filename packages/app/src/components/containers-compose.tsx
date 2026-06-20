@@ -86,43 +86,36 @@ export function ContainersComposePanel(props: { onChanged?: () => Promise<void> 
   }
 
   return (
-    <section class="flex flex-col gap-3 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-4">
+ <section class="flex flex-col gap-3 rounded-md border border-v2 border border-base bg-v2-background-bg-base p-4">
+	<h2 class="text-center">Choose one of the Quick Launch Recipes below to get started.</h2>
       <div>
-        <div class="text-sm text-v2-text-text-base">{language.t("containers.compose.title")}</div>
-        <p class="mt-1 text-xs leading-relaxed text-v2-text-text-muted">{language.t("containers.compose.description")}</p>
+        <div class="text-sm text-v2-text-text-base">{language.t("quick_launch_recipes.title")}</div>
+        <p class="m1 text-xs leading-relaxed text-v2-text-text-muted">{language.t("quick_launch_recipes.title")}</p>
       </div>
-      <label class="flex flex-col gap-1 text-sm">
-        <span class="text-v2-text-text-muted">{language.t("containers.compose.file")}</span>
-        <div class="flex gap-2">
-          <input
-            class="min-w-0 flex-1 rounded-md border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2 font-mono text-xs"
-            placeholder="/path/to/docker-compose.yml"
-            value={file()}
-            onInput={(event) => void persistFile(event.currentTarget.value)}
-          />
-          <ButtonV2 variant="neutral" size="normal" onClick={() => void pickComposeFile()}>
-            {language.t("containers.compose.pickFile")}
-          </ButtonV2>
-        </div>
-      </label>
-      <div class="flex flex-wrap gap-2">
-        <ButtonV2
-          variant="ghost"
-          size="normal"
-          disabled={!file().trim() || pending() !== undefined}
-          onClick={() => void run("deploy")}
-        >
-          {pending() === "deploy" ? language.t("containers.compose.deploying") : language.t("containers.compose.deploy")}
-        </ButtonV2>
-        <ButtonV2
-          variant="ghost-danger"
-          size="normal"
-          disabled={!file().trim() || pending() !== undefined}
-          onClick={() => void run("stop")}
-        >
-          {pending() === "stop" ? language.t("containers.compose.stopping") : language.t("containers.compose.stop")}
-        </ButtonV2>
-      </div>
+	<div class="min-w-2 flex flex-wrap gap-3 text-sm">
+      <ButtonV2>
+        Create Ubuntu Linux VM
+      </ButtonV2>
+	<ButtonV2>
+	n8n workflow
+	</ButtonV2>
+		<ButtonV2>
+			Django app
+		</ButtonV2>
+			<ButtonV2>
+				Spin up Jenkins
+			</ButtonV2>
+				<ButtonV2>
+					Svelte + Tailwind
+				</ButtonV2>
+					<ButtonV2>
+						Spin up Ghidra
+					</ButtonV2>
+						<ButtonV2>
+						Start a Notion container
+						</ButtonV2>
+	</div>
     </section>
-  )
+ )
+
 }
