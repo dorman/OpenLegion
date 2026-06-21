@@ -73,3 +73,7 @@ export {
   vesperTheme,
   zenburnTheme,
 } from "./default-themes"
+
+if (import.meta.hot) {
+  import.meta.hot.accept()
+}

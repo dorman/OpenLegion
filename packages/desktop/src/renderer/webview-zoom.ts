@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-import { createSignal } from "solid-js"
+import { createRoot, createSignal } from "solid-js"
 
 const OS_NAME = (() => {
   if (navigator.userAgent.includes("Mac")) return "macos"
@@ -11,7 +11,7 @@ const OS_NAME = (() => {
   return "unknown"
 })()
 
-const [webviewZoom, setWebviewZoom] = createSignal(1)
+const [webviewZoom, setWebviewZoom] = createRoot(() => createSignal(1))
 let requestedZoom = 1
 let pinchZoomEnabled = false
 let wheelPinch = undefined as
@@ -136,3 +136,7 @@ window.addEventListener("keydown", (event) => {
 })
 
 export { webviewZoom, resetZoom, setPinchZoomEnabled, zoomIn, zoomOut }
+
+if (import.meta.hot) {
+  import.meta.hot.accept()
+}

@@ -624,7 +624,6 @@ export const dict = {
   "settings.section.server": "服务器",
 
   "settings.tab.general": "通用",
-  "settings.tab.shortcuts": "快捷键",
 
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "WSL 集成",
@@ -736,23 +735,6 @@ export const dict = {
   "settings.general.sounds.permissions.description": "当需要权限时播放声音",
   "settings.general.sounds.errors.title": "错误",
   "settings.general.sounds.errors.description": "发生错误时播放声音",
-
-  "settings.shortcuts.title": "键盘快捷键",
-  "settings.shortcuts.reset.button": "重置为默认值",
-  "settings.shortcuts.reset.toast.title": "快捷键已重置",
-  "settings.shortcuts.reset.toast.description": "键盘快捷键已重置为默认设置。",
-  "settings.shortcuts.conflict.title": "快捷键已被占用",
-  "settings.shortcuts.conflict.description": "{{keybind}} 已分配给 {{titles}}。",
-  "settings.shortcuts.unassigned": "未设置",
-  "settings.shortcuts.pressKeys": "按下按键",
-  "settings.shortcuts.search.placeholder": "搜索快捷键",
-  "settings.shortcuts.search.empty": "未找到快捷键",
-  "settings.shortcuts.group.general": "通用",
-  "settings.shortcuts.group.session": "会话",
-  "settings.shortcuts.group.navigation": "导航",
-  "settings.shortcuts.group.modelAndAgent": "模型与智能体",
-  "settings.shortcuts.group.terminal": "终端",
-  "settings.shortcuts.group.prompt": "提示",
 
   "settings.providers.title": "提供商",
   "settings.providers.description": "提供商设置将在此处可配置。",

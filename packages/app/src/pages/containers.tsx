@@ -499,7 +499,7 @@ export default function ContainersPage() {
             </div>
           </header>
 
-          <ContainersComposePanel onChanged={refresh} />
+          <ContainersComposePanel />
 
           <section class="flex min-h-0 flex-1 flex-col gap-3">
             <Show
