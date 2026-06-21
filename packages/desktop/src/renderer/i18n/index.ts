@@ -192,3 +192,7 @@ export function initI18n(): Promise<Locale> {
   state.init = promise
   return promise
 }
+
+if (import.meta.hot) {
+  import.meta.hot.accept()
+}

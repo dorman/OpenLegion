@@ -624,7 +624,6 @@ export const dict = {
   "settings.section.desktop": "Escritorio",
   "settings.section.server": "Servidor",
   "settings.tab.general": "General",
-  "settings.tab.shortcuts": "Atajos",
   "settings.desktop.section.wsl": "WSL",
   "settings.desktop.wsl.title": "Integración con WSL",
   "settings.desktop.wsl.description": "Ejecutar el servidor OpenLegion dentro de WSL en Windows.",
@@ -746,25 +745,6 @@ export const dict = {
   "settings.general.sounds.permissions.description": "Reproducir sonido cuando se requiera un permiso",
   "settings.general.sounds.errors.title": "Errores",
   "settings.general.sounds.errors.description": "Reproducir sonido cuando ocurra un error",
-
-  "settings.shortcuts.title": "Atajos de teclado",
-  "settings.shortcuts.reset.button": "Restablecer a valores predeterminados",
-  "settings.shortcuts.reset.toast.title": "Atajos restablecidos",
-  "settings.shortcuts.reset.toast.description":
-    "Los atajos de teclado han sido restablecidos a los valores predeterminados.",
-  "settings.shortcuts.conflict.title": "Atajo ya en uso",
-  "settings.shortcuts.conflict.description": "{{keybind}} ya está asignado a {{titles}}.",
-  "settings.shortcuts.unassigned": "Sin asignar",
-  "settings.shortcuts.pressKeys": "Presiona teclas",
-  "settings.shortcuts.search.placeholder": "Buscar atajos",
-  "settings.shortcuts.search.empty": "No se encontraron atajos",
-
-  "settings.shortcuts.group.general": "General",
-  "settings.shortcuts.group.session": "Sesión",
-  "settings.shortcuts.group.navigation": "Navegación",
-  "settings.shortcuts.group.modelAndAgent": "Modelo y agente",
-  "settings.shortcuts.group.terminal": "Terminal",
-  "settings.shortcuts.group.prompt": "Prompt",
 
   "settings.providers.title": "Proveedores",
   "settings.providers.description": "La configuración de proveedores estará disponible aquí.",

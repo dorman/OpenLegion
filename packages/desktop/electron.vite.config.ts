@@ -84,9 +84,62 @@ export default defineConfig({
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
+    server: {
+      warmup: {
+        // Pre-transform the default view and its direct deps before the Electron
+        // window opens. Without this, on-demand Vite compilation races with the
+        // renderer's first render cycle and causes HMR-triggered double reloads.
+        // Paths are relative to the renderer Vite root (src/renderer/).
+        clientFiles: [
+          "./index.tsx",
+          "./i18n/index.ts",
+          "../../../app/src/index.ts",
+          "../../../app/src/app.tsx",
+          "../../../app/src/pages/containers.tsx",
+          "../../../app/src/pages/home.tsx",
+          "../../../app/src/components/containers-compose.tsx",
+        ],
+      },
+    },
     optimizeDeps: {
       // Workspace UI sources (incl. logo assets) must rebundle on every cold dev start.
       exclude: ["@openlegion-ai/ui", "@openlegion-ai/ui/logo"],
+      // Pre-bundle the packages used in lazy-loaded chunks so Vite doesn't
+      // discover them mid-session and force additional page reloads.
+      //
+      // NOTE: shiki/katex/marked are imported by @openlegion-ai/ui/context/marked
+      // which is rendered immediately via MarkedProvider in app.tsx. Without
+      // these entries Vite discovers them after first render (~11 s) and forces
+      // a full page reload when optimization completes.
+      include: [
+        "solid-js",
+        "solid-js/web",
+        "@solidjs/router",
+        "@solidjs/meta",
+        "@tanstack/solid-query",
+        "effect",
+        // i18n — imported by renderer/index.tsx via i18n/index.ts; missing this
+        // causes a mid-session dep-optimization that invalidates i18n/index.ts
+        // and cascades (no HMR boundary) to // @refresh reload in renderer/index.tsx
+        "@solid-primitives/i18n",
+        // markdown / syntax-highlighting stack (heavy — root cause of the 11 s startup reload)
+        "shiki",
+        "@shikijs/transformers",
+        "katex",
+        "marked",
+        "marked-katex-extension",
+        "marked-shiki",
+        "@pierre/diffs",
+        // general UI utilities
+        "motion",
+        "motion-dom",
+        "motion-utils",
+        "dompurify",
+        "morphdom",
+        "fuzzysort",
+        "luxon",
+        "diff",
+      ],
     },
     build: {
       sourcemap: true,

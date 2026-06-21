@@ -62,10 +62,11 @@ const Session = lazy(() =>
   ),
 )
 
-// Warm up the session chunk immediately so Vite compiles it in the background
-// before the user first navigates to a session. Without this, the on-demand
-// compile races with navigation and "Failed to fetch dynamically imported
-// module" crashes the renderer on first use.
+// Pre-warm all lazy routes so Vite compiles them before the user navigates.
+// ContainersRoute is the immediate default view on desktop; without preloading
+// it the on-demand compile races with first navigation and crashes the renderer.
+void ContainersRoute.preload()
+void HomeRoute.preload()
 void Session.preload()
 
 const SessionRoute = Object.assign(

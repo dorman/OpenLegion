@@ -9,7 +9,10 @@ if (process.platform === "darwin") {
 } else {
   console.log("Skipping icon regeneration on non-macOS — using committed icons in packages/desktop/icons/")
 }
-await $`rm -rf node_modules/.vite`
+// Vite 7 invalidates its dep-optimization cache automatically when bun.lock or
+// vite.config.ts changes. Wiping it on every start forces a cold-cache run on
+// every restart, which triggers a mandatory "optimized dependencies changed.
+// reloading" full-reload ~8-11 s after the app first renders. Keep the cache.
 await $`bun ./scripts/copy-icons.ts ${process.env.OPENLEGION_CHANNEL ?? "dev"}`
 
 await $`cd ../openlegion && bun script/build-node.ts`

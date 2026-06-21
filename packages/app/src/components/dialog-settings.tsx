@@ -5,7 +5,6 @@ import { Icon } from "@openlegion-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { SettingsGeneral } from "./settings-general"
-import { SettingsKeybinds } from "./settings-keybinds"
 import { SettingsProviders } from "./settings-providers"
 import { SettingsModels } from "./settings-models"
 import { SettingsServers } from "./settings-servers"
@@ -27,10 +26,6 @@ export const DialogSettings: Component = () => {
                     <Tabs.Trigger value="general">
                       <Icon name="sliders" />
                       {language.t("settings.tab.general")}
-                    </Tabs.Trigger>
-                    <Tabs.Trigger value="shortcuts">
-                      <Icon name="keyboard" />
-                      {language.t("settings.tab.shortcuts")}
                     </Tabs.Trigger>
                     <Tabs.Trigger value="servers">
                       <Icon name="server" />
@@ -62,9 +57,6 @@ export const DialogSettings: Component = () => {
         </Tabs.List>
         <Tabs.Content value="general" class="no-scrollbar">
           <SettingsGeneral />
-        </Tabs.Content>
-        <Tabs.Content value="shortcuts" class="no-scrollbar">
-          <SettingsKeybinds />
         </Tabs.Content>
         <Tabs.Content value="servers" class="no-scrollbar">
           <SettingsServers />
