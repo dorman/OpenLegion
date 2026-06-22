@@ -104,13 +104,13 @@ export default defineConfig({
     optimizeDeps: {
       // Workspace UI sources (incl. logo assets) must rebundle on every cold dev start.
       exclude: ["@openlegion-ai/ui", "@openlegion-ai/ui/logo"],
-      // Pre-bundle the packages used in lazy-loaded chunks so Vite doesn't
-      // discover them mid-session and force additional page reloads.
+      // Pre-bundle ALL npm packages that the renderer touches on startup.
+      // Without these, Vite discovers them mid-session and forces a full page
+      // reload when optimization completes (~10 s after first render).
       //
-      // NOTE: shiki/katex/marked are imported by @openlegion-ai/ui/context/marked
-      // which is rendered immediately via MarkedProvider in app.tsx. Without
-      // these entries Vite discovers them after first render (~11 s) and forces
-      // a full page reload when optimization completes.
+      // The first cold start after a config change will take 30-60 s while Vite
+      // bundles everything — this is expected and only happens ONCE. Subsequent
+      // starts reuse the cache (predev.ts no longer wipes node_modules/.vite).
       include: [
         "solid-js",
         "solid-js/web",
@@ -118,11 +118,7 @@ export default defineConfig({
         "@solidjs/meta",
         "@tanstack/solid-query",
         "effect",
-        // i18n — imported by renderer/index.tsx via i18n/index.ts; missing this
-        // causes a mid-session dep-optimization that invalidates i18n/index.ts
-        // and cascades (no HMR boundary) to // @refresh reload in renderer/index.tsx
         "@solid-primitives/i18n",
-        // markdown / syntax-highlighting stack (heavy — root cause of the 11 s startup reload)
         "shiki",
         "@shikijs/transformers",
         "katex",
@@ -130,7 +126,6 @@ export default defineConfig({
         "marked-katex-extension",
         "marked-shiki",
         "@pierre/diffs",
-        // general UI utilities
         "motion",
         "motion-dom",
         "motion-utils",

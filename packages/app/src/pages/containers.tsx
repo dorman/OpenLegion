@@ -1,5 +1,4 @@
 import { ButtonV2 } from "@openlegion-ai/ui/v2/button-v2"
-import { Spinner } from "@openlegion-ai/ui/spinner"
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { useQuery, useQueryClient } from "@tanstack/solid-query"
 import { Navigate, useNavigate } from "@solidjs/router"
@@ -163,7 +162,6 @@ export default function ContainersPage() {
   // New sandbox creation is agent-guided: picking a runtime opens an agent chat
   // seeded with that runtime's setup goal, rather than a form.
   async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
-    console.log("[OL:containers] handleChooseRuntime start", runtimeKind)
     const conn = server.current
     if (!conn) {
       showToast({ variant: "error", title: language.t("containers.error.noServer") })
@@ -177,15 +175,10 @@ export default function ContainersPage() {
         global,
         layout,
         createClient: serverSDK.createClient,
-        navigate: (path) => {
-          console.log("[OL:containers] navigate called with", path)
-          navigate(path)
-        },
+        navigate,
       })
-      console.log("[OL:containers] handleChooseRuntime done", result?.id)
       return result
     } catch (err) {
-      console.error("[OL:containers] handleChooseRuntime error", err)
       showToast({
         variant: "error",
         title: "Failed to start setup session",
@@ -502,14 +495,6 @@ export default function ContainersPage() {
           <ContainersComposePanel />
 
           <section class="flex min-h-0 flex-1 flex-col gap-3">
-            <Show
-              when={!containers.isLoading}
-              fallback={
-                <div class="flex justify-center p-10">
-                  <Spinner />
-                </div>
-              }
-            >
               <Show
                 when={(containers.data?.length ?? 0) > 0}
                 fallback={
@@ -578,7 +563,6 @@ export default function ContainersPage() {
                   </div>
                 </Show>
               </Show>
-            </Show>
             <Show when={containers.error}>
               <div class="text-sm text-v2-text-text-danger">
                 {containers.error instanceof Error ? containers.error.message : String(containers.error)}

@@ -72,7 +72,9 @@ void Session.preload()
 const SessionRoute = Object.assign(
   () => (
     <SessionProviders>
-      <Session />
+      <Suspense>
+        <Session />
+      </Suspense>
     </SessionProviders>
   ),
   { preload: Session.preload },
@@ -171,16 +173,8 @@ function SessionProviders(props: ParentProps) {
 function RouterRoot(props: ParentProps<{ appChildren?: JSX.Element }>) {
   return (
     <AppShellProviders>
-      <Suspense
-        fallback={
-          <div class="h-dvh w-screen flex items-center justify-center bg-background-base">
-            <Mark class="w-9 opacity-40" />
-          </div>
-        }
-      >
-        {props.appChildren}
-        {props.children}
-      </Suspense>
+      {props.appChildren}
+      {props.children}
     </AppShellProviders>
   )
 }
@@ -244,25 +238,23 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
         ),
   )
 
+  const showSplash = () =>
+    checkMode() === "blocking" && startupHealthCheck.loading
+
+  const healthy = () =>
+    startupHealthCheck.latest === true
+
   return (
-    <Suspense
+    <Show
+      when={!showSplash()}
       fallback={
         <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
           <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
         </div>
       }
     >
-      {/*<Show
-        when={checkMode() === "blocking" ? !startupHealthCheck.loading : startupHealthCheck.state !== "pending"}
-        fallback={
-          <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-            <Splash class="w-56 max-w-[60vw] object-contain animate-pulse" />
-          </div>
-        }
-      >*/}
-      {checkMode() === "blocking" ? startupHealthCheck() : startupHealthCheck.latest}
       <Show
-        when={startupHealthCheck()}
+        when={healthy()}
         fallback={
           <ConnectionError
             onRetry={() => {
@@ -278,8 +270,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
       >
         {props.children}
       </Show>
-      {/*</Show>*/}
-    </Suspense>
+    </Show>
   )
 }
 
