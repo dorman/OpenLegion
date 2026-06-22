@@ -19,9 +19,9 @@ Everything runs **on your machine**. There is no hosted control plane; data, cre
 
 ### Screenshots
 
-**Sandboxes page** — create and manage container and desktop workloads, check local runtime status, and start the sandbox daemon from one place.
+**Sandboxes dashboard** — Quick Launch Recipes, guided empty-state cards, runtime status sidebar, and the sandbox daemon indicator. Create containers, Kubernetes workloads, and Linux desktop VMs from one place.
 
-![OpenLegion sandboxes page](./docs/screenshots/containers-page.png)
+![OpenLegion sandboxes dashboard](./docs/screenshots/sandboxes-dashboard.png)
 
 **Desktop VM display** — inspect a sandbox, then open a live Linux desktop in the app—over VNC, or the low-latency CDP browser stream for the headless-Chromium image (no separate viewer required).
 
@@ -122,7 +122,7 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 
 ### Desktop UI
 
-- **Sandboxes page** — card layout with workload type and running/stopped pills, isolated-network label, and actions (open session, inspect, start, stop, remove)
+- **Sandboxes page** — Quick Launch Recipes, guided empty-state cards, card layout with workload type and running/stopped pills, isolated-network label, and actions (open session, inspect, start, stop, remove)
 - **Onboarding** — guided setup for daemon readiness, first sandbox creation, and inspect/session workflow
 - **Create sandbox dialog** — sectioned form for workload type (container, Kubernetes, or desktop), desktop installer presets, runtime options, and general settings
 - **Inspect sandbox** — modal with **Logs**, **Shell**, **Desktop**, and **Audit** tabs; the Desktop tab streams VNC or, for the headless-Chromium image, CDP
@@ -136,7 +136,7 @@ Config and state: **`~/.openlegion/`** (global), optional **`.openlegion/`** per
 - [x] **Multiple engines** — Docker, Kubernetes (`kind`), QEMU desktops, and Kata research micro-VMs behind one daemon
 - [x] **CDP browser display** — low-latency Chrome DevTools stream as an alternative to VNC for the headless-Chromium desktop image
 - [x] **Agent computer-use** — `sandbox_screenshot` / `sandbox_input` over VNC and CDP
-- [x] **Compose project management** — basic deploy/stop from a compose file on the Sandboxes page
+- [x] **Quick Launch Recipes** — one-click sandbox presets (Ubuntu VM, n8n, Django, Jenkins, Ghidra, etc.) on the Sandboxes page
 - [x] **Multi-sandbox workspaces** — tabbed panel when multiple sandboxes are running
 - [x] **Project sandboxes** — linked project paths shown in the desktop sidebar
 - [x] **Security-team views** — audit tab in inspect dialog for local sandbox permission events
@@ -286,7 +286,7 @@ bun ./scripts/generate-brand-icons.ts
 bun ./scripts/copy-icons.ts dev
 ```
 
-On macOS, `bun run dev:desktop` also regenerates icons and clears the Vite cache on cold start so logo changes are picked up.
+On macOS, `bun run dev:desktop` also regenerates icons on cold start so logo changes are picked up.
 
 ## Contributing
 

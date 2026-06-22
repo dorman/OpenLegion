@@ -18,7 +18,7 @@ export type { ProjectAvatarVariant }
 
 const AVATAR_COLOR_KEYS = ["pink", "mint", "orange", "purple", "cyan", "lime"] as const
 const DEFAULT_SIDEBAR_WIDTH = 344
-const DEFAULT_FILE_TREE_WIDTH = 200
+const DEFAULT_FILE_TREE_WIDTH = 320
 const DEFAULT_SESSION_WIDTH = 600
 const DEFAULT_TERMINAL_HEIGHT = 280
 export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
