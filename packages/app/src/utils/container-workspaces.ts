@@ -108,6 +108,8 @@ export type LinkedSandboxContext = {
   id: string
   label: string
   mode: "container" | "sandbox"
+  runtime?: ContainerRuntime
+  kind?: "container" | "desktop" | "kubernetes"
 }
 
 export function linkedSandboxFromMetadata(metadata?: Record<string, unknown>) {
@@ -117,6 +119,7 @@ export function linkedSandboxFromMetadata(metadata?: Record<string, unknown>) {
       id: container.id,
       label: container.id,
       mode: "container",
+      runtime: container.runtime,
     } satisfies LinkedSandboxContext
   }
   const sandbox = sessionSandboxFromMetadata(metadata)
@@ -125,6 +128,8 @@ export function linkedSandboxFromMetadata(metadata?: Record<string, unknown>) {
     id: sandbox.id,
     label: sandbox.name ?? sandbox.id,
     mode: "sandbox",
+    runtime: sandbox.runtime,
+    kind: sandbox.kind,
   } satisfies LinkedSandboxContext
 }
 

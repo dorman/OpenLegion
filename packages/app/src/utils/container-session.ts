@@ -199,8 +199,23 @@ export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
   serverCtx.projects.touch(directory)
   input.layout.projects.open(directory)
 
+  const kindMap: Record<SandboxRuntime, "container" | "desktop" | "kubernetes"> = {
+    docker: "container",
+    kubernetes: "kubernetes",
+    "linux-vm": "desktop",
+  }
   const client = input.createClient({ directory, throwOnError: true })
-  const created = await client.session.create({ directory })
+  const created = await client.session.create({
+    directory,
+    metadata: {
+      [SESSION_SANDBOX_KEY]: {
+        id: `setup-${input.runtime}-${Date.now()}`,
+        name: `New ${input.runtime} sandbox`,
+        runtime: input.runtime === "linux-vm" ? "microvm" : "docker",
+        kind: kindMap[input.runtime],
+      },
+    },
+  })
   const session = created.data
   if (!session?.id) throw new Error("Failed to create session")
 

@@ -15,6 +15,9 @@ import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import FileTree from "@/components/file-tree"
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { SessionContextTab, SortableTab, FileVisual } from "@/components/session"
+import { SessionSandboxPanel } from "@/components/session/session-sandbox-panel"
+import { SidebarTerminalTab } from "@/components/session/sidebar-terminal-tab"
+import { linkedSandboxFromMetadata } from "@/utils/container-workspaces"
 import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
@@ -61,13 +64,22 @@ export function SessionSidePanel(props: {
   const desktopV2 = () => platform.platform === "desktop" && settings.general.newLayoutDesigns()
   const shown = createMemo(() => (desktopV2() ? settings.general.showFileTree() : true))
 
+  const sessionMetadata = createMemo(() => {
+    const id = params.id
+    if (!id) return undefined
+    return sync.session.get(id)?.metadata
+  })
+  const sandboxLinked = createMemo(() => !!linkedSandboxFromMetadata(sessionMetadata()))
+
   const reviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   const fileOpen = createMemo(() => isDesktop() && shown() && layout.fileTree.opened())
-  const open = createMemo(() => reviewOpen() || fileOpen())
+  const sandboxOpen = createMemo(() => isDesktop() && sandboxLinked())
+  const open = createMemo(() => reviewOpen() || fileOpen() || sandboxOpen())
   const reviewTab = createMemo(() => isDesktop())
   const panelWidth = createMemo(() => {
     if (!open()) return "0px"
     if (reviewOpen()) return "360px"
+    if (sandboxOpen()) return "320px"
     return `${layout.fileTree.width()}px`
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
@@ -142,7 +154,11 @@ export function SessionSidePanel(props: {
   })
   const contextOpen = tabState.contextOpen
   const openedTabs = tabState.openedTabs
-  const activeTab = tabState.activeTab
+  const activeTab = createMemo(() => {
+    const base = tabState.activeTab()
+    if (base === "empty" && sandboxLinked()) return "sandbox"
+    return base
+  })
   const activeFileTab = tabState.activeFileTab
 
   const fileTreeTab = () => layout.fileTree.tab()
@@ -251,6 +267,14 @@ export function SessionSidePanel(props: {
                           onCleanup(stop)
                         }}
                       >
+                        <Show when={sandboxLinked()}>
+                          <Tabs.Trigger value="sandbox">
+                            <div>Sandbox</div>
+                          </Tabs.Trigger>
+                          <Tabs.Trigger value="terminal">
+                            <div>Terminal</div>
+                          </Tabs.Trigger>
+                        </Show>
                         <Show when={reviewTab() && props.canReview()}>
                           <Tabs.Trigger value="review">
                             <div class="flex items-center gap-1.5">
@@ -314,6 +338,19 @@ export function SessionSidePanel(props: {
                         </div>
                       </Tabs.List>
                     </div>
+
+                    <Show when={sandboxLinked()}>
+                      <Tabs.Content value="sandbox" class="flex flex-col h-full overflow-hidden contain-strict">
+                        <Show when={activeTab() === "sandbox"}>
+                          <SessionSandboxPanel metadata={sessionMetadata()} />
+                        </Show>
+                      </Tabs.Content>
+                      <Tabs.Content value="terminal" class="flex flex-col h-full overflow-hidden contain-strict">
+                        <Show when={activeTab() === "terminal"}>
+                          <SidebarTerminalTab metadata={sessionMetadata()} />
+                        </Show>
+                      </Tabs.Content>
+                    </Show>
 
                     <Show when={reviewTab() && props.canReview()}>
                       <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">

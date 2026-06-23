@@ -1093,8 +1093,8 @@ export const dict = {
   "settings.permissions.row.preset.description":
     "Apply a permission profile tuned for sandbox network, mount, and shell access",
   "settings.permissions.row.preset.default": "Project default",
-  "session.sandbox.banner.stopped": 'Linked sandbox "{label}" is stopped.',
-  "session.sandbox.banner.missing": 'Linked sandbox "{label}" is no longer available.',
+  "session.sandbox.banner.stopped": 'Linked sandbox "{{label}}" is stopped.',
+  "session.sandbox.banner.missing": 'Linked sandbox "{{label}}" is no longer available.',
   "session.sandbox.banner.restart": "Restart sandbox",
   "session.sandbox.banner.unlink": "Unlink",
   "session.sandbox.banner.restarted": "Sandbox restarted",

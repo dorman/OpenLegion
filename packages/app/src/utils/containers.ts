@@ -80,6 +80,22 @@ export async function listContainers(server: ServerConnection.HttpBase) {
   return (await response.json()) as ContainerInfo[]
 }
 
+/**
+ * Like {@link listContainers}, but degrades to an empty list when the container
+ * runtime is unavailable (e.g. the Docker daemon is not running) instead of
+ * throwing. Used by status widgets (the session sandbox panel/banner) that are
+ * rendered inside a Suspense boundary — letting the query reject there would
+ * suspend/blank the whole surrounding page on every fetch. A management surface
+ * that needs to surface the failure should call {@link listContainers} directly.
+ */
+export async function listContainersSafe(server: ServerConnection.HttpBase) {
+  try {
+    return await listContainers(server)
+  } catch {
+    return [] as ContainerInfo[]
+  }
+}
+
 export async function createContainer(server: ServerConnection.HttpBase, input: ContainerCreateInput) {
   const response = await containerFetch(server, "/global/containers", {
     method: "POST",
