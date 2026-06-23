@@ -5,7 +5,7 @@ import { Show, createMemo } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useServer } from "@/context/server"
-import { containerIdsMatch, listContainers, startContainer } from "@/utils/containers"
+import { containerIdsMatch, listContainersSafe, startContainer, type ContainerInfo } from "@/utils/containers"
 import { linkedSandboxFromMetadata } from "@/utils/container-workspaces"
 import { showToast } from "@/utils/toast"
 
@@ -27,9 +27,13 @@ export function SessionSandboxBanner(props: {
 
   const containers = createQuery(() => ({
     queryKey: ["containers", server.key],
-    queryFn: () => listContainers(http()!),
+    queryFn: () => listContainersSafe(http()!),
     enabled: !!http() && !!linked(),
     refetchInterval: 10_000,
+    // Start with data so reading `.data` never suspends the surrounding route
+    // while the first fetch is in flight (the banner renders in the composer
+    // region). See listContainersSafe for the matching error handling.
+    initialData: [] as ContainerInfo[],
   }))
 
   const live = createMemo(() => {
@@ -87,8 +91,10 @@ export function SessionSandboxBanner(props: {
     }
   }
 
+  const pendingSetup = createMemo(() => linked()?.id.startsWith("setup-") && !live())
+
   return (
-    <Show when={linked() && stopped()}>
+    <Show when={linked() && stopped() && !pendingSetup()}>
       <div class="mb-2 flex flex-wrap items-center gap-3 rounded-md border border-border-weak-base bg-background-base px-3 py-2 text-13-regular text-text-base">
         <Icon name="warning" size="small" class="shrink-0 text-text-weak" />
         <span class="min-w-0 flex-1">
