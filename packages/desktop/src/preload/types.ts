@@ -40,6 +40,22 @@ export type EnsureMicrovmDaemonResult = {
   error?: string
 }
 
+export type MicrovmRecoveryStep = { step: string; ok: boolean; detail?: string }
+
+export type MicrovmDaemonRecoveryResult = {
+  ok: boolean
+  url: string
+  steps: MicrovmRecoveryStep[]
+  error?: string
+}
+
+export type MicrovmDaemonStatus = {
+  state: "healthy" | "offline" | "recovering" | "recovered" | "unrecoverable"
+  url: string
+  error?: string
+  steps?: MicrovmRecoveryStep[]
+}
+
 export type LinuxDisplayBackend = "wayland" | "auto"
 export type TitlebarTheme = {
   mode: "light" | "dark"
@@ -121,6 +137,8 @@ export type ElectronAPI = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  recoverMicrovmDaemon: () => Promise<MicrovmDaemonRecoveryResult>
+  onMicrovmDaemonStatus: (cb: (status: MicrovmDaemonStatus) => void) => () => void
   getSandboxHost: () => Promise<SandboxHostConfig>
   setSandboxHost: (config: SandboxHostConfig) => Promise<void>
   ensureDesktopImage: (presetId: string) => Promise<EnsureDesktopImageResult>

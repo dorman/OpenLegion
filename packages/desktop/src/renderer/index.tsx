@@ -290,6 +290,10 @@ const createPlatform = (): Platform => {
 
     ensureMicrovmDaemon: () => window.api.ensureMicrovmDaemon(),
 
+    recoverMicrovmDaemon: () => window.api.recoverMicrovmDaemon(),
+
+    onMicrovmDaemonStatus: (cb) => window.api.onMicrovmDaemonStatus(cb),
+
     getSandboxHost: () => window.api.getSandboxHost(),
 
     setSandboxHost: (config) => window.api.setSandboxHost(config),

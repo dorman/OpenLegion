@@ -41,7 +41,13 @@ import {
   setBackgroundColor,
   setDockIcon,
 } from "./windows"
-import { containerRuntimeStatus, ensureMicrovmDaemon } from "./container-runtime"
+import {
+  containerRuntimeStatus,
+  ensureMicrovmDaemon,
+  recoverMicrovmDaemon,
+  startMicrovmDaemonMonitor,
+  stopMicrovmDaemonMonitor,
+} from "./container-runtime"
 import { getSandboxHostConfig, setSandboxHostConfig } from "./sandbox-host"
 import { ensureDesktopImage, cancelDesktopImageDownload } from "./desktop-images"
 import {
@@ -200,6 +206,7 @@ const main = Effect.gen(function* () {
 
   app.on("before-quit", () => {
     writeLog("lifecycle", "before-quit", processMeta(sessionStartedAt))
+    stopMicrovmDaemonMonitor()
     closeAllContainerPtys()
     void killSidecar()
   })
@@ -294,6 +301,7 @@ const main = Effect.gen(function* () {
     recordFatalRendererError: (error) => writeLog("renderer", "fatal renderer error", { ...error }, "error"),
     containerRuntimeStatus: () => containerRuntimeStatus(),
     ensureMicrovmDaemon: () => ensureMicrovmDaemon(),
+    recoverMicrovmDaemon: () => recoverMicrovmDaemon(),
     getSandboxHost: () => getSandboxHostConfig(),
     setSandboxHost: (config) => setSandboxHostConfig(config),
     ensureDesktopImage: (event, presetId) => ensureDesktopImage(presetId, event.sender),
@@ -399,6 +407,18 @@ const main = Effect.gen(function* () {
 
     void ensureMicrovmDaemon().then((result) => {
       if (!result.ok) logger.warn("sandbox daemon unavailable", result)
+    })
+
+    // Guardrail: watch the local daemon and auto-run the recovery playbook if it
+    // goes offline while the app is running, so the user doesn't have to.
+    startMicrovmDaemonMonitor({
+      onStatus: (status) => {
+        if (status.state === "offline") logger.warn("sandbox daemon offline", status)
+        else logger.log("sandbox daemon status", status)
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("microvm-daemon-status", status)
+        }
+      },
     })
 
     logger.log("loading task finished")

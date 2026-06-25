@@ -411,7 +411,10 @@ export default function ContainersPage() {
     if (ensuringDaemon()) return
     setEnsuringDaemon(true)
     try {
-      const result = await platform.ensureMicrovmDaemon?.()
+      // Prefer the self-healing routine (also brings up Docker / reclaims a
+      // stuck port); fall back to a plain start on older desktop builds.
+      const run = platform.recoverMicrovmDaemon ?? platform.ensureMicrovmDaemon
+      const result = await run?.()
       if (!result) {
         showToast({
           variant: "error",

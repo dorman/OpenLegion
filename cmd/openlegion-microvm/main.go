@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -17,9 +18,15 @@ func main() {
 	eng := engine.NewRouter()
 	srv := daemon.NewServer(st, eng)
 
+	// Bind before logging "listening" so the log doesn't claim success when the
+	// port is already in use (e.g. an orphaned daemon is still bound to it).
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("microvm daemon listening on http://%s", addr)
 	log.Printf("mode: docker sandboxes + optional qemu desktop vms")
-	if err := http.ListenAndServe(addr, srv.Routes()); err != nil {
+	if err := http.Serve(ln, srv.Routes()); err != nil {
 		log.Fatal(err)
 	}
 }

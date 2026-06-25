@@ -1,13 +1,14 @@
 import { useDialog } from "@openlegion-ai/ui/context/dialog"
 import { A, useLocation } from "@solidjs/router"
 import { useQuery } from "@tanstack/solid-query"
-import { createMemo, For, ParentProps, Show } from "solid-js"
+import { createEffect, createMemo, For, onCleanup, ParentProps, Show } from "solid-js"
 import { RuntimePill } from "@/components/runtime-pill"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { listContainerWorkspaces } from "@/utils/container-workspaces"
+import { showToast } from "@/utils/toast"
 
 type NavItem = {
   id: string
@@ -30,6 +31,30 @@ export function DesktopShell(props: ParentProps) {
     refetchInterval: 10_000,
     queryFn: async () => platform.containerRuntimeStatus?.(),
   }))
+
+  // Surface the background self-healing guardrail: when the main process detects
+  // the local sandbox daemon has gone offline it auto-runs the recovery
+  // playbook, and reports the transitions here so the user sees what's happening
+  // (and the runtime badge refreshes) without having to report the problem.
+  createEffect(() => {
+    if (platform.platform !== "desktop" || !platform.onMicrovmDaemonStatus) return
+    const stop = platform.onMicrovmDaemonStatus((status) => {
+      if (status.state === "recovering") {
+        showToast({ title: "Sandbox daemon offline", description: "Trying to reconnect automatically..." })
+      } else if (status.state === "recovered") {
+        showToast({ variant: "success", icon: "circle-check", title: "Sandbox daemon recovered" })
+        void runtime.refetch()
+      } else if (status.state === "unrecoverable") {
+        showToast({
+          variant: "error",
+          title: "Could not recover sandbox daemon",
+          description: status.error ?? "Open the Sandboxes page to start it manually.",
+        })
+        void runtime.refetch()
+      }
+    })
+    onCleanup(stop)
+  })
 
   const workspaces = useQuery(() => ({
     queryKey: ["container-workspaces", server.key],

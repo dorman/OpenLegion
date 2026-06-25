@@ -7,6 +7,7 @@ import type { DesktopMenuAction } from "@openlegion-ai/app/desktop-menu"
 import type {
   ContainerRuntimeStatus,
   EnsureMicrovmDaemonResult,
+  MicrovmDaemonRecoveryResult,
   EnsureDesktopImageResult,
   FatalRendererError,
   SandboxHostConfig,
@@ -53,6 +54,7 @@ type Deps = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void> | void
   containerRuntimeStatus: () => Promise<ContainerRuntimeStatus>
   ensureMicrovmDaemon: () => Promise<EnsureMicrovmDaemonResult>
+  recoverMicrovmDaemon: () => Promise<MicrovmDaemonRecoveryResult>
   getSandboxHost: () => SandboxHostConfig
   setSandboxHost: (config: SandboxHostConfig) => void
   ensureDesktopImage: (event: IpcMainInvokeEvent, presetId: string) => Promise<EnsureDesktopImageResult>
@@ -98,6 +100,7 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("get-home-directory", () => homedir())
   ipcMain.handle("container-runtime-status", () => deps.containerRuntimeStatus())
   ipcMain.handle("ensure-microvm-daemon", () => deps.ensureMicrovmDaemon())
+  ipcMain.handle("recover-microvm-daemon", () => deps.recoverMicrovmDaemon())
   ipcMain.handle("get-sandbox-host", () => deps.getSandboxHost())
   ipcMain.handle("set-sandbox-host", (_event: IpcMainInvokeEvent, config: SandboxHostConfig) =>
     deps.setSandboxHost(config),
