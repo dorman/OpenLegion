@@ -45,6 +45,22 @@ export type EnsureMicrovmDaemonResult = {
   error?: string
 }
 
+export type MicrovmRecoveryStep = { step: string; ok: boolean; detail?: string }
+
+export type MicrovmDaemonRecoveryResult = {
+  ok: boolean
+  url: string
+  steps: MicrovmRecoveryStep[]
+  error?: string
+}
+
+export type MicrovmDaemonStatus = {
+  state: "healthy" | "offline" | "recovering" | "recovered" | "unrecoverable"
+  url: string
+  error?: string
+  steps?: MicrovmRecoveryStep[]
+}
+
 export type ContainerPtyCreateResult = { id: string } | { error: string }
 
 export type ContainerPty = {
@@ -166,6 +182,15 @@ export type Platform = {
 
   /** Start the local sandbox daemon when possible (desktop only) */
   ensureMicrovmDaemon?(): Promise<EnsureMicrovmDaemonResult>
+
+  /**
+   * Run the self-healing troubleshooting playbook for the local sandbox daemon
+   * (ensure the container runtime is up, reclaim the port, respawn). Desktop only.
+   */
+  recoverMicrovmDaemon?(): Promise<MicrovmDaemonRecoveryResult>
+
+  /** Subscribe to background daemon health/recovery transitions (desktop only) */
+  onMicrovmDaemonStatus?(cb: (status: MicrovmDaemonStatus) => void): () => void
 
   /** Read the persisted sandbox-daemon connection (desktop only) */
   getSandboxHost?(): Promise<SandboxHostConfig>

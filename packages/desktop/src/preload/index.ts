@@ -72,6 +72,12 @@ const api: ElectronAPI = {
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   containerRuntimeStatus: () => ipcRenderer.invoke("container-runtime-status"),
   ensureMicrovmDaemon: () => ipcRenderer.invoke("ensure-microvm-daemon"),
+  recoverMicrovmDaemon: () => ipcRenderer.invoke("recover-microvm-daemon"),
+  onMicrovmDaemonStatus: (cb) => {
+    const handler = (_: unknown, status: import("./types").MicrovmDaemonStatus) => cb(status)
+    ipcRenderer.on("microvm-daemon-status", handler)
+    return () => ipcRenderer.removeListener("microvm-daemon-status", handler)
+  },
   getSandboxHost: () => ipcRenderer.invoke("get-sandbox-host"),
   setSandboxHost: (config) => ipcRenderer.invoke("set-sandbox-host", config),
   ensureDesktopImage: (presetId) => ipcRenderer.invoke("ensure-desktop-image", presetId),
