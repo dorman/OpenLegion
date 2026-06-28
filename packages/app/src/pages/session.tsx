@@ -61,6 +61,7 @@ import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { shouldUseV2NewSessionPage } from "@/pages/session/new-session-layout"
 import { Identifier } from "@/utils/id"
+import { linkedSandboxFromMetadata } from "@/utils/container-workspaces"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
 import { extractPromptFromParts } from "@/utils/prompt"
@@ -268,10 +269,24 @@ export default function Page() {
     shouldUseV2NewSessionPage({ newLayoutDesigns: newSessionDesign(), sessionID: params.id })
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened() && !isV2NewSessionPage())
   const desktopFileTreeOpen = createMemo(() => isDesktop() && layout.fileTree.opened() && !isV2NewSessionPage())
-  const desktopSidePanelOpen = createMemo(() => desktopReviewOpen() || desktopFileTreeOpen())
+  // The side panel (SessionSidePanel) forces itself open at a fixed 320px for
+  // sandbox-linked sessions; mirror that here so the chat panel reserves the
+  // matching width instead of staying 100% and overlapping the panel.
+  const SANDBOX_PANEL_WIDTH = 320
+  const desktopSandboxOpen = createMemo(() => {
+    if (!isDesktop() || isV2NewSessionPage()) return false
+    const id = params.id
+    if (!id) return false
+    return !!linkedSandboxFromMetadata(sync.session.get(id)?.metadata)
+  })
+  const desktopSidePanelOpen = createMemo(
+    () => desktopReviewOpen() || desktopFileTreeOpen() || desktopSandboxOpen(),
+  )
   const sessionPanelWidth = createMemo(() => {
     if (!desktopSidePanelOpen()) return "100%"
     if (desktopReviewOpen()) return `${layout.session.width()}px`
+    // Precedence mirrors SessionSidePanel.panelWidth: sandbox before file tree.
+    if (desktopSandboxOpen()) return `calc(100% - ${SANDBOX_PANEL_WIDTH}px)`
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
