@@ -24,6 +24,7 @@ import { DialogSelectServer } from "@/components/dialog-select-server"
 import { GuidedEmptyCards } from "@/components/guided-empty-cards"
 import { ServerConnection, useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
+import { useServerSDK } from "@/context/server-sdk"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
@@ -113,6 +114,7 @@ export default function Home() {
 
 function HomeDesign() {
   const sync = useServerSync()
+  const serverSDK = useServerSDK()
   const layout = useLayout()
   const platform = usePlatform()
   const desktopShell = createMemo(() => platform.platform === "desktop")
@@ -149,17 +151,56 @@ function HomeDesign() {
     },
   }))
 
+  // Surface the user's existing chats even for directories they haven't opened
+  // as projects. `scope: "project"` returns all root sessions across every
+  // directory (sorted most-recently-updated), so the Agents list isn't limited
+  // to the curated opened-projects set. Display-only: nothing is added to the
+  // opened-projects list until the user actually opens one of these chats.
+  const discoveredSessions = useQuery(() => ({
+    queryKey: ["home", "all-sessions", server.key],
+    enabled: !!server.current,
+    queryFn: async () => {
+      try {
+        const result = await serverSDK.client.session.list({
+          scope: "project",
+          roots: true,
+          limit: HOME_SESSION_LIMIT,
+        })
+        return (result.data ?? []).filter((s) => !!s?.id && !s.parentID && !s.time?.archived)
+      } catch {
+        return [] as Session[]
+      }
+    },
+  }))
+
   const projectByID = createMemo(
     () => new Map(projects().flatMap((project) => (project.id ? [[project.id, project] as const] : []))),
   )
-  const allRecords = createMemo(() =>
-    buildHomeSessionRecords({
+  const allRecords = createMemo(() => {
+    const opened = buildHomeSessionRecords({
       sync,
       projectDirectories,
       projects,
       projectByID,
-    }),
-  )
+    })
+    const seen = new Set(opened.map((record) => `${pathKey(record.session.directory)}:${record.session.id}`))
+    const discovered = (discoveredSessions.data ?? []).flatMap((session) => {
+      const key = `${pathKey(session.directory)}:${session.id}`
+      if (seen.has(key)) return []
+      seen.add(key)
+      // Reuse a real opened project when one matches; otherwise synthesize a
+      // lightweight one from the session's directory so it still renders.
+      const project = projectForSession(session, projects(), projectByID()) ?? {
+        worktree: session.directory,
+        expanded: false,
+      }
+      return [{ session, project, projectName: displayName(project) }]
+    })
+    return [...opened, ...discovered].sort(
+      (a, b) =>
+        (b.session.time.updated ?? b.session.time.created) - (a.session.time.updated ?? a.session.time.created),
+    )
+  })
   const records = createMemo(() => {
     const filtered = allRecords().filter((record) => {
       if (!desktopShell() || state.agentFilter === "all") return true
@@ -369,7 +410,7 @@ function HomeDesign() {
           <div class="mt-3 min-h-0 flex-1 overflow-y-auto">
             <div class="pt-3 flex flex-col gap-6">
               <Show
-                when={!sessionLoad.isLoading}
+                when={!sessionLoad.isLoading && !discoveredSessions.isLoading}
                 fallback={<HomeSessionSkeleton label={language.t("common.loading")} />}
               >
                 <Show
