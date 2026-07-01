@@ -589,13 +589,21 @@ export function MessageTimeline(props: {
   // Re-measure when the scroll viewport itself resizes (e.g. the side panel
   // opening/closing changes the chat width). Without this the virtualizer can
   // keep a stale viewport size and render blank rows until a manual scroll
-  // nudges it; measureTimeline preserves scroll position unless already pinned
-  // to the bottom.
-  createResizeObserver(() => scrollRoot(), () => measureTimeline())
+  // nudges it. Only re-measure here (repaint) — re-anchoring to the bottom on
+  // every resize can fight a manual scroll, so leave scroll position alone.
+  createResizeObserver(() => scrollRoot(), () => virtualizer?.measure())
 
   function anchorMeasuredBottom() {
     if (!listRoot) return false
     if (!measuredBottomAnchored) return false
+    // A manual scroll always wins: never yank while the user is actively
+    // scrolling, and re-check the real position so a stale measuredBottomAnchored
+    // (off by a frame) can't pull them back to the bottom.
+    if (props.hasScrollGesture()) return false
+    if (!isMeasuredBottom(listRoot)) {
+      measuredBottomAnchored = false
+      return false
+    }
     listRoot.scrollTop = listRoot.scrollHeight
     return true
   }
