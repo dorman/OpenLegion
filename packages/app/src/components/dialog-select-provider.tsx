@@ -8,8 +8,10 @@ import { ProviderIcon } from "@openlegion-ai/ui/provider-icon"
 import { DialogConnectProvider } from "./dialog-connect-provider"
 import { useLanguage } from "@/context/language"
 import { DialogCustomProvider } from "./dialog-custom-provider"
+import { DialogLocalProvider } from "./dialog-local-provider"
 
 const CUSTOM_ID = "_custom"
+const LOCAL_ID = "_local"
 
 export const DialogSelectProvider: Component = () => {
   const dialog = useDialog()
@@ -19,6 +21,7 @@ export const DialogSelectProvider: Component = () => {
   const popularGroup = () => language.t("dialog.provider.group.popular")
   const otherGroup = () => language.t("dialog.provider.group.other")
   const customLabel = () => language.t("settings.providers.tag.custom")
+  const localLabel = () => language.t("dialog.provider.local.label")
   const note = (id: string) => {
     if (id === "anthropic") return language.t("dialog.provider.anthropic.note")
     if (id === "openai") return language.t("dialog.provider.openai.note")
@@ -36,11 +39,17 @@ export const DialogSelectProvider: Component = () => {
         key={(x) => x?.id}
         items={() => {
           language.locale()
-          return [{ id: CUSTOM_ID, name: customLabel() }, ...providers.all().values()]
+          return [
+            { id: LOCAL_ID, name: localLabel() },
+            { id: CUSTOM_ID, name: customLabel() },
+            ...providers.all().values(),
+          ]
         }}
         filterKeys={["id", "name"]}
-        groupBy={(x) => (popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
+        groupBy={(x) => (x.id === LOCAL_ID || popularProviders.includes(x.id) ? popularGroup() : otherGroup())}
         sortBy={(a, b) => {
+          if (a.id === LOCAL_ID) return -1
+          if (b.id === LOCAL_ID) return 1
           if (a.id === CUSTOM_ID) return -1
           if (b.id === CUSTOM_ID) return 1
           if (popularProviders.includes(a.id) && popularProviders.includes(b.id))
@@ -55,6 +64,10 @@ export const DialogSelectProvider: Component = () => {
         }}
         onSelect={(x) => {
           if (!x) return
+          if (x.id === LOCAL_ID) {
+            dialog.show(() => <DialogLocalProvider back="providers" />)
+            return
+          }
           if (x.id === CUSTOM_ID) {
             dialog.show(() => <DialogCustomProvider back="providers" />)
             return
@@ -64,8 +77,11 @@ export const DialogSelectProvider: Component = () => {
       >
         {(i) => (
           <div class="px-1.25 w-full flex items-center gap-x-3">
-            <ProviderIcon data-slot="list-item-extra-icon" id={i.id} />
+            <ProviderIcon data-slot="list-item-extra-icon" id={i.id === LOCAL_ID ? "synthetic" : i.id} />
             <span>{i.name}</span>
+            <Show when={i.id === LOCAL_ID}>
+              <div class="text-14-regular text-text-weak">{language.t("dialog.provider.local.tagline")}</div>
+            </Show>
             <Show when={i.id === "openlegion"}>
               <div class="text-14-regular text-text-weak">{language.t("dialog.provider.openlegion.tagline")}</div>
             </Show>
