@@ -10,6 +10,7 @@ import { batch, createMemo, createSignal, For, Show } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { Link } from "@/components/link"
 import { useLanguage } from "@/context/language"
+import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { showToast } from "@/utils/toast"
 import { DialogSelectProvider } from "./dialog-select-provider"
@@ -18,15 +19,16 @@ const OPENAI_COMPATIBLE = "@ai-sdk/openai-compatible"
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-_]*$/
 const DETECT_TIMEOUT_MS = 4_000
 
-type PresetID = "ollama" | "lmstudio" | "custom"
+type PresetID = "ollama" | "lmstudio" | "unsloth" | "custom"
 
 const PRESETS: Record<PresetID, { providerID: string; name: string; baseURL: string }> = {
   ollama: { providerID: "ollama", name: "Ollama", baseURL: "http://localhost:11434/v1" },
   lmstudio: { providerID: "lmstudio", name: "LM Studio", baseURL: "http://localhost:1234/v1" },
+  unsloth: { providerID: "unsloth-studio", name: "Unsloth Studio", baseURL: "http://localhost:8888/v1" },
   custom: { providerID: "", name: "", baseURL: "" },
 }
 
-const PRESET_IDS: PresetID[] = ["ollama", "lmstudio", "custom"]
+const PRESET_IDS: PresetID[] = ["ollama", "lmstudio", "unsloth", "custom"]
 
 /** Parse an OpenAI-compatible `/models` response into a list of model ids. */
 function parseModelIDs(json: unknown): string[] {
@@ -38,12 +40,14 @@ function parseModelIDs(json: unknown): string[] {
 export function DialogLocalProvider(props: { back?: "providers" | "close" }) {
   const dialog = useDialog()
   const serverSync = useServerSync()
+  const serverSDK = useServerSDK()
   const language = useLanguage()
 
   const [preset, setPreset] = createSignal<PresetID>("ollama")
   const [providerID, setProviderID] = createSignal(PRESETS.ollama.providerID)
   const [name, setName] = createSignal(PRESETS.ollama.name)
   const [baseURL, setBaseURL] = createSignal(PRESETS.ollama.baseURL)
+  const [apiKey, setApiKey] = createSignal("")
   const [manual, setManual] = createSignal("")
   const [detected, setDetected] = createSignal<string[] | undefined>(undefined)
   const [selected, setSelected] = createStore<Record<string, boolean>>({})
@@ -56,6 +60,7 @@ export function DialogLocalProvider(props: { back?: "providers" | "close" }) {
       setProviderID(cfg.providerID)
       setName(cfg.name)
       setBaseURL(cfg.baseURL)
+      setApiKey("")
       setDetected(undefined)
       setSelected(reconcile({}))
       setErr(reconcile({}))
@@ -79,9 +84,13 @@ export function DialogLocalProvider(props: { back?: "providers" | "close" }) {
       if (!/^https?:\/\//.test(url)) throw new Error(language.t("provider.local.error.baseURL"))
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), DETECT_TIMEOUT_MS)
+      const key = apiKey().trim()
       try {
         const res = await fetch(`${url}/models`, {
-          headers: { accept: "application/json" },
+          headers: {
+            accept: "application/json",
+            ...(key ? { authorization: `Bearer ${key}` } : {}),
+          },
           signal: controller.signal,
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -103,8 +112,12 @@ export function DialogLocalProvider(props: { back?: "providers" | "close" }) {
     mutationFn: async () => {
       const id = providerID().trim()
       const url = baseURL().trim().replace(/\/+$/, "")
+      const key = apiKey().trim()
       const models = selectedModelIDs()
       const disabled = serverSync.data.config.disabled_providers ?? []
+      if (key) {
+        await serverSDK.client.auth.set({ providerID: id, auth: { type: "api", key } })
+      }
       await serverSync.updateConfig({
         provider: {
           [id]: {
@@ -256,6 +269,14 @@ export function DialogLocalProvider(props: { back?: "providers" | "close" }) {
                   : language.t("provider.local.detect.action")}
               </Button>
             </div>
+
+            <TextField
+              label={language.t("provider.local.field.apiKey.label")}
+              placeholder={language.t("provider.local.field.apiKey.placeholder")}
+              description={language.t("provider.local.field.apiKey.description")}
+              value={apiKey()}
+              onChange={setApiKey}
+            />
           </div>
 
           <div class="flex flex-col gap-3">
