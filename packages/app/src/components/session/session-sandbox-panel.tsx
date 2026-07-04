@@ -3,17 +3,26 @@ import { createQuery, useQueryClient } from "@tanstack/solid-query"
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
-import { ContainerTerminal } from "@/components/container-terminal"
+import { SandboxTerminal } from "@/components/session/sandbox-terminal"
 import {
   containerIdsMatch,
   fetchContainerLogs,
   fetchContainerShell,
+  getContainerNetwork,
   listContainersSafe,
+  listRuntimesSafe,
+  setContainerNetwork,
+  snapshotContainer,
   startContainer,
   stopContainer,
   type ContainerInfo,
+  type ContainerRuntime,
+  type NetworkMode,
+  type NetworkState,
+  type RuntimeBackendStatus,
 } from "@/utils/containers"
 import { linkedSandboxFromMetadata, type LinkedSandboxContext } from "@/utils/container-workspaces"
+import { capabilitiesFor, runtimeForKind } from "@/utils/sandbox-capabilities"
 import { showToast } from "@/utils/toast"
 
 export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> }) {
@@ -25,6 +34,8 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
   const [actionPending, setActionPending] = createSignal(false)
   const [shellCommand, setShellCommand] = createSignal<string | undefined>(undefined)
   const [shellLoading, setShellLoading] = createSignal(false)
+  const [snapshotting, setSnapshotting] = createSignal(false)
+  const [networkPending, setNetworkPending] = createSignal(false)
 
   const linked = createMemo(() => linkedSandboxFromMetadata(props.metadata))
 
@@ -39,7 +50,29 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
     // while the first fetch is in flight (the panel renders inside a Suspense
     // boundary). See listContainersSafe for the matching error handling.
     initialData: [] as ContainerInfo[],
+    // initialData marks the query "success", and the app-wide default is
+    // refetchOnMount:false — without this the first real fetch wouldn't happen
+    // until refetchInterval fired, leaving stale [] data on open.
+    refetchOnMount: "always",
   }))
+
+  const caps = createMemo(() => capabilitiesFor(linked()?.kind))
+  const backend = createMemo(() => runtimeForKind(linked()?.kind, linked()?.runtime))
+
+  const runtimes = createQuery(() => ({
+    queryKey: ["runtimes", server.key],
+    queryFn: () => listRuntimesSafe(http()!),
+    enabled: !!http() && !!linked(),
+    refetchInterval: 10_000,
+    initialData: [] as RuntimeBackendStatus[],
+    refetchOnMount: "always",
+  }))
+
+  // The backend this sandbox needs, when we have a reading that says it's down.
+  const runtimeDown = createMemo(() => {
+    const status = (runtimes.data ?? []).find((r) => r.id === backend())
+    return status && !status.available ? status : undefined
+  })
 
   const live = createMemo((): ContainerInfo | undefined => {
     const item = linked()
@@ -48,6 +81,21 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
   })
 
   const running = createMemo(() => (live()?.status ?? "stopped") === "running")
+
+  // Network isolation state for the linked sandbox. initialData + a
+  // never-throwing queryFn keep this from suspending the route (see the
+  // containers query note); enabled only once the sandbox actually exists.
+  const network = createQuery(() => ({
+    queryKey: ["container-network", server.key, linked()?.id],
+    queryFn: () =>
+      getContainerNetwork(http()!, linked()!.id).catch(
+        () => ({ mode: "online", networks: [] }) as NetworkState,
+      ),
+    enabled: !!http() && !!live() && caps().networkIsolation,
+    initialData: { mode: "online", networks: [] } as NetworkState,
+    refetchOnMount: "always",
+  }))
+  const offline = createMemo(() => network.data?.mode === "offline")
   const pendingSetup = createMemo(() => {
     const item = linked()
     return !!item && item.id.startsWith("setup-") && !live()
@@ -135,11 +183,51 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
     }
   }
 
+  async function handleSnapshot() {
+    const conn = http()
+    const item = linked()
+    if (!conn || !item || snapshotting()) return
+    setSnapshotting(true)
+    try {
+      const snap = await snapshotContainer(conn, item.id)
+      await queryClient.invalidateQueries({ queryKey: ["container-snapshots", server.key, item.id] })
+      showToast({ variant: "success", icon: "circle-check", title: "Snapshot captured", description: snap.ref })
+    } catch (err) {
+      showToast({ title: "Failed to snapshot", description: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setSnapshotting(false)
+    }
+  }
+
+  async function handleSetNetwork(mode: NetworkMode) {
+    const conn = http()
+    const item = linked()
+    if (!conn || !item || networkPending()) return
+    setNetworkPending(true)
+    try {
+      await setContainerNetwork(conn, item.id, mode)
+      await queryClient.invalidateQueries({ queryKey: ["container-network", server.key, item.id] })
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: mode === "offline" ? "Sandbox isolated" : "Network restored",
+      })
+    } catch (err) {
+      showToast({ title: "Failed to change network", description: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setNetworkPending(false)
+    }
+  }
+
   const kindLabel = (item: LinkedSandboxContext) => {
     if (item.kind === "desktop") return "Desktop VM"
     if (item.kind === "kubernetes") return "Kubernetes"
     return "Container"
   }
+
+  const runtimeLabel = (id: ContainerRuntime) =>
+    id === "microvm" ? language.t("sandbox.runtime.microvm.label") : id === "podman" ? "Podman" : "Docker"
+  const runtimeRemediation = (id: ContainerRuntime) => language.t(`sandbox.runtime.${id}.unavailable`)
 
   return (
     <div class="flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -154,6 +242,19 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
       >
         {(item) => (
           <>
+            <Show when={runtimeDown()}>
+              {(status) => (
+                <section class="flex items-start gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-deep p-3">
+                  <div class="flex flex-col gap-1">
+                    <h4 class="text-sm font-medium text-v2-text-text-base">
+                      {language.t("sandbox.runtime.unavailable.title", { runtime: runtimeLabel(status().id) })}
+                    </h4>
+                    <p class="text-xs text-v2-text-text-muted">{runtimeRemediation(status().id)}</p>
+                  </div>
+                </section>
+              )}
+            </Show>
+
             <section class="flex flex-col gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-3">
               <div class="flex items-center justify-between">
                 <h3 class="text-sm font-medium text-v2-text-text-base">{item().label}</h3>
@@ -221,16 +322,52 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
                   >
                     {logsLoading() ? "Loading..." : "View logs"}
                   </ButtonV2>
-                  <ButtonV2
-                    variant={shellCommand() ? "neutral" : "ghost"}
-                    size="small"
-                    onClick={() => void handleOpenShell()}
-                    disabled={shellLoading() || !running()}
-                  >
-                    {shellLoading() ? "Opening..." : shellCommand() ? "Close shell" : "Shell"}
-                  </ButtonV2>
+                  <Show when={caps().exec}>
+                    <ButtonV2
+                      variant={shellCommand() ? "neutral" : "ghost"}
+                      size="small"
+                      onClick={() => void handleOpenShell()}
+                      disabled={shellLoading() || !running()}
+                    >
+                      {shellLoading() ? "Opening..." : shellCommand() ? "Close shell" : "Shell"}
+                    </ButtonV2>
+                  </Show>
+                  <Show when={caps().snapshot}>
+                    <ButtonV2
+                      variant="ghost"
+                      size="small"
+                      onClick={() => void handleSnapshot()}
+                      disabled={snapshotting() || !live()}
+                    >
+                      {snapshotting() ? "Snapshotting..." : "Snapshot"}
+                    </ButtonV2>
+                  </Show>
                 </div>
               </section>
+
+              <Show when={caps().networkIsolation && !!live()}>
+                <section class="flex flex-col gap-2">
+                  <h4 class="text-xs font-medium uppercase tracking-wide text-v2-text-text-muted">Network</h4>
+                  <div class="flex items-center justify-between gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-3">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="text-sm text-v2-text-text-base">{offline() ? "Isolated" : "Online"}</span>
+                      <span class="text-xs text-v2-text-text-muted">
+                        {offline()
+                          ? "No network access — the sandbox is cut off from everything."
+                          : "The sandbox can reach the network."}
+                      </span>
+                    </div>
+                    <ButtonV2
+                      variant={offline() ? "accent" : "neutral"}
+                      size="small"
+                      onClick={() => void handleSetNetwork(offline() ? "online" : "offline")}
+                      disabled={networkPending()}
+                    >
+                      {networkPending() ? "..." : offline() ? "Go online" : "Isolate"}
+                    </ButtonV2>
+                  </div>
+                </section>
+              </Show>
             </Show>
 
             <Show when={shellCommand()}>
@@ -242,7 +379,7 @@ export function SessionSandboxPanel(props: { metadata?: Record<string, unknown> 
                       Close
                     </ButtonV2>
                   </div>
-                  <ContainerTerminal command={cmd()} active={true} />
+                  <SandboxTerminal command={cmd()} />
                 </section>
               )}
             </Show>

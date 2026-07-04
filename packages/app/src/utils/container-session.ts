@@ -4,6 +4,7 @@ import type { useLayout } from "@/context/layout"
 import type { Platform } from "@/context/platform"
 import type { useServerSDK } from "@/context/server-sdk"
 import { seedPromptDraft } from "@/context/prompt"
+import { templateById } from "@/utils/sandbox-templates"
 import { base64Encode } from "@openlegion-ai/core/util/encode"
 import { ensureContainerAvailable, type ContainerInfo } from "@/utils/containers"
 import {
@@ -159,21 +160,12 @@ export async function askAgentAboutSandbox(input: AskAgentInput) {
 
 export type SandboxRuntime = "docker" | "kubernetes" | "linux-vm"
 
-// Opening prompt seeded per runtime — creation is agent-guided (no forms): the
-// agent uses the sandbox_* tools (and, for the VM, the host-agent docs) to walk
-// the user through it. See packages/openlegion tool registry.
-const SANDBOX_SETUP_PROMPTS: Record<SandboxRuntime, string> = {
-  docker:
-    "I want to create a new Docker container sandbox. Help me choose an image and network settings, then create and start it for me using the sandbox tools.",
-  kubernetes:
-    "I want to create a new Kubernetes sandbox. Help me choose an image, then create it as a workload on the local kind cluster using the sandbox tools.",
-  "linux-vm":
-    "I want to set up a Linux VM research sandbox on a separate Linux host (a sacrificial tower). Walk me through installing the OpenLegion daemon and Kata on that host with the host-agent scripts, then connecting this app to its daemon.",
-}
-
 type StartSandboxSetupInput = {
   conn: ServerConnection.Any
-  runtime: SandboxRuntime
+  // A curated template id (see sandbox-templates.ts). Creation is agent-guided
+  // (no forms): the template picks a runtime and seeds a workflow-specific
+  // prompt so the agent provisions the right environment via the sandbox tools.
+  templateId: string
   platform: Platform
   global: ReturnType<typeof useGlobal>
   layout: ReturnType<typeof useLayout>
@@ -190,6 +182,9 @@ type StartSandboxSetupInput = {
  * the user's home directory is used as a neutral default.
  */
 export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
+  const template = templateById(input.templateId)
+  if (!template) throw new Error(`Unknown sandbox template: ${input.templateId}`)
+
   const serverCtx = input.global.createServerCtx(input.conn)
   let directory: string | undefined = serverCtx.projects.last() ?? serverCtx.projects.list()[0]?.worktree
   if (!directory) directory = await input.platform.getHomeDirectory?.()
@@ -209,17 +204,17 @@ export async function startSandboxSetupSession(input: StartSandboxSetupInput) {
     directory,
     metadata: {
       [SESSION_SANDBOX_KEY]: {
-        id: `setup-${input.runtime}-${Date.now()}`,
-        name: `New ${input.runtime} sandbox`,
-        runtime: input.runtime === "linux-vm" ? "microvm" : "docker",
-        kind: kindMap[input.runtime],
+        id: `setup-${template.id}-${Date.now()}`,
+        name: template.sandboxName,
+        runtime: template.runtime === "linux-vm" ? "microvm" : "docker",
+        kind: kindMap[template.runtime],
       },
     },
   })
   const session = created.data
   if (!session?.id) throw new Error("Failed to create session")
 
-  await seedPromptDraft(input.platform, directory, session.id, SANDBOX_SETUP_PROMPTS[input.runtime])
+  await seedPromptDraft(input.platform, directory, session.id, template.prompt)
   input.navigate(`/${base64Encode(directory)}/session/${session.id}`)
   return session
 }

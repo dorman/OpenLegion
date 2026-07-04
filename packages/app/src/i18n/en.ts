@@ -830,7 +830,20 @@ export const dict = {
   "containers.running.title": "Sandboxes",
   "containers.running.active": "{{count}} active",
   "containers.choose.title": "New sandbox",
-  "containers.choose.description": "Choose a runtime — an agent guides you through setup, no forms.",
+  "containers.choose.description": "Choose an environment — an agent guides you through setup, no forms.",
+  "containers.choose.advanced.show": "Advanced — pick a raw runtime instead",
+  "containers.choose.advanced.label": "Advanced",
+  "sandbox.template.detonation.pill": "DETONATION",
+  "sandbox.template.detonation.label": "Malware detonation (offline)",
+  "sandbox.template.detonation.description":
+    "An isolated container with no network from the first instant — safely detonate and observe a sample.",
+  "sandbox.template.toolkit.pill": "RE TOOLKIT",
+  "sandbox.template.toolkit.label": "Reverse-engineering toolkit",
+  "sandbox.template.toolkit.description":
+    "A container preloaded with static-analysis tools (radare2, capa, YARA, binwalk, gdb) for triaging binaries.",
+  "sandbox.template.ghidra.pill": "GHIDRA",
+  "sandbox.template.ghidra.label": "Ghidra desktop",
+  "sandbox.template.ghidra.description": "A graphical Ghidra environment for interactive disassembly and decompilation.",
   "containers.choose.docker.pill": "DOCKER",
   "containers.choose.docker.title": "Docker container",
   "containers.choose.docker.description":
@@ -1133,6 +1146,13 @@ export const dict = {
   "session.sandbox.banner.unlink": "Unlink",
   "session.sandbox.banner.restarted": "Sandbox restarted",
   "session.sandbox.banner.unlinked": "Sandbox unlinked from session",
+  "sandbox.runtime.microvm.label": "Sandbox daemon",
+  "sandbox.runtime.unavailable.title": "{{runtime}} isn't available",
+  "sandbox.runtime.docker.unavailable":
+    "Docker isn't running. Start Docker Desktop, or run `colima start`, then this sandbox's controls will work.",
+  "sandbox.runtime.podman.unavailable": "Podman isn't reachable. Start it with `podman machine start`.",
+  "sandbox.runtime.microvm.unavailable":
+    "The sandbox daemon is unreachable. Start the OpenLegion daemon on your Linux host, then check the connection in Settings.",
   "settings.general.row.reasoningSummaries.title": "Show reasoning summaries",
   "settings.general.row.reasoningSummaries.description": "Display model reasoning summaries in the timeline",
   "settings.general.row.shellToolPartsExpanded.title": "Expand shell tool parts",

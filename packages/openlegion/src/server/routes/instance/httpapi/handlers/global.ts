@@ -137,6 +137,10 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return result
     })
 
+    const runtimes = Effect.fn("GlobalHttpApi.runtimes")(function* () {
+      return yield* container.runtimes()
+    })
+
     const containers = Effect.fn("GlobalHttpApi.containers")(function* () {
       return yield* mapContainerError(container.list())
     })
@@ -155,6 +159,25 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
     const containerStop = Effect.fn("GlobalHttpApi.containerStop")(function* (ctx: { params: { id: string } }) {
       yield* mapContainerError(container.stop(ctx.params.id))
       return HttpApiSchema.NoContent.make()
+    })
+
+    const containerSnapshot = Effect.fn("GlobalHttpApi.containerSnapshot")(function* (ctx: { params: { id: string } }) {
+      return yield* mapContainerError(container.snapshot(ctx.params.id))
+    })
+
+    const containerSnapshots = Effect.fn("GlobalHttpApi.containerSnapshots")(function* (ctx: { params: { id: string } }) {
+      return yield* mapContainerError(container.snapshots(ctx.params.id))
+    })
+
+    const containerNetwork = Effect.fn("GlobalHttpApi.containerNetwork")(function* (ctx: { params: { id: string } }) {
+      return yield* mapContainerError(container.getNetwork(ctx.params.id))
+    })
+
+    const containerSetNetwork = Effect.fn("GlobalHttpApi.containerSetNetwork")(function* (ctx: {
+      params: { id: string }
+      payload: { mode: "online" | "offline" }
+    }) {
+      return yield* mapContainerError(container.setNetwork(ctx.params.id, ctx.payload.mode))
     })
 
     const containerRemove = Effect.fn("GlobalHttpApi.containerRemove")(function* (ctx: { params: { id: string } }) {
@@ -230,6 +253,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configGet", configGet)
       .handle("configUpdate", configUpdate)
       .handle("dispose", dispose)
+      .handle("runtimes", runtimes)
       .handle("containers", containers)
       .handle("containerCreate", containerCreate)
       .handle("containerStart", containerStart)
@@ -237,6 +261,10 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("containerLogs", containerLogs)
       .handle("containerShell", containerShell)
       .handle("containerDisplay", containerDisplay)
+      .handle("containerSnapshot", containerSnapshot)
+      .handle("containerSnapshots", containerSnapshots)
+      .handle("containerNetwork", containerNetwork)
+      .handle("containerSetNetwork", containerSetNetwork)
       .handle("containerRemove", containerRemove)
       .handle("containerWorkspaces", containerWorkspaces)
       .handle("containerWorkspaceUpsert", containerWorkspaceUpsert)

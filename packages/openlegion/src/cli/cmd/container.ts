@@ -18,6 +18,9 @@ function runContainer<A, R>(effect: Effect.Effect<A, Container.Error, R>) {
     Effect.catchTag("ContainerShellFailedError", (error) => fail(error.message)),
     Effect.catchTag("ContainerDisplayFailedError", (error) => fail(error.message)),
     Effect.catchTag("ComposeFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerSnapshotFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerNetworkFailedError", (error) => fail(error.message)),
+    Effect.catchTag("ContainerNotSupportedError", (error) => fail(error.message)),
   )
 }
 

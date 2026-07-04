@@ -18,7 +18,8 @@ URL to a contained XFCE desktop (see `../packages/sandbox-images/`).
 | `preflight.sh` | Is this box capable? (x86_64, VT-x/AMD-V, `/dev/kvm`, RAM) |
 | `setup-kata.sh` | Install Docker + Kata, register the `kata` runtime, create the no-egress network |
 | `verify.sh` | **Acceptance gate** — proves Kata boots its own guest kernel and egress is blocked |
-| `launch-session.sh` | Start one hardened, no-egress, Kata-isolated session |
+| `install-daemon.sh` | Install the sandbox daemon as a systemd service, bound to the LAN with a bearer token (this is what the Mac app talks to) |
+| `launch-session.sh` | Start one hardened, no-egress, Kata-isolated session (manual/CLI path) |
 | `destroy-session.sh` | Tear down sessions; `--prune <ttl>` for the ephemeral lifecycle |
 
 ## Run order (on the Linux box)
@@ -50,10 +51,20 @@ sudo ./host-agent/verify.sh
 docker build -t openlegion/re-desktop:latest packages/sandbox-images/re-desktop
 docker build -t openlegion/ghidra:12.1.2     packages/sandbox-images/ghidra
 
-# 4. Run the daemon, bound to the LAN. Set a token so it isn't open to the network.
-OPENLEGION_MICROVM_LISTEN=0.0.0.0:7420 \
-OPENLEGION_MICROVM_TOKEN=$(openssl rand -hex 32) \
-  go build -o openlegion-microvm ./cmd/openlegion-microvm && ./openlegion-microvm
+# 4. Install the daemon as a persistent systemd service, bound to the LAN with a
+#    generated bearer token. It prints the URL + token to paste into the Mac app.
+sudo ./host-agent/install-daemon.sh
+#    (If Go isn't on the tower, cross-compile on the Mac and pass the binary:
+#     GOOS=linux GOARCH=amd64 go build -o openlegion-microvm ./cmd/openlegion-microvm
+#     scp openlegion-microvm tower:/tmp/ ; sudo ./host-agent/install-daemon.sh --bin /tmp/openlegion-microvm)
+```
+
+For a quick, non-persistent run instead of the service, you can still launch it
+in the foreground:
+
+```sh
+OPENLEGION_MICROVM_LISTEN=0.0.0.0:7420 OPENLEGION_MICROVM_TOKEN=$(openssl rand -hex 32) \
+  go run ./cmd/openlegion-microvm
 ```
 
 Then point the desktop app at this host in **Settings → Servers → Sandbox

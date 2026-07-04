@@ -20,12 +20,7 @@ import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
-import {
-  askAgentAboutSandbox,
-  openContainerSession,
-  startSandboxSetupSession,
-  type SandboxRuntime,
-} from "@/utils/container-session"
+import { askAgentAboutSandbox, openContainerSession, startSandboxSetupSession } from "@/utils/container-session"
 import {
   listContainerWorkspaces,
   workspaceForContainer,
@@ -156,12 +151,12 @@ export default function ContainersPage() {
   })
 
   function showCreateDialog() {
-    dialog.show(() => <DialogChooseRuntime onChoose={(runtime) => void handleChooseRuntime(runtime)} />)
+    dialog.show(() => <DialogChooseRuntime onChoose={(templateId) => void handleChooseTemplate(templateId)} />)
   }
 
-  // New sandbox creation is agent-guided: picking a runtime opens an agent chat
-  // seeded with that runtime's setup goal, rather than a form.
-  async function handleChooseRuntime(runtimeKind: SandboxRuntime) {
+  // New sandbox creation is agent-guided: picking a template opens an agent chat
+  // seeded with that environment's setup goal, rather than a form.
+  async function handleChooseTemplate(templateId: string) {
     const conn = server.current
     if (!conn) {
       showToast({ variant: "error", title: language.t("containers.error.noServer") })
@@ -170,7 +165,7 @@ export default function ContainersPage() {
     try {
       const result = await startSandboxSetupSession({
         conn,
-        runtime: runtimeKind,
+        templateId,
         platform,
         global,
         layout,
