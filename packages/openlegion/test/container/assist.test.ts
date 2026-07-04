@@ -17,6 +17,7 @@ const info: Container.Info = {
 function stubContainer(overrides: Partial<Container.Interface> = {}): Container.Interface {
   const unexpected = Effect.die(new Error("unexpected call"))
   return {
+    runtimes: () => Effect.succeed([]),
     list: () => Effect.succeed([info]),
     create: () => unexpected,
     start: () => unexpected,
@@ -27,6 +28,10 @@ function stubContainer(overrides: Partial<Container.Interface> = {}): Container.
     display: () => unexpected,
     composeUp: () => unexpected,
     composeDown: () => unexpected,
+    snapshot: () => unexpected,
+    snapshots: () => unexpected,
+    getNetwork: () => unexpected,
+    setNetwork: () => unexpected,
     ...overrides,
   }
 }

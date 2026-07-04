@@ -6,7 +6,7 @@ import "@openlegion-ai/core/account"
 import "@/server/event"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { CreateInput, DisplayOutput, Info, ListOutput, LogsOutput, ShellOutput, ComposeInput, ComposeOutput } from "@/container/schema"
+import { CreateInput, DisplayOutput, Info, ListOutput, LogsOutput, RuntimesOutput, ShellOutput, ComposeInput, ComposeOutput, SnapshotOutput, SnapshotsOutput, NetworkOutput, SetNetworkInput } from "@/container/schema"
 import { UpsertPayload, Workspace } from "@/container/workspace"
 import { described } from "./metadata"
 
@@ -83,12 +83,16 @@ export const GlobalPaths = {
   config: "/global/config",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  runtimes: "/global/runtimes",
   containers: "/global/containers",
   containerStart: "/global/containers/:id/start",
   containerStop: "/global/containers/:id/stop",
   containerLogs: "/global/containers/:id/logs",
   containerShell: "/global/containers/:id/shell",
   containerDisplay: "/global/containers/:id/display",
+  containerSnapshot: "/global/containers/:id/snapshot",
+  containerSnapshots: "/global/containers/:id/snapshots",
+  containerNetwork: "/global/containers/:id/network",
   containerRemove: "/global/containers/:id",
   containerWorkspaces: "/global/container-workspaces",
   containerWorkspace: "/global/container-workspaces/:containerId",
@@ -155,6 +159,15 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.upgrade",
           summary: "Upgrade openlegion",
           description: "Upgrade openlegion to the specified version or latest if not specified.",
+        }),
+      ),
+      HttpApiEndpoint.get("runtimes", GlobalPaths.runtimes, {
+        success: described(RuntimesOutput, "Sandbox runtime backends and their availability"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.runtimes",
+          summary: "List runtime backends",
+          description: "Report the availability of each sandbox backend (Docker, Podman, sandbox daemon).",
         }),
       ),
       HttpApiEndpoint.get("containers", GlobalPaths.containers, {
@@ -232,6 +245,51 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.containers.display",
           summary: "Container display session",
           description: "Resolve a websocket URL for the remote desktop display of a sandbox workload.",
+        }),
+      ),
+      HttpApiEndpoint.post("containerSnapshot", GlobalPaths.containerSnapshot, {
+        params: { id: ContainerID },
+        success: described(SnapshotOutput, "Snapshot reference"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.snapshot",
+          summary: "Snapshot sandbox",
+          description: "Capture a point-in-time snapshot of a sandbox that can be restored later.",
+        }),
+      ),
+      HttpApiEndpoint.get("containerSnapshots", GlobalPaths.containerSnapshots, {
+        params: { id: ContainerID },
+        success: described(SnapshotsOutput, "Snapshots for this sandbox"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.snapshots",
+          summary: "List sandbox snapshots",
+          description: "List the point-in-time snapshots captured for a sandbox.",
+        }),
+      ),
+      HttpApiEndpoint.get("containerNetwork", GlobalPaths.containerNetwork, {
+        params: { id: ContainerID },
+        success: described(NetworkOutput, "Sandbox network state"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.network.get",
+          summary: "Get sandbox network state",
+          description: "Report whether a sandbox has network egress (online) or is isolated (offline).",
+        }),
+      ),
+      HttpApiEndpoint.post("containerSetNetwork", GlobalPaths.containerNetwork, {
+        params: { id: ContainerID },
+        payload: SetNetworkInput,
+        success: described(NetworkOutput, "Updated sandbox network state"),
+        error: ContainerApiError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.containers.network.set",
+          summary: "Set sandbox network isolation",
+          description: "Isolate a sandbox from the network (offline) or restore its egress (online).",
         }),
       ),
       HttpApiEndpoint.delete("containerRemove", GlobalPaths.containerRemove, {

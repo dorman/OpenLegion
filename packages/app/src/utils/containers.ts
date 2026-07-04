@@ -80,6 +80,29 @@ export async function listContainers(server: ServerConnection.HttpBase) {
   return (await response.json()) as ContainerInfo[]
 }
 
+export type RuntimeBackendStatus = {
+  id: ContainerRuntime
+  available: boolean
+  detail?: string
+  version?: string
+}
+
+/** Availability of each sandbox backend (Docker, Podman, sandbox daemon). */
+export async function listRuntimes(server: ServerConnection.HttpBase) {
+  const response = await containerFetch(server, "/global/runtimes")
+  return (await response.json()) as RuntimeBackendStatus[]
+}
+
+/** Like {@link listRuntimes}, but degrades to `[]` instead of throwing — used by
+ * status widgets rendered inside a Suspense boundary (see listContainersSafe). */
+export async function listRuntimesSafe(server: ServerConnection.HttpBase) {
+  try {
+    return await listRuntimes(server)
+  } catch {
+    return [] as RuntimeBackendStatus[]
+  }
+}
+
 /**
  * Like {@link listContainers}, but degrades to an empty list when the container
  * runtime is unavailable (e.g. the Docker daemon is not running) instead of
@@ -106,6 +129,35 @@ export async function createContainer(server: ServerConnection.HttpBase, input: 
 
 export async function startContainer(server: ServerConnection.HttpBase, id: string) {
   await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/start`, { method: "POST" })
+}
+
+export type SnapshotInfo = { ref: string; createdAt: number }
+export type NetworkMode = "online" | "offline"
+export type NetworkState = { mode: NetworkMode; networks: string[] }
+
+export async function snapshotContainer(server: ServerConnection.HttpBase, id: string) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/snapshot`, {
+    method: "POST",
+  })
+  return (await response.json()) as SnapshotInfo
+}
+
+export async function listSnapshots(server: ServerConnection.HttpBase, id: string) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/snapshots`)
+  return (await response.json()) as SnapshotInfo[]
+}
+
+export async function getContainerNetwork(server: ServerConnection.HttpBase, id: string) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/network`)
+  return (await response.json()) as NetworkState
+}
+
+export async function setContainerNetwork(server: ServerConnection.HttpBase, id: string, mode: NetworkMode) {
+  const response = await containerFetch(server, `/global/containers/${encodeURIComponent(id)}/network`, {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  })
+  return (await response.json()) as NetworkState
 }
 
 export async function stopContainer(server: ServerConnection.HttpBase, id: string) {

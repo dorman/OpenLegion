@@ -59,6 +59,18 @@ export class ComposeFailedError extends Schema.TaggedErrorClass<ComposeFailedErr
   message: Schema.String,
 }) {}
 
+export class SnapshotFailedError extends Schema.TaggedErrorClass<SnapshotFailedError>()("ContainerSnapshotFailedError", {
+  message: Schema.String,
+}) {}
+
+export class NetworkFailedError extends Schema.TaggedErrorClass<NetworkFailedError>()("ContainerNetworkFailedError", {
+  message: Schema.String,
+}) {}
+
+export class NotSupportedError extends Schema.TaggedErrorClass<NotSupportedError>()("ContainerNotSupportedError", {
+  message: Schema.String,
+}) {}
+
 export class StartFailedError extends Schema.TaggedErrorClass<StartFailedError>()("ContainerStartFailedError", {
   message: Schema.String,
 }) {}
@@ -75,10 +87,14 @@ export type Error =
   | ShellFailedError
   | DisplayFailedError
   | ComposeFailedError
+  | SnapshotFailedError
+  | NetworkFailedError
+  | NotSupportedError
 
 type ProcessResult = { code: number; stdout: string; stderr: string }
 
 export interface Interface {
+  readonly runtimes: () => Effect.Effect<ContainerSchema.RuntimesOutput>
   readonly list: () => Effect.Effect<ListOutput, Error>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
   readonly start: (id: string) => Effect.Effect<void, Error>
@@ -89,6 +105,10 @@ export interface Interface {
   readonly display: (id: string) => Effect.Effect<ContainerSchema.DisplayOutput, Error>
   readonly composeUp: (file: string) => Effect.Effect<ContainerSchema.ComposeOutput, Error>
   readonly composeDown: (file: string) => Effect.Effect<ContainerSchema.ComposeOutput, Error>
+  readonly snapshot: (id: string) => Effect.Effect<ContainerSchema.SnapshotOutput, Error>
+  readonly snapshots: (id: string) => Effect.Effect<ContainerSchema.SnapshotsOutput, Error>
+  readonly getNetwork: (id: string) => Effect.Effect<ContainerSchema.NetworkOutput, Error>
+  readonly setNetwork: (id: string, mode: ContainerSchema.NetworkMode) => Effect.Effect<ContainerSchema.NetworkOutput, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@openlegion/Container") {}
@@ -113,8 +133,9 @@ function buildCreateArgs(input: CreateInput) {
     input.cpuCores !== undefined && Number.isFinite(input.cpuCores) && input.cpuCores > 0
       ? ["--cpus", String(input.cpuCores)]
       : []
+  const net = input.network === "offline" ? ["--network", "none"] : []
   const command = input.command ?? []
-  return ["container", "create", ...name, ...env, ...ports, ...volumes, ...cpus, input.image, ...command]
+  return ["container", "create", ...name, ...env, ...ports, ...volumes, ...cpus, ...net, input.image, ...command]
 }
 
 const SANDBOX_LABEL_PREFIX = "openlegion.sandbox.id="
@@ -224,6 +245,37 @@ export const layer = Layer.effect(
       return yield* new RuntimeNotFoundError({
         message: "Neither the sandbox daemon, docker, nor podman is available",
       })
+    })
+
+    // Report the health of every backend so the app can show status +
+    // remediation instead of a raw failure. Never fails: an unreachable backend
+    // is reported as available:false. User-facing remediation copy lives in the
+    // app (localizable); `detail` here is just the raw technical reason.
+    const runtimes = Effect.fnUntraced(function* () {
+      // `--version` only proves the CLI is installed; `version --format
+      // {{.Server.Version}}` contacts the daemon and returns its version, so a
+      // nonzero exit means the daemon is unreachable (the case we care about).
+      const cli = function* (id: "docker" | "podman") {
+        const result = yield* run(id, ["version", "--format", "{{.Server.Version}}"])
+        const available = result.code === 0
+        return {
+          id,
+          available,
+          version: available ? result.stdout.trim() || undefined : undefined,
+          detail: available ? undefined : normalizeMessage(result, `${id} daemon is not reachable`),
+        } satisfies ContainerSchema.RuntimeStatus
+      }
+      const microvmUp = yield* microvmClient.health()
+      const statuses: ContainerSchema.RuntimeStatus[] = [
+        {
+          id: "microvm",
+          available: microvmUp,
+          detail: microvmUp ? undefined : "sandbox daemon unreachable",
+        },
+        yield* cli("docker"),
+        yield* cli("podman"),
+      ]
+      return statuses
     })
 
     const dockerRuntime = (): CliRuntime => {
@@ -499,7 +551,122 @@ export const layer = Layer.effect(
       return { output: result.stdout.trim() || "Compose stack stopped." }
     })
 
-    return Service.of({ list, create, start, stop, remove, logs, shell, display, composeUp, composeDown })
+    // --- Snapshots (Docker/Podman only; VM/k8s report NotSupported) ---
+    const SNAPSHOT_LABEL = "openlegion.snapshot-of"
+    const snapshotTag = (id: string, createdAt: number) =>
+      `openlegion-snapshot:${id.toLowerCase().replace(/[^a-z0-9_.-]/g, "-")}-${createdAt}`
+
+    const snapshot = Effect.fn("Container.snapshot")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* new NotSupportedError({ message: "Snapshots for VM sandboxes aren't supported yet." })
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const containerId = yield* dockerContainerId(id)
+      const createdAt = Date.now()
+      const ref = snapshotTag(id, createdAt)
+      const result = yield* run(runtime, ["commit", "--change", `LABEL ${SNAPSHOT_LABEL}=${id}`, containerId, ref])
+      if (result.code !== 0) {
+        return yield* new SnapshotFailedError({ message: normalizeMessage(result, "Failed to snapshot sandbox") })
+      }
+      return { ref, createdAt } satisfies ContainerSchema.SnapshotOutput
+    })
+
+    const snapshots = Effect.fn("Container.snapshots")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* new NotSupportedError({ message: "Snapshots for VM sandboxes aren't supported yet." })
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const result = yield* run(runtime, [
+        "images",
+        "--filter",
+        `label=${SNAPSHOT_LABEL}=${id}`,
+        "--format",
+        "{{.Repository}}:{{.Tag}}",
+      ])
+      if (result.code !== 0) {
+        return yield* new SnapshotFailedError({ message: normalizeMessage(result, "Failed to list snapshots") })
+      }
+      return result.stdout
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((ref) => ({ ref, createdAt: Number(ref.split("-").pop()) || 0 }))
+        .sort((a, b) => b.createdAt - a.createdAt) satisfies ContainerSchema.SnapshotsOutput
+    })
+
+    // --- Network isolation (online / offline egress) ---
+    const parseNetworks = (json: string): string[] => {
+      try {
+        const obj = JSON.parse(json) as Record<string, unknown> | null
+        return obj ? Object.keys(obj) : []
+      } catch {
+        return []
+      }
+    }
+
+    const getNetwork = Effect.fn("Container.getNetwork")(function* (id: string) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* new NotSupportedError({ message: "Network isolation for VM sandboxes isn't supported yet." })
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const containerId = yield* dockerContainerId(id)
+      const result = yield* run(runtime, ["inspect", "--format", "{{json .NetworkSettings.Networks}}", containerId])
+      if (result.code !== 0) {
+        return yield* new NetworkFailedError({ message: normalizeMessage(result, "Failed to inspect sandbox network") })
+      }
+      const networks = parseNetworks(result.stdout.trim())
+      // `--network none` still shows up as a `none` pseudo-network in the
+      // inspect output; ignore it so offline-created sandboxes read as offline.
+      const active = networks.filter((net) => net !== "none")
+      return { mode: active.length === 0 ? "offline" : "online", networks } satisfies ContainerSchema.NetworkOutput
+    })
+
+    const setNetwork = Effect.fn("Container.setNetwork")(function* (id: string, mode: ContainerSchema.NetworkMode) {
+      const runtime = yield* detectRuntime()
+      if (runtime === "microvm") {
+        return yield* new NotSupportedError({ message: "Network isolation for VM sandboxes isn't supported yet." })
+      }
+      yield* ensureRuntimeAvailable(runtime)
+      const containerId = yield* dockerContainerId(id)
+      const current = yield* getNetwork(id)
+      if (mode === "offline") {
+        // Detach from every real network so the sandbox can't reach anything.
+        // `none` is a pseudo-network that can't be disconnected, so skip it.
+        for (const net of current.networks.filter((net) => net !== "none")) {
+          yield* run(runtime, ["network", "disconnect", "-f", net, containerId])
+        }
+      } else if (current.mode === "offline") {
+        // Reconnect to the runtime's default network to restore egress. Podman's
+        // default network is named `podman`; Docker's is `bridge`.
+        const defaultNet = runtime === "podman" ? "podman" : "bridge"
+        const res = yield* run(runtime, ["network", "connect", defaultNet, containerId])
+        if (res.code !== 0) {
+          return yield* new NetworkFailedError({ message: normalizeMessage(res, "Failed to restore sandbox network") })
+        }
+      }
+      return yield* getNetwork(id)
+    })
+
+    return Service.of({
+      runtimes,
+      list,
+      create,
+      start,
+      stop,
+      remove,
+      logs,
+      shell,
+      display,
+      composeUp,
+      composeDown,
+      snapshot,
+      snapshots,
+      getNetwork,
+      setNetwork,
+    })
   }),
 )
 
